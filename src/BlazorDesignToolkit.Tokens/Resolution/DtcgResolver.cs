@@ -146,7 +146,7 @@ public static class DtcgResolver
                     order.Add(entry);
                 }
             }
-            return new ResolverDocument(name, description, sets, modifiers, order, bag.ToSortedList(), sourceName, baseDirectory);
+            return new ResolverDocument(name, description, sets, modifiers, order, bag.ToSortedList(), sourceName, baseDirectory, root);
         }
 
         private ResolutionOrderItem? ReadOrderItem(SourceNode item, List<ResolverSet> sets, List<ResolverModifier> modifiers)
@@ -371,7 +371,7 @@ public sealed class ResolverSession(ResolverDocument document, IResolverSourceLo
         if (source.Inline is not null) return [source.Inline];
         var reference = source.Reference!;
         List<SourceObject> result;
-        if (reference.StartsWith("#/sets/", StringComparison.Ordinal))
+        if (reference.StartsWith("#/sets/", StringComparison.Ordinal) && reference.IndexOf('/', "#/sets/".Length) < 0)
         {
             var name = reference["#/sets/".Length..].Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal);
             var set = Document.FindSet(name);
@@ -392,9 +392,36 @@ public sealed class ResolverSession(ResolverDocument document, IResolverSourceLo
         }
         else if (reference.StartsWith('#'))
         {
-            bag.Report(DiagnosticCatalog.UnsupportedConstruct,
-                $"Same-document reference '{reference}' is not supported in sources; only '#/sets/…' references are.", location: source.Location, actual: reference);
-            return [];
+            // Any other same-document pointer (for example into $defs or into another set's sources): an array is a list of
+            // sources, an object with $ref is a reference object, any other object is an inline token tree.
+            if (Document.Root is null || !JsonPointer.TryParse(reference, out var segments, out var error) || JsonPointer.Navigate(Document.Root, segments) is not { } node)
+            {
+                bag.Report(DiagnosticCatalog.InvalidResolverDocument, $"Reference '{reference}' does not resolve inside the resolver document.",
+                    location: source.Location, actual: reference);
+                return [];
+            }
+            if (!visiting.Add(reference))
+            {
+                bag.Report(DiagnosticCatalog.InvalidResolverDocument, $"Circular source reference: {string.Join(" -> ", visiting.Append(reference))}.",
+                    location: source.Location, referenceChain: [.. visiting, reference]);
+                return [];
+            }
+            result = [];
+            IEnumerable<SourceNode> items = node is SourceArray array ? array.Items : [node];
+            foreach (var item in items)
+            {
+                if (item is not SourceObject obj)
+                {
+                    bag.Report(DiagnosticCatalog.InvalidResolverDocument, $"Reference '{reference}' must point to an object or an array of objects.",
+                        location: item.Location, actual: reference);
+                    continue;
+                }
+                var nested = obj["$ref"] is SourceString { Value: var inner }
+                    ? ResolverSource.FromReference(inner, obj.Without("$ref") is { Count: > 0 } rest ? rest : null, obj.Location)
+                    : ResolverSource.FromTokens(obj, obj.Location);
+                result.AddRange(await ExpandAsync(nested, visiting, bag, cancellationToken).ConfigureAwait(false));
+            }
+            visiting.Remove(reference);
         }
         else
         {

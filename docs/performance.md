@@ -1,7 +1,27 @@
 # Performance
 
-Baselines measured with BenchmarkDotNet, plus runtime theme-switch latency measured in a real browser. No regression
-thresholds are enforced in CI yet; use these numbers to compare before and after a change on the same machine.
+Baselines measured with BenchmarkDotNet, plus runtime theme-switch latency measured in a real browser. CI enforces a
+regression gate against `benchmarks/baseline.json` (see below).
+
+## Regression gate (CI)
+
+The `benchmarks` job runs every benchmark and compares it with the committed baseline:
+
+```bash
+dotnet run -c Release --project benchmarks/BlazorDesignToolkit.Benchmarks -- --gate benchmarks/baseline.json
+```
+
+- **Allocations** must stay within **10 %** of the baseline (plus 1 KB). Allocated bytes per operation are deterministic
+  across machines, so this is a tight check that catches most accidental regressions.
+- **Time** must stay within **4×** the baseline mean. CI runners are slower and noisier than the machine the baseline was
+  recorded on, so the factor is generous; it still catches algorithmic regressions (a quadratic loop over 20,000 tokens
+  shows up as far more than 4×).
+- A benchmark missing from the run fails the gate; a new benchmark without a baseline is reported but not gated.
+- During development the gate flagged an 11 % allocation increase in theme composition (a tree signature computed
+  for every document instead of only for documents with inherited `$extends` targets); it was fixed before the baseline
+  was recorded.
+- After an intended change, regenerate the baseline on a quiet machine and commit it:
+  `dotnet run -c Release --project benchmarks/BlazorDesignToolkit.Benchmarks -- --update-baseline benchmarks/baseline.json`.
 
 ## Running the benchmarks
 

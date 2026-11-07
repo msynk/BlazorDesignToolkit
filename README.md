@@ -5,17 +5,19 @@ styling-independent UI primitives.
 
 - **Design tokens, interoperable.** Reads and writes the stable [DTCG 2025.10](https://www.designtokens.org/tr/2025.10/)
   format (format, color and resolver modules) — aliases, JSON Pointer references, `$extends`, `$root`, all 13 types and
-  all 14 color spaces — with diagnostics that point to the exact file, line and token.
+  all 14 color spaces, CSS Color 4 gamut mapping, opt-in allow-listed remote sources — with diagnostics that point to the
+  exact file, line and token.
 - **Validated design systems.** Stable rule ids, configurable severities, justified suppressions, naming and layering
   rules, scale checks, and WCAG 2.2 contrast checks in every theme combination that never guess when a result cannot be
   established.
 - **Themes that switch instantly.** Brands are independent of color mode, contrast and density. One generated stylesheet
   covers every combination; switching changes an attribute — no reload, no CSS regeneration, no flash on startup, and
   `system` preferences work even without JavaScript.
-- **Headless, accessible primitives.** Tabs, dialogs, menus, listboxes, selects, comboboxes, tree views, popovers,
-  tooltips, toasts and more, following the WAI-ARIA Authoring Practices, built on native elements, unstyled.
-- **Framework adapters, optional.** Type-checked outputs for Tailwind CSS v4, Bootstrap 5.3 and Fluent 2 — verified by
-  compiling with the real tools.
+- **Headless, accessible primitives.** Tabs, dialogs, menus with submenus, menubars, listboxes, selects, comboboxes, tree
+  views (both virtualizable), sliders, number fields, date pickers, popovers, tooltips, toasts and more, following the
+  WAI-ARIA Authoring Practices, built on native elements, unstyled, with localizable texts.
+- **Framework adapters, optional.** Type-checked outputs for Tailwind CSS 4 and 3, Bootstrap 5.3 (including runtime
+  theming of its compiled components) and all Fluent 2 tokens — verified by compiling with the real tools.
 - **CI tooling.** `bdt validate | build | export | coverage | diff | check` with JSON, SARIF and GitHub annotations.
 
 ## Packages
@@ -27,11 +29,13 @@ styling-independent UI primitives.
 | `BlazorDesignToolkit.Theming.Blazor` | Runtime switching, system preferences, persistence, no-flash startup | Theming, Blazor |
 | `BlazorDesignToolkit.Primitives` | Accessible headless components | Blazor |
 | `BlazorDesignToolkit.Primitives.StarterStyles` | Optional CSS for the primitives | — |
-| `BlazorDesignToolkit.Tokens.Tailwind` / `.Bootstrap` / `.Fluent` | Framework integrations | Tokens |
+| `BlazorDesignToolkit.Tokens.Tailwind` / `.Fluent` | Framework integrations | Tokens |
+| `BlazorDesignToolkit.Tokens.Bootstrap` | Bootstrap integration (Sass, runtime variables per theme, component bridge) | Tokens, Theming |
 | `BlazorDesignToolkit.Testing` | Accessibility assertions for component tests | AngleSharp |
 | `BlazorDesignToolkit.Cli` (`bdt`) | Command-line tool | all of the above (token side) |
 
-Targets .NET 10. Blazor packages support Interactive Server and Interactive WebAssembly (and Auto).
+Targets .NET 10 (LTS; .NET 8 and 9 reach end of support in November 2026). Blazor packages support Interactive Server
+and Interactive WebAssembly (and Auto).
 
 ## Quick start
 

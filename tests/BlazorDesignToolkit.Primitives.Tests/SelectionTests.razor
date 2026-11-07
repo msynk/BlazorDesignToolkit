@@ -7,7 +7,7 @@
     public void Listbox_single_selection_follows_focus_and_skips_disabled()
     {
         string? value = null;
-        var cut = Render(@<Listbox TItem="string" Items="s_fruits" ItemDisabled="@(f => f == "Banana")" Value="value" ValueChanged="v => value = v" aria-label="Fruit" />);
+        var cut = Render(@<Listbox TItem="string" Items="s_fruits" ItemDisabled="@(f => f == "Banana")" ValueChanged="v => value = v" aria-label="Fruit" />);
         var listbox = cut.Find("[role=listbox]");
         listbox.Focus();
         Assert.Equal(cut.FindAll("[role=option]")[0].Id, cut.Find("[role=listbox]").Attr("aria-activedescendant"));
@@ -27,7 +27,7 @@
     public void Listbox_multiple_selection_with_space_shift_and_select_all()
     {
         IReadOnlyCollection<string> values = [];
-        var cut = Render(@<Listbox TItem="string" Items="s_fruits" Multiple="true" Values="values" ValuesChanged="v => values = v" aria-label="Fruit" />);
+        var cut = Render(@<Listbox TItem="string" Items="s_fruits" Multiple="true" ValuesChanged="v => values = v" aria-label="Fruit" />);
         Assert.Equal("true", cut.Find("[role=listbox]").Attr("aria-multiselectable"));
         cut.Find("[role=listbox]").Focus();
         cut.Find("[role=listbox]").KeyDown(Key(" "));
@@ -45,7 +45,7 @@
     {
         string? value = null;
         var cut = Render(@<FormField><FormLabel>Fruit</FormLabel>
-            <Select TItem="string" Items="s_fruits" Value="value" ValueChanged="v => value = v" Placeholder="Choose" Name="fruit" />
+            <Select TItem="string" Items="s_fruits" ValueChanged="v => value = v" Placeholder="Choose" Name="fruit" />
         </FormField>);
         var combo = cut.Find("[role=combobox]");
         Assert.Equal("listbox", combo.Attr("aria-haspopup"));

@@ -34,7 +34,7 @@
 
     protected override void OnParametersSet()
     {
-        _value.Sync(Value);
+        _value.Sync(Value, IsProvided(nameof(Value)));
         Context.NotifyStateChanged();
     }
 

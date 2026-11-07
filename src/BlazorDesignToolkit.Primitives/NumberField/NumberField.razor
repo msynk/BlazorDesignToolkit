@@ -1,0 +1,190 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Spinbutton: an editable <input role="spinbutton"> with aria-valuenow/min/max and optional increment/decrement
+   buttons (not in the tab sequence; aria-controls the input). Up/Down change by Step, Page Up/Down by LargeStep. Typed text
+   is parsed with the culture when the field loses focus or Enter is pressed; text that is not a number reverts to the last
+   value (or empties the field when Nullable). Values are clamped to Min/Max and snapped to Step. *@
+@using System.Globalization
+@inherits PrimitiveBase
+
+<div data-number-field="" data-disabled="@(IsDisabled ? "" : null)" @attributes='Attributes("role", "aria-valuenow", "aria-valuemin", "aria-valuemax", "id", "type", "value")'>
+    @if (ShowButtons)
+    {
+        <button type="button" tabindex="-1" data-number-field-decrement=""
+                aria-label="@(DecrementLabel ?? Strings.NumberFieldDecrement)" aria-controls="@_id"
+                disabled="@(IsDisabled || ReadOnly || (Current is { } d && Min is { } min && d <= min))"
+                @onmousedown:preventDefault
+                @onclick="() => StepAsync(-1)">@(DecrementContent ?? (b => b.AddContent(0, "−")))</button>
+    }
+    <input type="text" role="spinbutton" @ref="_input"
+           id="@_id"
+           inputmode="decimal"
+           autocomplete="off"
+           aria-valuenow="@(Current is { } v ? v.ToString(CultureInfo.InvariantCulture) : null)"
+           aria-valuemin="@Min?.ToString(CultureInfo.InvariantCulture)"
+           aria-valuemax="@Max?.ToString(CultureInfo.InvariantCulture)"
+           aria-valuetext="@(Current is { } t ? ValueText?.Invoke(t) ?? FormatValue(t) : null)"
+           aria-describedby="@Field?.DescribedBy"
+           aria-invalid="@(Field?.Invalid == true || _invalidText ? "true" : null)"
+           aria-required="@(Required || Field?.Required == true ? "true" : null)"
+           aria-label="@Label"
+           disabled="@IsDisabled"
+           readonly="@ReadOnly"
+           name="@Name"
+           data-bdt-keys="ArrowUp ArrowDown PageUp PageDown"
+           @bind:get="_text" @bind:set="OnTextChanged" @bind:event="oninput"
+           @onkeydown="OnKeyDownAsync"
+           @onblur="CommitAsync" />
+    @if (ShowButtons)
+    {
+        <button type="button" tabindex="-1" data-number-field-increment=""
+                aria-label="@(IncrementLabel ?? Strings.NumberFieldIncrement)" aria-controls="@_id"
+                disabled="@(IsDisabled || ReadOnly || (Current is { } i && Max is { } max && i >= max))"
+                @onmousedown:preventDefault
+                @onclick="() => StepAsync(1)">@(IncrementContent ?? (b => b.AddContent(0, "+")))</button>
+    }
+</div>
+
+@code {
+    private readonly Controllable<double?> _value = new(null);
+    private ElementReference _input;
+    private string _id = "";
+    private string _text = "";
+    private bool _editing;
+    private bool _invalidText;
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter] public double? Value { get; set; }
+    [Parameter] public EventCallback<double?> ValueChanged { get; set; }
+    [Parameter] public double? DefaultValue { get; set; }
+    [Parameter] public double? Min { get; set; }
+    [Parameter] public double? Max { get; set; }
+    [Parameter] public double Step { get; set; } = 1;
+    /// <summary>Page Up/Page Down increment. Default: 10 steps.</summary>
+    [Parameter] public double? LargeStep { get; set; }
+    /// <summary>Allow an empty field (value null). Default true.</summary>
+    [Parameter] public bool Nullable { get; set; } = true;
+    /// <summary>.NET format string for display, e.g. "N2" or "0.##". Default "G".</summary>
+    [Parameter] public string? Format { get; set; }
+    /// <summary>Culture for parsing and formatting. Default: the current culture.</summary>
+    [Parameter] public CultureInfo? Culture { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool ShowButtons { get; set; } = true;
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? IncrementLabel { get; set; }
+    [Parameter] public string? DecrementLabel { get; set; }
+    [Parameter] public RenderFragment? IncrementContent { get; set; }
+    [Parameter] public RenderFragment? DecrementContent { get; set; }
+    /// <summary>Human-readable value (aria-valuetext), e.g. <c>v => $"{v} items"</c>. Default: the formatted value.</summary>
+    [Parameter] public Func<double, string>? ValueText { get; set; }
+
+    private bool IsDisabled => Disabled || Field?.Disabled == true;
+    private double? Current => _value.Get(Value, ValueChanged.HasDelegate);
+    private CultureInfo EffectiveCulture => Culture ?? CultureInfo.CurrentCulture;
+    private double Large => LargeStep ?? Step * 10;
+
+    protected override void OnInitialized()
+    {
+        _id = Field?.ControlId ?? ProvidedId ?? Ids.Next("number");
+        _value.Initialize(Normalize(DefaultValue ?? Value));
+        TrackField(Field);
+    }
+
+    protected override void OnParametersSet()
+    {
+        _value.Sync(Value, IsProvided(nameof(Value)));
+        if (!_editing) _text = Current is { } v ? FormatValue(v) : "";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Js.TrackAsync("preventKeys", _input);
+    }
+
+    private string FormatValue(double value) => value.ToString(Format ?? "G", EffectiveCulture);
+
+    private double? Normalize(double? value) => value is { } v ? Coerce(v) : null;
+
+    private double Clamp(double value) => Math.Clamp(value, Min ?? double.MinValue, Max ?? double.MaxValue);
+
+    /// <summary>Clamps to Min/Max and, when Min is set, snaps to Min + n × Step (Max is respected after snapping).</summary>
+    private double Coerce(double value)
+    {
+        var clamped = Clamp(value);
+        if (Min is { } min && Step > 0)
+        {
+            clamped = min + Math.Round((clamped - min) / Step, MidpointRounding.AwayFromZero) * Step;
+            if (Max is { } max && clamped > max) clamped -= Step;
+        }
+        return Math.Round(clamped, 10);
+    }
+
+    /// <summary>Parses the text with the culture; null when empty, NaN when it is not a number.</summary>
+    internal static double? Parse(string text, CultureInfo culture)
+    {
+        var trimmed = text.Trim();
+        if (trimmed.Length == 0) return null;
+        // Accept the culture's minus sign and also the ASCII hyphen and the Unicode minus.
+        trimmed = trimmed.Replace('−', '-');
+        return double.TryParse(trimmed, NumberStyles.Number | NumberStyles.AllowExponent, culture, out var v) ? v : double.NaN;
+    }
+
+    private void OnTextChanged(string? text)
+    {
+        _text = text ?? "";
+        _editing = true;
+        _invalidText = false;
+    }
+
+    private async Task SetAsync(double? value)
+    {
+        var next = Normalize(value);
+        _editing = false;
+        _invalidText = false;
+        if (next != Current) await _value.SetAsync(next, ValueChanged.HasDelegate, ValueChanged);
+        _text = Current is { } c ? FormatValue(c) : "";
+    }
+
+    private async Task CommitAsync()
+    {
+        if (!_editing) return;
+        var parsed = Parse(_text, EffectiveCulture);
+        if (parsed is null)
+        {
+            if (Nullable) await SetAsync(null);
+            else { _editing = false; _text = Current is { } c ? FormatValue(c) : ""; }
+            return;
+        }
+        if (double.IsNaN(parsed.Value))
+        {
+            // Not a number: keep the last valid value.
+            _editing = false;
+            _invalidText = false;
+            _text = Current is { } c ? FormatValue(c) : "";
+            return;
+        }
+        await SetAsync(parsed);
+    }
+
+    private async Task StepAsync(int direction, double? amount = null)
+    {
+        if (IsDisabled || ReadOnly) return;
+        var parsed = _editing ? Parse(_text, EffectiveCulture) : Current;
+        var basis = parsed is { } p && !double.IsNaN(p) ? p : Current ?? Min ?? 0;
+        await SetAsync(basis + direction * (amount ?? Step));
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowUp": await StepAsync(1); break;
+            case "ArrowDown": await StepAsync(-1); break;
+            case "PageUp": await StepAsync(1, Large); break;
+            case "PageDown": await StepAsync(-1, Large); break;
+            case "Enter": await CommitAsync(); break;
+        }
+    }
+}

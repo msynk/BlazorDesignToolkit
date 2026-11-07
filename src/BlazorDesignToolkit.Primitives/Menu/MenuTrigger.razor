@@ -37,6 +37,7 @@
         // Enter and Space also raise click (detail 0); they open with focus on the first item, as does a pointer click.
         Context.OpenedByPointer = e.Detail > 0;
         return Context.Owner.OpenAsync(Menu.MenuFocus.First);
+
     }
 
     private Task OnKeyDownAsync(KeyboardEventArgs e) => e.Key switch

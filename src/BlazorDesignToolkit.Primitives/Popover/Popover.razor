@@ -8,6 +8,14 @@
 </CascadingValue>
 
 @code {
+    private bool _openProvided;
+
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        _openProvided = parameters.TryGetValue<bool>(nameof(Open), out _);
+        return base.SetParametersAsync(parameters);
+    }
+
     private readonly Controllable<bool> _open = new(false);
 
     [Parameter] public bool Open { get; set; }
@@ -30,7 +38,7 @@
 
     protected override void OnParametersSet()
     {
-        _open.Sync(Open);
+        _open.Sync(Open, _openProvided);
         Context.NotifyStateChanged();
     }
 

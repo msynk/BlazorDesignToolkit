@@ -82,8 +82,9 @@ public sealed class ResolverDocument
     public const string SupportedVersion = "2025.10";
 
     internal ResolverDocument(string? name, string? description, IReadOnlyList<ResolverSet> sets, IReadOnlyList<ResolverModifier> modifiers,
-        IReadOnlyList<ResolutionOrderItem> order, IReadOnlyList<Diagnostic> diagnostics, string? sourceName, string? baseDirectory)
+        IReadOnlyList<ResolutionOrderItem> order, IReadOnlyList<Diagnostic> diagnostics, string? sourceName, string? baseDirectory, SourceObject? root = null)
     {
+        Root = root;
         Name = name;
         Description = description;
         Sets = sets;
@@ -101,6 +102,8 @@ public sealed class ResolverDocument
     public IReadOnlyList<ResolutionOrderItem> ResolutionOrder { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
     public string? SourceName { get; }
+    /// <summary>The parsed document, used to resolve same-document pointers such as <c>#/$defs/brand</c> in sources.</summary>
+    public SourceObject? Root { get; }
     /// <summary>Directory used to resolve relative file references.</summary>
     public string? BaseDirectory { get; }
     public bool HasErrors => Diagnostics.Any(static d => d.Severity == DiagnosticSeverity.Error);
@@ -122,6 +125,7 @@ public interface IResolverSourceLoader
 /// <summary>
 /// Loads referenced files from disk. References must stay inside <see cref="RootDirectory"/>; absolute paths,
 /// parent-directory escapes and remote URLs are rejected, so a resolver document cannot read arbitrary files or reach the network.
+/// Wrap it in an <see cref="HttpResolverSourceLoader"/> to allow specific remote URLs.
 /// </summary>
 public sealed class FileSystemResolverSourceLoader(string rootDirectory, JsonParseOptions? parseOptions = null) : IResolverSourceLoader
 {
@@ -132,8 +136,8 @@ public sealed class FileSystemResolverSourceLoader(string rootDirectory, JsonPar
         var bag = new DiagnosticBag();
         if (reference.Contains("://", StringComparison.Ordinal))
         {
-            bag.Report(DiagnosticCatalog.UnsupportedConstruct, $"Remote reference '{reference}' is not supported; the toolkit never makes network requests.",
-                actual: reference, remediation: "Download the file and reference it with a relative path.");
+            bag.Report(DiagnosticCatalog.UnsupportedConstruct, $"Remote reference '{reference}' is not allowed: remote loading is off by default.",
+                actual: reference, remediation: "Download the file and reference it with a relative path, or allow its URL prefix (HttpResolverSourceLoader; CLI: \"remote\": { \"allow\": [ … ] }).");
             return new SourceParseResult(null, bag.Items);
         }
         if (Path.IsPathRooted(reference))

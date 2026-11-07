@@ -1,14 +1,15 @@
 # Framework integrations
 
-Each integration is a separate package that depends only on `BlazorDesignToolkit.Tokens`. Mappings are type-checked:
+Each integration is a separate package that depends on `BlazorDesignToolkit.Tokens` (Bootstrap also on
+`BlazorDesignToolkit.Theming`, for its per-theme output). Mappings are type-checked:
 a token that does not fit the target is reported (BDT7004 unknown target/token, BDT7005 type mismatch, BDT7001
 unsupported conversion) instead of being converted silently. In **reference** mode outputs point at the toolkit's runtime
 custom properties, so brand and mode switching keep working; **literal** mode emits values from one resolved token set.
 
-## Tailwind CSS v4 (`BlazorDesignToolkit.Tokens.Tailwind`)
+## Tailwind CSS (`BlazorDesignToolkit.Tokens.Tailwind`)
 
-- **Supported:** Tailwind CSS 4.0+ (CSS-first `@theme`). Verified by integration tests that compile the output with
-  `@tailwindcss/cli` 4.3.4. Tailwind 3 JavaScript configuration is not generated.
+- **Supported:** Tailwind CSS 4.0+ (CSS-first `@theme`, format `tailwind`) and Tailwind CSS 3 (JavaScript preset, format
+  `tailwind-v3`). Verified by integration tests that compile the output with `@tailwindcss/cli` 4.3.4 and Tailwind 3.4.17.
 - **Setup:** export, then import after Tailwind:
 
 ```css
@@ -31,8 +32,36 @@ custom properties, so brand and mode switching keep working; **literal** mode em
   `--line-height`, `--letter-spacing`, `--font-weight` companions), `font-weight`, `tracking`, `leading`, `spacing`,
   `radius`, `shadow`, `inset-shadow`, `drop-shadow` (no spread/inset), `blur`, `perspective`, `breakpoint`, `container`,
   `ease` (cubicBezier).
+- **Breakpoints and containers** are always written as literal values: Tailwind uses them inside `@media` and
+  `@container` queries, where `var()` is not allowed.
 - **Limitations:** reference mode requires a prefix (otherwise `--color-x: var(--color-x)` would be circular — reported as
   a configuration error). `reset` clears Tailwind's defaults per mapped namespace (`--color-*: initial`).
+
+### Tailwind CSS 3 (`tailwind-v3`)
+
+The same mappings (with v4 namespace names) produce a preset module:
+
+```js
+// tailwind.config.js
+module.exports = { content: ["./**/*.razor"], presets: [require("./tokens.tailwind.cjs")] };
+```
+
+```js
+// tokens.tailwind.cjs (generated)
+module.exports = { "theme": { "extend": {
+  "colors": { "surface-default": "color-mix(in oklab, var(--ds-color-surface-default) calc(<alpha-value> * 100%), transparent)" },
+  "borderRadius": { "md": "var(--ds-radius-md)" },
+  "fontSize": { "body": ["var(--ds-typography-body-font-size)", { "lineHeight": "var(--ds-typography-body-line-height)", … }] } } } };
+```
+
+- Namespaces map to v3 theme keys: `color` → `colors`, `font` → `fontFamily`, `text` → `fontSize`, `font-weight`,
+  `tracking` → `letterSpacing`, `leading` → `lineHeight`, `spacing`, `radius` → `borderRadius`, `shadow` → `boxShadow`,
+  `drop-shadow`, `blur`, `breakpoint` → `screens`, `container` → `maxWidth`, `ease` → `transitionTimingFunction`.
+  `inset-shadow` and `perspective` have no Tailwind 3 key and are reported.
+- Colors are wrapped in `color-mix()` with Tailwind's `<alpha-value>` placeholder, so opacity modifiers (`bg-surface-default/50`)
+  work with runtime variables and any color space. Set `opacityModifiers: false` for plain values.
+- Settings: `prefix`, `values` (`reference`/`literal`), `module` (`common-js`/`es-module`), `opacityModifiers`, `extend`
+  (`false` replaces Tailwind's defaults), `colorFormat`. Values are JSON-encoded, so token text cannot inject code.
 
 ## Bootstrap 5.3 (`BlazorDesignToolkit.Tokens.Bootstrap`)
 
@@ -44,28 +73,46 @@ custom properties, so brand and mode switching keep working; **literal** mode em
 @import "bootstrap/scss/bootstrap";
 ```
 
-  Colors must be opaque sRGB because Bootstrap's `tint-color`, `shade-color` and `mix` run at compile time; wide-gamut or
-  translucent colors are reported.
-- **`bootstrap-css`:** runtime `--bs-*` overrides (reference or literal) with `-rgb` companions (`--bs-primary-rgb: 45, 109, 202`)
-  computed from the resolved token. The `-rgb` values are static; generate one file per theme/mode with `selector`
-  (for example `[data-bs-theme=dark]`).
-- **Limitation (important):** component classes such as `.btn-primary` compile their colors from Sass. Runtime overrides
-  change utilities, body colors, links, borders and radii, but not those compiled component colors. Use the Sass output for
-  a brand, and runtime variables for mode switching of the variables Bootstrap reads at runtime. Variables Bootstrap only
-  reads in Sass are rejected for the CSS output.
+  Bootstrap's `tint-color`, `shade-color` and `mix` work in sRGB: wide-gamut colors are CSS Color 4 gamut-mapped (BDT7003)
+  and translucent colors are reported.
+- **`bootstrap-themes` (recommended for runtime theming):** one stylesheet with Bootstrap's runtime variables for **every
+  theme and mode** (same attributes and cascade as the toolkit's theme stylesheet), followed by a **component bridge**. Load
+  it after `bootstrap.css`:
+
+```json
+{ "format": "bootstrap-themes", "path": "wwwroot/css/aurora.bootstrap.css", "settings": { "prefix": "ds" },
+  "config": { "mappings": { "primary": "color.surface.accent", "danger": "color.surface.danger", "body-bg": "color.surface.default" } } }
+```
+
+  For each theme color it emits what Bootstrap would compute in Sass for that theme and mode: `--bs-primary` (a `var()`
+  reference to the token), `--bs-primary-rgb`, `--bs-primary-text-emphasis`, `-bg-subtle`, `-border-subtle` (light and dark
+  variants), and the button states (hover/active backgrounds and borders as `color-mix()` over the runtime color, contrast
+  text from Bootstrap's `color-contrast()` algorithm, focus shadow). The bridge points `.btn-*`, `.btn-outline-*`,
+  `.text-bg-*`, `.link-*:hover` and the components that use `$component-active-bg` (nav pills, dropdown items, pagination,
+  list groups, progress bars, form checks, form focus rings, range thumbs, accordion) at those variables, so theme and mode
+  switches recolor them without recompiling Bootstrap. The derived values are verified against a real Bootstrap 5.3.8
+  build for dark and light colors, in light and dark mode. Rules use `:is()` so they win over Bootstrap's own `:root` and
+  `[data-bs-theme]` rules.
+- **`bootstrap-css`:** the same variables and bridge for one token set and selector (`selector`, default
+  `:root, [data-bs-theme=light]`), for apps without the toolkit's themes.
+- **Remaining compile-time parts:** SVG icons that Bootstrap embeds as data URIs with compiled colors (select caret, form
+  switch knob, accordion chevron, validation icons) and `$theme-colors` loops for colors you did not map keep their
+  compiled values. Variables Bootstrap only reads in Sass are rejected for the runtime outputs.
 - **Known variables:** theme colors, base colors and grays, body/secondary/tertiary/emphasis colors, border, link,
   focus ring, radii, spacing, font families/sizes/weights, line heights and shadows (see `BootstrapVariables.All`).
 
 ## Fluent 2 (`BlazorDesignToolkit.Tokens.Fluent`)
 
-- **Supported:** Fluent 2 alias tokens as CSS custom properties (`--colorNeutralForeground1`, `--colorBrandBackground`,
-  `--borderRadiusMedium`, `--fontFamilyBase`, `--durationNormal`, `--curveEasyEase`, `--shadow4`, spacing, stroke widths,
-  font sizes and line heights), as used by Fluent UI Web Components 3 and the Fluent UI Blazor library built on them.
+- **Supported:** all 467 Fluent 2 design tokens as CSS custom properties (`--colorNeutralForeground1`, `--colorBrandBackground`,
+  `--borderRadiusMedium`, `--fontFamilyBase`, `--durationNormal`, `--curveEasyEase`, `--shadow4`, `--zIndexPopup`, …), as used
+  by Fluent UI Web Components 3 and the Fluent UI Blazor library built on them. The catalog is generated from
+  `@fluentui/tokens` (version in `FluentTokenCatalog.SourceVersion`) and an integration test checks it against the package.
 - **Setup:** load the generated CSS after any theme Fluent applies, or do not apply a Fluent theme.
 - **Validation:** names must exist in `FluentTokenCatalog` (case-sensitive, with suggestions). Fluent line heights are
   lengths; a DTCG `number` line-height multiplier is rejected. Durations are written in milliseconds in literal mode.
-- **Limitation:** the catalog covers the commonly mapped alias tokens, not every Fluent token; unknown names are rejected
-  rather than guessed.
+- **Types by token family:** `color*` color; `borderRadius*`, `fontSize*`, `lineHeight*`, `spacing*`, `strokeWidth*` dimension;
+  `fontFamily*`, `fontWeight*`, `shadow*` (shadow), `duration*`, `curve*` (cubicBezier), `zIndex*` (number). Unknown names are
+  rejected rather than guessed.
 
 ## Plain CSS and custom design systems
 

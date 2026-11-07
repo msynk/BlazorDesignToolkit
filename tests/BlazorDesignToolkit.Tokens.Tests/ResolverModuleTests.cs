@@ -134,7 +134,7 @@ public class ResolverModuleTests
             var loader = new FileSystemResolverSourceLoader(root);
             var ct = TestContext.Current.CancellationToken;
             Assert.Contains("outside the allowed root", Assert.Single((await loader.LoadAsync("../secret.json", root, ct)).Diagnostics).Message);
-            Assert.Contains("network", Assert.Single((await loader.LoadAsync("https://example.com/t.json", root, ct)).Diagnostics).Message);
+            Assert.Contains("off by default", Assert.Single((await loader.LoadAsync("https://example.com/t.json", root, ct)).Diagnostics).Message);
             Assert.Equal(DiagnosticCatalog.FileNotFound.Id, Assert.Single((await loader.LoadAsync("missing.json", root, ct)).Diagnostics).RuleId);
         }
         finally

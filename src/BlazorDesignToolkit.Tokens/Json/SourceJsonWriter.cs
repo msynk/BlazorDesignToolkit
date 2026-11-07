@@ -73,8 +73,10 @@ public static class SourceJsonWriter
 public static class JsonPointer
 {
     /// <summary>
-    /// Parses a same-document pointer such as <c>#/colors/blue/$value</c>. Percent-decoding is not applied:
-    /// DTCG examples use raw characters in fragments, and token names may legitimately contain '%'.
+    /// Parses a same-document pointer such as <c>#/colors/blue/$value</c>. The fragment is percent-decoded first
+    /// (RFC 6901 §6, UTF-8), so <c>#/brand%20colors</c> and <c>#/brand colors</c> address the same group. A '%' that does
+    /// not start a valid escape (two hexadecimal digits) is kept literally, because DTCG examples use raw characters in
+    /// fragments and token names may contain '%'.
     /// </summary>
     public static bool TryParse(string pointer, out IReadOnlyList<string> segments, out string? error)
     {
@@ -85,7 +87,11 @@ public static class JsonPointer
             error = "Only same-document pointers starting with '#' are supported in token files.";
             return false;
         }
-        var body = pointer[1..];
+        if (!TryPercentDecode(pointer.AsSpan(1), out var body))
+        {
+            error = "The pointer contains percent-encoded bytes that are not valid UTF-8.";
+            return false;
+        }
         if (body.Length == 0)
         {
             error = "The pointer refers to the whole document.";
@@ -123,8 +129,43 @@ public static class JsonPointer
         return true;
     }
 
+    /// <summary>Formats a pointer fragment. '~' and '/' are escaped as in RFC 6901 and '%' is percent-encoded so that the
+    /// result parses back to the same segments; other characters are kept as written.</summary>
     public static string Format(IEnumerable<string> segments)
-        => "#/" + string.Join('/', segments.Select(static s => s.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal)));
+        => "#/" + string.Join('/', segments.Select(static s => s.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal).Replace("%", "%25", StringComparison.Ordinal)));
+
+    private static bool TryPercentDecode(ReadOnlySpan<char> text, out string decoded)
+    {
+        decoded = text.ToString();
+        if (text.IndexOf('%') < 0) return true;
+        var bytes = new List<byte>(text.Length);
+        Span<byte> utf8 = stackalloc byte[4];
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '%' && i + 2 < text.Length && IsHex(text[i + 1]) && IsHex(text[i + 2]))
+            {
+                bytes.Add((byte)((HexValue(text[i + 1]) << 4) | HexValue(text[i + 2])));
+                i += 2;
+                continue;
+            }
+            System.Text.Rune.DecodeFromUtf16(text[i..], out var rune, out var consumed);
+            var count = rune.EncodeToUtf8(utf8);
+            for (var b = 0; b < count; b++) bytes.Add(utf8[b]);
+            i += consumed - 1;
+        }
+        try
+        {
+            decoded = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(bytes.ToArray());
+            return true;
+        }
+        catch (DecoderFallbackException)
+        {
+            return false;
+        }
+
+        static bool IsHex(char c) => c is (>= '0' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F');
+        static int HexValue(char c) => c <= '9' ? c - '0' : (c | 0x20) - 'a' + 10;
+    }
 
     /// <summary>Navigates <paramref name="node"/> by object keys and array indices.</summary>
     public static SourceNode? Navigate(SourceNode node, IEnumerable<string> segments)

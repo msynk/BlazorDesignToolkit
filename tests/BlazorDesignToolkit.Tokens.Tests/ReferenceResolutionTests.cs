@@ -227,6 +227,32 @@ public class ReferenceResolutionTests
         => Assert.Contains(TestHelpers.Resolve(json).Diagnostics, d => d.RuleId == DiagnosticCatalog.InvalidExtends.Id);
 
     [Fact]
+    public void Extends_can_target_a_group_that_exists_only_through_extension()
+    {
+        var set = TestHelpers.Resolve("""
+        {
+          "base": { "size": { "$type": "dimension", "sm": { "$value": { "value": 4, "unit": "px" } } } },
+          "brand": { "$extends": "{base}" },
+          "button": { "$extends": "{brand.size}", "lg": { "$value": { "value": 8, "unit": "px" } } },
+          "chain": { "$extends": "#/button" }
+        }
+        """);
+        set.AssertNoErrors();
+        Assert.Equal(4, ((DimensionValue)set["brand.size.sm"]!.Value!).Value);
+        Assert.Equal(4, ((DimensionValue)set["button.sm"]!.Value!).Value);
+        Assert.Equal(8, ((DimensionValue)set["chain.lg"]!.Value!).Value);
+        Assert.Equal(4, ((DimensionValue)set["chain.sm"]!.Value!).Value);
+    }
+
+    [Fact]
+    public void Extends_through_inherited_groups_that_never_terminate_is_circular()
+    {
+        // a.x exists only because a extends b, and b extends a.x: the chain keeps growing.
+        var set = TestHelpers.Resolve("""{ "a": { "$extends": "{b}" }, "b": { "$extends": "{a.x}", "x": { "t": { "$type": "number", "$value": 1 } } } }""");
+        Assert.Contains(set.Diagnostics, d => d.RuleId == DiagnosticCatalog.CircularExtends.Id && d.TokenPath == "b");
+    }
+
+    [Fact]
     public void Resolution_supports_cancellation()
     {
         using var cts = new CancellationTokenSource();

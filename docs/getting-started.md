@@ -3,8 +3,8 @@
 Requirements: .NET 10 SDK. Blazor packages support Interactive Server, Interactive WebAssembly and Auto render modes;
 static server rendering renders correct markup without interactivity.
 
-> The packages are not yet published to NuGet. Until they are, reference the projects in `src/` or build packages with
-> `dotnet pack -c Release -o artifacts`.
+> Packages are published to NuGet by the release workflow (`.github/workflows/release.yml`) when a version tag is pushed.
+> Before the first release, reference the projects in `src/` or build packages with `dotnet pack -c Release -o artifacts`.
 
 ## 1. Write tokens (DTCG 2025.10)
 

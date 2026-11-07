@@ -1,0 +1,166 @@
+@namespace BlazorDesignToolkit.Primitives
+@* A slider with two thumbs (WAI-ARIA multi-thumb slider). Each thumb is a role="slider"; the start thumb's maximum is the
+   end value and the end thumb's minimum is the start value (minus/plus MinDistance), as in the APG example. Keys as in
+   Slider. A pointer press moves the nearest thumb. Styling hooks: --bdt-slider-start and --bdt-slider-end (percent). *@
+@inherits PrimitiveBase
+
+<div @ref="_root" @attributes='Attributes("aria-label", "aria-labelledby", "role", "id")'
+     role="group"
+     aria-labelledby="@(Field?.LabelId ?? LabelledBy)"
+     aria-label="@Label"
+     data-slider=""
+     data-range=""
+     data-orientation="@(Orientation == Orientation.Vertical ? "vertical" : "horizontal")"
+     data-disabled="@(IsDisabled ? "" : null)"
+     data-dragging="@(_dragIndex >= 0 ? "" : null)"
+     style="--bdt-slider-start: @Percent(StartValue)%; --bdt-slider-end: @Percent(EndValue)%">
+    <div data-slider-track=""><div data-slider-range=""></div></div>
+    @for (var i = 0; i < 2; i++)
+    {
+        var index = i;
+        var value = index == 0 ? StartValue : EndValue;
+        <div role="slider" @ref="_thumbs[index]"
+             id="@($"{_id}-{(index == 0 ? "start" : "end")}")"
+             tabindex="@(IsDisabled ? "-1" : "0")"
+             aria-valuemin="@Format(index == 0 ? Min : StartValue + MinDistance)"
+             aria-valuemax="@Format(index == 0 ? EndValue - MinDistance : Max)"
+             aria-valuenow="@Format(value)"
+             aria-valuetext="@ValueText?.Invoke(value)"
+             aria-orientation="@(Orientation == Orientation.Vertical ? "vertical" : "horizontal")"
+             aria-label="@(index == 0 ? StartLabel ?? Strings.SliderMinimum : EndLabel ?? Strings.SliderMaximum)"
+             aria-describedby="@Field?.DescribedBy"
+             aria-disabled="@(IsDisabled ? "true" : null)"
+             data-slider-thumb=""
+             data-index="@index"
+             data-bdt-keys="ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown Home End"
+             style="--bdt-slider-value: @Percent(value)%"
+             @onkeydown="e => OnKeyDownAsync(index, e)"></div>
+    }
+    @if (Name is not null)
+    {
+        <input type="hidden" name="@($"{Name}.Start")" value="@Format(StartValue)" />
+        <input type="hidden" name="@($"{Name}.End")" value="@Format(EndValue)" />
+    }
+</div>
+
+@code {
+    private readonly Controllable<double> _start = new(0);
+    private readonly Controllable<double> _end = new(100);
+    private readonly ElementReference[] _thumbs = new ElementReference[2];
+    private ElementReference _root;
+    private DotNetObjectReference<RangeSlider>? _reference;
+    private string _id = "";
+    private int _dragIndex = -1;
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter] public double Start { get; set; }
+    [Parameter] public EventCallback<double> StartChanged { get; set; }
+    [Parameter] public double End { get; set; } = 100;
+    [Parameter] public EventCallback<double> EndChanged { get; set; }
+    [Parameter] public double? DefaultStart { get; set; }
+    [Parameter] public double? DefaultEnd { get; set; }
+    /// <summary>Raised with (start, end) when the user finishes a change.</summary>
+    [Parameter] public EventCallback<(double Start, double End)> ValueCommitted { get; set; }
+    [Parameter] public double Min { get; set; }
+    [Parameter] public double Max { get; set; } = 100;
+    [Parameter] public double Step { get; set; } = 1;
+    [Parameter] public double? LargeStep { get; set; }
+    /// <summary>Minimum distance between the thumbs. Default 0 (thumbs may meet).</summary>
+    [Parameter] public double MinDistance { get; set; }
+    [Parameter] public Orientation Orientation { get; set; } = Orientation.Horizontal;
+    [Parameter] public TextDirection Direction { get; set; } = TextDirection.Ltr;
+    [Parameter] public bool Disabled { get; set; }
+    /// <summary>Accessible name of the group when there is no FormField label.</summary>
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? LabelledBy { get; set; }
+    /// <summary>Names of the thumbs (default from <see cref="PrimitiveStrings"/>: "Minimum", "Maximum").</summary>
+    [Parameter] public string? StartLabel { get; set; }
+    [Parameter] public string? EndLabel { get; set; }
+    [Parameter] public Func<double, string>? ValueText { get; set; }
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsDisabled => Disabled || Field?.Disabled == true;
+    private double StartValue => _start.Get(Start, StartChanged.HasDelegate);
+    private double EndValue => _end.Get(End, EndChanged.HasDelegate);
+    private double Large => LargeStep ?? SliderMath.DefaultLargeStep(Min, Max, Step);
+
+    protected override void OnInitialized()
+    {
+        _id = Field?.ControlId ?? ProvidedId ?? Ids.Next("range-slider");
+        var start = SliderMath.Snap(DefaultStart ?? Start, Min, Max, Step);
+        _start.Initialize(start);
+        _end.Initialize(Math.Max(start, SliderMath.Snap(DefaultEnd ?? End, Min, Max, Step)));
+        TrackField(Field);
+        if (Field is not null)
+        {
+            Field.LabelTargetsControl = false;
+            Field.NotifyChanged();
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        _start.Sync(Start, IsProvided(nameof(Start)));
+        _end.Sync(End, IsProvided(nameof(End)));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _reference = DotNetObjectReference.Create(this);
+        foreach (var thumb in _thumbs) await Js.TrackAsync("preventKeys", thumb);
+        await Js.TrackAsync("attachSlider", _root, _reference, new { vertical = Orientation == Orientation.Vertical, rtl = Direction == TextDirection.Rtl });
+    }
+
+    private static string Format(double value) => value.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+    private string Percent(double value) => SliderMath.ToPercent(value, Min, Max).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    private async Task SetAsync(int index, double value, bool commit)
+    {
+        if (index == 0)
+        {
+            var next = SliderMath.Snap(Math.Min(value, EndValue - MinDistance), Min, Max, Step);
+            if (next != StartValue) await _start.SetAsync(next, StartChanged.HasDelegate, StartChanged);
+        }
+        else
+        {
+            var next = SliderMath.Snap(Math.Max(value, StartValue + MinDistance), Min, Max, Step);
+            if (next != EndValue) await _end.SetAsync(next, EndChanged.HasDelegate, EndChanged);
+        }
+        if (commit && ValueCommitted.HasDelegate) await ValueCommitted.InvokeAsync((StartValue, EndValue));
+    }
+
+    private async Task OnKeyDownAsync(int index, KeyboardEventArgs e)
+    {
+        if (IsDisabled) return;
+        var current = index == 0 ? StartValue : EndValue;
+        if (SliderMath.KeyValue(e.Key, current, Min, Max, Step, Large, Orientation, Direction) is { } next) await SetAsync(index, next, commit: true);
+    }
+
+    [JSInvokable]
+    public Task OnPointer(double fraction, string phase) => InvokeAsync(async () =>
+    {
+        if (IsDisabled) return;
+        var value = SliderMath.FromFraction(fraction, Min, Max, Step);
+        if (phase == "start" || _dragIndex < 0)
+        {
+            // The nearest thumb; when both are at the same place, the one that can move towards the pointer.
+            var toStart = Math.Abs(value - StartValue);
+            var toEnd = Math.Abs(value - EndValue);
+            _dragIndex = toStart < toEnd || (toStart == toEnd && value < StartValue) ? 0 : 1;
+        }
+        var index = _dragIndex;
+        if (phase == "end") _dragIndex = -1;
+        // Apply the value before awaiting focus, so later pointer events are never overwritten by an older position.
+        var setting = SetAsync(index, value, commit: phase == "end");
+        if (phase == "start") await _thumbs[index].FocusAsync();
+        await setting;
+        StateHasChanged();
+    });
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _reference?.Dispose();
+    }
+}

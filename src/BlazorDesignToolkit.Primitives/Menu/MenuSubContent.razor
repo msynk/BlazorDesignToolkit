@@ -1,0 +1,17 @@
+@namespace BlazorDesignToolkit.Primitives
+@* The nested menu of a MenuSub; accepts the same items as MenuContent. *@
+
+<CascadingValue Value="Sub.Context" IsFixed="true">
+    <MenuContent @attributes="AdditionalAttributes">@ChildContent</MenuContent>
+</CascadingValue>
+
+@code {
+    [CascadingParameter] private MenuSub Sub { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Sub is null) throw new InvalidOperationException("MenuSubContent must be placed inside MenuSub.");
+    }
+}

@@ -70,6 +70,25 @@ public class BlazorAdapterTests : BunitContext
     }
 
     [Fact]
+    public void ThemeScope_applies_overrides_to_its_subtree_only()
+    {
+        Configure();
+        IReadOnlyList<BlazorDesignToolkit.Tokens.Diagnostics.Diagnostic>? reported = null;
+        var red = BlazorDesignToolkit.Tokens.Json.SourceJsonParser.Parse("""{ "colorSpace": "srgb", "components": [1, 0, 0] }""").Root!;
+        var cut = Render<ThemeScope>(p => p
+            .Add(s => s.ThemeId, "aurora")
+            .Add(s => s.Overrides, new Dictionary<string, BlazorDesignToolkit.Tokens.Json.SourceNode> { ["color.blue.600"] = red, ["no.such.token"] = red })
+            .Add(s => s.OverrideDiagnostics, d => reported = d)
+            .AddUnmatched("style", "outline: 1px solid")
+            .AddChildContent("<p>x</p>"));
+        var style = cut.Find("div").GetAttribute("style")!;
+        Assert.Matches(@"--[a-z-]*color-blue-600: #ff0000;", style);
+        Assert.EndsWith("outline: 1px solid", style);  // the author's own style is kept and wins
+        Assert.NotNull(reported);
+        Assert.Contains(reported!, d => d.Severity == BlazorDesignToolkit.Tokens.Diagnostics.DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public void ThemeProvider_applies_state_follows_system_and_reacts_to_changes()
     {
         Configure();

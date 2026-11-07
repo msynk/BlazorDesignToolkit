@@ -25,3 +25,23 @@ known gaps.
 - `BlazorDesignToolkit.Testing`: markup accessibility audit for bUnit tests.
 - `BlazorDesignToolkit.Tokens.Tailwind`, `.Bootstrap`, `.Fluent`: integration exporters.
 - `bdt` CLI: `validate`, `build`, `export`, `coverage`, `diff`, `check`, `rules`; text, JSON, GitHub and SARIF reports.
+- Tokens: `$extends` to groups that exist only through another extension; percent-decoded JSON Pointer fragments; CSS Color 4
+  gamut mapping for sRGB outputs (`gamutMapping`); opt-in remote sources (`HttpResolverSourceLoader`, CLI `remote`) with an
+  HTTPS allow-list; same-document pointers in resolver sources.
+- Theming: `ThemeScope.Overrides`; `ThemeCssOptions.Declarations` and `ElevateSpecificity` for integrations.
+- Primitives: submenus (`MenuSub`), `Menubar`, `Slider`, `RangeSlider`, `NumberField`, `DatePicker`; virtualization for
+  `Listbox` and `TreeView`; Page Up/Page Down in lists and trees; `PrimitiveStrings` for localizable texts; controlled
+  components revert changes the parent does not accept; a dialog with `CloseOnEscape=false` survives browser close watchers;
+  the no-Popover-API fallback hides closed popups.
+- Integrations: Tailwind CSS 3 preset (`tailwind-v3`); Bootstrap runtime variables per theme and mode with a component
+  bridge (`bootstrap-themes`); all 467 Fluent 2 tokens.
+- Tooling: benchmark regression gate in CI; tag-triggered release workflow (SourceLink, package validation, GitHub
+  release, NuGet push behind an approval environment).
+
+### Fixed
+
+- Characters typed quickly into the combobox and command menu could be lost under Interactive Server.
+- Decorative glyphs of the starter styles were read as part of accessible names.
+- `bdt check` reported `failOn: none` in JSON reports of passing runs.
+- Tailwind v4 breakpoints and container sizes used `var()`, which media and container queries do not accept.
+- Overlapping value changes (rapid pointer moves) could let an older change revert a newer one in controlled components.

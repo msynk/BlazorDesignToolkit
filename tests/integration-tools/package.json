@@ -1,11 +1,13 @@
 {
   "name": "bdt-integration-tools",
   "private": true,
-  "description": "Pinned third-party compilers used only by integration tests to prove that generated Tailwind and Bootstrap outputs compile. Not shipped.",
+  "description": "Pinned third-party packages used only by integration tests: Tailwind (3 and 4) and Bootstrap compilers prove that generated outputs compile; @fluentui/tokens is the reference list of Fluent 2 token names. Not shipped.",
   "devDependencies": {
     "@tailwindcss/cli": "4.3.4",
     "tailwindcss": "4.3.4",
     "sass": "1.107.1",
-    "bootstrap": "5.3.8"
+    "bootstrap": "5.3.8",
+    "tailwindcss3": "npm:tailwindcss@3.4.17",
+    "@fluentui/tokens": "1.0.0-alpha.24"
   }
 }

@@ -45,7 +45,7 @@
         TrackField(Field);
     }
 
-    protected override void OnParametersSet() => _checked.Sync(Checked);
+    protected override void OnParametersSet() => _checked.Sync(Checked, IsProvided(nameof(Checked)));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

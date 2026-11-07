@@ -98,7 +98,15 @@ change. No CSS is regenerated and the page is not reloaded. The JavaScript modul
 navigation, which can rewrite attributes of the document element.
 
 `ThemeScope` applies another theme to a subtree (previews, embedded brands) without JavaScript. It renders every axis
-attribute, because custom properties set on an element are inherited by its descendants.
+attribute, because custom properties set on an element are inherited by its descendants. `Overrides` (token path → DTCG
+`$value`) applies runtime overrides to the subtree only, as inline custom properties on the scope element (only the
+declarations that change); invalid overrides are reported through `OverrideDiagnostics`:
+
+```razor
+<ThemeScope ThemeId="ember" Axes="@(new Dictionary<string, string> { ["mode"] = "dark" })" Overrides="_previewOverrides">
+    <BrandPreview />
+</ThemeScope>
+```
 
 ## Startup without a flash of the wrong theme
 
@@ -130,3 +138,8 @@ enable persistence.
 Theme selectors use `:where()`, so specificity equals the number of axis attributes and your own rules override tokens
 easily. References are emitted as `var(--…)` by default so runtime overrides of a primitive cascade to every alias.
 See [css-export.md](css-export.md) for options.
+
+Two options serve integrations that need per-theme values of their own: `ThemeCssOptions.Declarations` replaces the
+declarations generated for each composed selection (the generator still builds selectors, cascade diffs and `system`
+media queries), and `ElevateSpecificity` wraps the scope in `:is()` instead of `:where()` so the rules win over framework
+rules on `:root`. The Bootstrap integration's `bootstrap-themes` output uses both (see [integrations.md](integrations.md)).

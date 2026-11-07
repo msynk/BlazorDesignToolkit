@@ -20,7 +20,7 @@
 @code {
     private ElementReference _element;
     private DotNetObjectReference<DialogContent>? _reference;
-    private int _handle;
+    private readonly JsResource _overlay = new();
     private bool _shown;
 
     [CascadingParameter] internal Dialog.DialogContext Context { get; set; } = default!;
@@ -41,20 +41,19 @@
             _shown = true;
             _reference ??= DotNetObjectReference.Create(this);
             var owner = Context.Owner;
-            _handle = await Js.TrackAsync("showDialog", _element, owner.Modal, _reference, new
+            await _overlay.OpenAsync(() => Js.TrackAsync("showDialog", _element, owner.Modal, _reference, new
             {
                 closeOnEscape = owner.CloseOnEscape,
                 closeOnBackdropClick = owner.CloseOnBackdropClick,
                 lockScroll = owner.LockScroll,
                 initialFocus = owner.InitialFocus,
                 restoreFocus = true,
-            });
+            }));
         }
         else if (!open && _shown)
         {
             _shown = false;
-            await Js.ReleaseAsync(_handle);
-            _handle = 0;
+            await _overlay.CloseAsync(Js);
         }
     }
 

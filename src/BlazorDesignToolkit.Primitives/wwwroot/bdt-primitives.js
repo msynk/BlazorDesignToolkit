@@ -59,9 +59,121 @@ export function focusById(id, preventScroll) {
   focusElement(document.getElementById(id), preventScroll);
 }
 
+/**
+ * Brings row index of a virtualized list into view and (optionally) focuses the element with this id once it is rendered. The scroll
+ * is re-applied on every frame because the list may still be growing (rows just expanded) when the request starts.
+ */
+export function revealAndFocus(container, index, itemSize, id, timeoutMs, focus = true) {
+  const deadline = performance.now() + (timeoutMs ?? 1500);
+  const attempt = () => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      if (focus) el.focus({ preventScroll: true });
+      return;
+    }
+    scrollToIndex(container, index, itemSize);
+    if (performance.now() < deadline) requestAnimationFrame(attempt);
+  };
+  attempt();
+}
+
+/** Focuses the element with this id as soon as it exists (virtualized lists render rows after scrolling). */
+export function focusByIdWhenPresent(id, timeoutMs) {
+  const deadline = performance.now() + (timeoutMs ?? 1000);
+  const attempt = () => {
+    const el = document.getElementById(id);
+    if (el) { el.focus({ preventScroll: true }); return; }
+    if (performance.now() < deadline) requestAnimationFrame(attempt);
+  };
+  attempt();
+}
+
 export function scrollIntoViewById(id) {
   const el = id ? document.getElementById(id) : null;
   if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+// ---- Slider ------------------------------------------------------------------------------------------------
+
+/**
+ * Pointer input for sliders: pressing anywhere on the slider and dragging reports the position along the track (0–1) to
+ * .NET at most once per animation frame, plus 'start' and 'end'. Keyboard input is handled in .NET on the thumbs.
+ */
+export function attachSlider(root, dotNetRef, options) {
+  if (!root) return 0;
+  const vertical = !!options?.vertical;
+  const rtl = !!options?.rtl;
+  const track = () => root.querySelector('[data-slider-track]') ?? root;
+  let pointerId = null;
+  let frame = 0;
+  let pending = null;
+  let last = 0;
+  const fraction = (event) => {
+    const r = track().getBoundingClientRect();
+    if (vertical) return r.height === 0 ? 0 : 1 - (event.clientY - r.top) / r.height;
+    const f = r.width === 0 ? 0 : (event.clientX - r.left) / r.width;
+    return rtl ? 1 - f : f;
+  };
+  const send = (value, phase) => dotNetRef.invokeMethodAsync('OnPointer', Math.min(1, Math.max(0, value)), phase).catch(() => {});
+  const onDown = (event) => {
+    if (event.button !== 0 || root.hasAttribute('data-disabled')) return;
+    event.preventDefault();
+    pointerId = event.pointerId;
+    try { root.setPointerCapture(pointerId); } catch { /* not supported */ }
+    last = fraction(event);
+    send(last, 'start');
+  };
+  const onMove = (event) => {
+    if (event.pointerId !== pointerId) return;
+    pending = last = fraction(event);
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      if (pending !== null) send(pending, 'move');
+      pending = null;
+    });
+  };
+  const onUp = (event) => {
+    if (event.pointerId !== pointerId) return;
+    pointerId = null;
+    if (frame) { cancelAnimationFrame(frame); frame = 0; }
+    pending = null;
+    // Release where the pointer was last tracked: some engines report unreliable coordinates for a captured pointerup.
+    send(last, 'end');
+  };
+  root.addEventListener('pointerdown', onDown);
+  root.addEventListener('pointermove', onMove);
+  root.addEventListener('pointerup', onUp);
+  root.addEventListener('pointercancel', onUp);
+  // If the capture is lost without a pointerup (for example released outside the window), end the drag where it was.
+  root.addEventListener('lostpointercapture', onUp);
+  return register(() => {
+    if (frame) cancelAnimationFrame(frame);
+    root.removeEventListener('pointerdown', onDown);
+    root.removeEventListener('pointermove', onMove);
+    root.removeEventListener('pointerup', onUp);
+    root.removeEventListener('pointercancel', onUp);
+    root.removeEventListener('lostpointercapture', onUp);
+  });
+}
+
+/** Restores the checked state of a radio group from its rendered data-state attributes (after a rejected change). */
+export function syncRadioGroup(name) {
+  const selector = `input[type="radio"][name="${CSS.escape(name)}"]`;
+  for (const radio of document.querySelectorAll(selector)) radio.checked = radio.getAttribute('data-state') === 'checked';
+}
+
+/** Scrolls a virtualized list so that the item at index (uniform size) is inside the visible, rendered range. */
+export function scrollToIndex(container, index, itemSize) {
+  if (!container || index < 0) return;
+  // Use the real row height when rows are rendered (styles may differ from ItemSize); Virtualize lays rows out uniformly.
+  const row = container.querySelector(':scope > [role="option"], :scope > [role="treeitem"]');
+  const size = row?.offsetHeight || itemSize;
+  const top = index * size;
+  const bottom = top + size;
+  if (top < container.scrollTop) container.scrollTop = top;
+  else if (bottom > container.scrollTop + container.clientHeight) container.scrollTop = bottom - container.clientHeight;
 }
 
 export function setIndeterminate(element, value) {
@@ -141,6 +253,21 @@ export function showDialog(dialog, modal, dotNetRef, options) {
     event.preventDefault();
     if (options?.closeOnEscape !== false) dotNetRef.invokeMethodAsync('OnDialogDismiss', 'escape').catch(() => {});
   };
+  // Browsers' close watchers may close a dialog without a cancelable 'cancel' event (for example on a second Escape
+  // without user activation in between). Keep the .NET state authoritative: reopen when Escape must not close the dialog,
+  // otherwise report the dismissal so the state follows.
+  let closingByUs = false;
+  let lastFocused = null;
+  const onFocusIn = (event) => { lastFocused = event.target; };
+  const onClose = () => {
+    if (closingByUs) return;
+    if (options?.closeOnEscape === false) {
+      try { modal ? dialog.showModal() : dialog.show(); } catch { dialog.setAttribute('open', ''); }
+      if (lastFocused && dialog.contains(lastFocused)) lastFocused.focus();
+    } else {
+      dotNetRef.invokeMethodAsync('OnDialogDismiss', 'close').catch(() => {});
+    }
+  };
   const onClick = (event) => {
     if (event.target !== dialog || options?.closeOnBackdropClick !== true) return;
     const r = dialog.getBoundingClientRect();
@@ -149,6 +276,8 @@ export function showDialog(dialog, modal, dotNetRef, options) {
   };
   dialog.addEventListener('cancel', onCancel);
   dialog.addEventListener('click', onClick);
+  dialog.addEventListener('close', onClose);
+  dialog.addEventListener('focusin', onFocusIn);
   try {
     if (!dialog.open) modal ? dialog.showModal() : dialog.show();
   } catch {
@@ -160,6 +289,9 @@ export function showDialog(dialog, modal, dotNetRef, options) {
   return register(() => {
     dialog.removeEventListener('cancel', onCancel);
     dialog.removeEventListener('click', onClick);
+    dialog.removeEventListener('close', onClose);
+    dialog.removeEventListener('focusin', onFocusIn);
+    closingByUs = true;
     if (dialog.open) dialog.close();
     root.style.overflow = previousOverflow;
     if (options?.restoreFocus !== false && previous && typeof previous.focus === 'function' && document.contains(previous)) previous.focus();
@@ -169,6 +301,14 @@ export function showDialog(dialog, modal, dotNetRef, options) {
 // ---- Popover and positioning ------------------------------------------------------------------------------
 
 const supportsPopover = typeof HTMLElement !== 'undefined' && Object.prototype.hasOwnProperty.call(HTMLElement.prototype, 'popover');
+
+// Without the Popover API the browser does not hide [popover] elements, so the fallback hides them itself until opened.
+if (!supportsPopover && typeof document !== 'undefined' && !document.getElementById('bdt-popover-fallback')) {
+  const style = document.createElement('style');
+  style.id = 'bdt-popover-fallback';
+  style.textContent = '[popover]:not([data-bdt-open]) { display: none !important; }';
+  document.head.appendChild(style);
+}
 
 function place(floating, anchor, placement, offset) {
   if (!floating || !anchor) return;
@@ -234,6 +374,7 @@ export function showPopover(floating, anchor, dotNetRef, options) {
     }
   } else {
     // Fallback for browsers without the Popover API: show in place and emulate light dismiss.
+    floating.setAttribute('data-bdt-open', '');
     floating.style.display = 'block';
     floating.style.zIndex = '2147483000';
     const onPointer = (event) => {
@@ -247,6 +388,7 @@ export function showPopover(floating, anchor, dotNetRef, options) {
     fallbackCleanup = () => {
       document.removeEventListener('pointerdown', onPointer, true);
       document.removeEventListener('keydown', onKey, true);
+      floating.removeAttribute('data-bdt-open');
       floating.style.display = '';
     };
   }
@@ -294,7 +436,7 @@ export function attachTooltip(trigger, tooltip, options) {
     clearTimeout(hideTimer);
     if (open) return;
     open = true;
-    if (supportsPopover && tooltip.hasAttribute('popover')) { try { tooltip.showPopover(); } catch { } } else tooltip.hidden = false;
+    if (supportsPopover && tooltip.hasAttribute('popover')) { try { tooltip.showPopover(); } catch { } } else { tooltip.hidden = false; tooltip.setAttribute('data-bdt-open', ''); }
     tooltip.setAttribute('data-state', 'open');
     place(tooltip, trigger, placement, 6);
   };
@@ -302,7 +444,7 @@ export function attachTooltip(trigger, tooltip, options) {
     clearTimeout(showTimer);
     if (!open) return;
     open = false;
-    if (supportsPopover && tooltip.hasAttribute('popover')) { try { tooltip.hidePopover(); } catch { } } else tooltip.hidden = true;
+    if (supportsPopover && tooltip.hasAttribute('popover')) { try { tooltip.hidePopover(); } catch { } } else { tooltip.hidden = true; tooltip.removeAttribute('data-bdt-open'); }
     tooltip.setAttribute('data-state', 'closed');
   };
   const scheduleShow = (delay) => { clearTimeout(hideTimer); clearTimeout(showTimer); showTimer = setTimeout(show, delay); };

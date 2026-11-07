@@ -27,6 +27,23 @@
       ] }
     },
     {
+      "format": "tailwind-v3", "path": "generated/aurora.tailwind3.cjs", "settings": { "prefix": "ds" },
+      "config": { "mappings": [
+        { "tokens": "color.surface.*", "namespace": "color", "stripPrefix": "color" },
+        { "tokens": "color.text.*", "namespace": "color", "stripPrefix": "color" },
+        { "tokens": "radius.*", "namespace": "radius" },
+        { "tokens": "typography.*", "namespace": "text" },
+        { "tokens": "font.family.*", "namespace": "font" }
+      ] }
+    },
+    {
+      "format": "bootstrap-themes", "path": "generated/aurora.bootstrap.css", "settings": { "prefix": "ds" },
+      "config": { "mappings": {
+        "primary": "color.surface.accent", "danger": "color.surface.danger", "success": "color.surface.success",
+        "body-bg": "color.surface.default", "body-color": "color.text.default", "link-color": "color.text.link"
+      } }
+    },
+    {
       "format": "bootstrap-scss", "path": "generated/_aurora.bootstrap.scss",
       "config": { "mappings": {
         "primary": "color.surface.accent", "danger": "color.surface.danger", "success": "color.surface.success",

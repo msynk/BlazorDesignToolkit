@@ -2,13 +2,24 @@
 @* WAI-ARIA Menu Button pattern. MenuTrigger (aria-haspopup="menu") opens MenuContent (role="menu") in the top layer.
    Focus moves to the first item (Up arrow on the trigger: last item). Inside the menu: Up/Down move (wrapping),
    Home/End, type-to-select, Enter/Space activate, Escape closes and returns focus to the trigger, Tab closes the menu.
-   Items: MenuItem, MenuCheckboxItem, MenuRadioGroup + MenuRadioItem, MenuSeparator. *@
+   Items: MenuItem, MenuCheckboxItem, MenuRadioGroup + MenuRadioItem, MenuSeparator, MenuSub (submenus).
+   Inside a Menubar, use MenubarTrigger instead of MenuTrigger. *@
+@implements IMenuOwner
+@implements IDisposable
 
 <CascadingValue Value="Context" IsFixed="true">
     @ChildContent
 </CascadingValue>
 
 @code {
+    private bool _openProvided;
+
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        _openProvided = parameters.TryGetValue<bool>(nameof(Open), out _);
+        return base.SetParametersAsync(parameters);
+    }
+
     private readonly Controllable<bool> _open = new(false);
     private DateTimeOffset _dismissedAt;
 
@@ -16,9 +27,15 @@
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
     [Parameter] public string Placement { get; set; } = "bottom-start";
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    [CascadingParameter] internal Menubar.MenubarContext? Menubar { get; set; }
 
     internal MenuContext Context { get; } = new();
     internal bool IsOpen => _open.Get(Open, OpenChanged.HasDelegate);
+    bool IMenuOwner.IsOpen => IsOpen;
+    string IMenuOwner.Placement => Placement;
+    Task IMenuOwner.OpenAsync(MenuFocus? focus) => OpenAsync(focus);
+    Task IMenuOwner.CloseAsync(bool dismissed) => CloseAsync(dismissed);
+    Task IMenuOwner.CloseAllAsync() => CloseAsync();
 
     protected override void OnInitialized()
     {
@@ -26,30 +43,44 @@
         Context.Owner = this;
         Context.MenuId = Ids.Next("menu");
         Context.TriggerId = Context.MenuId + "-trigger";
+        Context.Menubar = Menubar;
+        Menubar?.Menus.Add(this);
     }
+
+    public void Dispose() => Menubar?.Menus.Remove(this);
 
     protected override void OnParametersSet()
     {
-        _open.Sync(Open);
+        _open.Sync(Open, _openProvided);
         Context.NotifyStateChanged();
     }
 
-    internal async Task OpenAsync(MenuFocus focus)
+    internal async Task OpenAsync(MenuFocus? focus)
     {
         if (IsOpen) return;
         if (DateTimeOffset.UtcNow - _dismissedAt < TimeSpan.FromMilliseconds(300) && focus == MenuFocus.First && Context.OpenedByPointer) return;
+        if (Menubar is not null)
+        {
+            // Only one menu of a menubar is open at a time.
+            foreach (var other in Menubar.Menus.Where(m => m != this && m.IsOpen).ToList()) await other.CloseAsync();
+            Menubar.OpenMenu = this;
+        }
         Context.PendingFocus = focus;
         await _open.SetAsync(true, OpenChanged.HasDelegate, OpenChanged);
         Context.NotifyStateChanged();
+        Menubar?.NotifyStateChanged();
     }
 
     internal async Task CloseAsync(bool dismissed = false)
     {
         if (!IsOpen) return;
         if (dismissed) _dismissedAt = DateTimeOffset.UtcNow;
+        if (Context.OpenSub is { } sub) await sub.CloseAsync();
         Context.Active = null;
+        if (Menubar?.OpenMenu == this) Menubar.OpenMenu = null;
         await _open.SetAsync(false, OpenChanged.HasDelegate, OpenChanged);
         Context.NotifyStateChanged();
+        Menubar?.NotifyStateChanged();
     }
 
     internal enum MenuFocus
@@ -60,7 +91,14 @@
 
     internal sealed class MenuContext : PrimitiveContext
     {
-        public Menu Owner { get; set; } = default!;
+        public IMenuOwner Owner { get; set; } = default!;
+        /// <summary>The menu that contains this submenu's trigger (null for a root menu).</summary>
+        public MenuContext? Parent { get; set; }
+        /// <summary>The submenu of this menu that is currently open.</summary>
+        public MenuSub? OpenSub { get; set; }
+        public Menubar.MenubarContext? Menubar { get; set; }
+        /// <summary>Moves focus to the first or last item of the open menu (set by MenuContent).</summary>
+        public Func<MenuFocus, Task>? FocusEdge { get; set; }
         public string MenuId { get; set; } = "";
         public string TriggerId { get; set; } = "";
         public ElementReference Trigger { get; set; }

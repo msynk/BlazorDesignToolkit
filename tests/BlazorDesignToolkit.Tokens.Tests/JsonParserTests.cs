@@ -113,6 +113,24 @@ public class JsonParserTests
     }
 
     [Theory]
+    [InlineData("#/brand%20colors/$value", new[] { "brand colors", "$value" })]
+    [InlineData("#/a%2Fb", new[] { "a", "b" })]                    // decoded before splitting (RFC 6901 §6)
+    [InlineData("#/caf%C3%A9", new[] { "café" })]
+    [InlineData("#/50%25", new[] { "50%" })]
+    [InlineData("#/50%", new[] { "50%" })]                         // a stray '%' is kept literally
+    [InlineData("#/%zz", new[] { "%zz" })]
+    public void Percent_decodes_pointer_fragments(string pointer, string[] expected)
+    {
+        Assert.True(JsonPointer.TryParse(pointer, out var segments, out var error), error);
+        Assert.Equal(expected, segments);
+        Assert.True(JsonPointer.TryParse(JsonPointer.Format(segments), out var again, out _));
+        Assert.Equal(segments, again);
+    }
+
+    [Fact]
+    public void Rejects_percent_encoded_invalid_utf8() => Assert.False(JsonPointer.TryParse("#/%C3%28", out _, out _));
+
+    [Theory]
     [InlineData("a/b")]
     [InlineData("#a")]
     [InlineData("#/a~2")]

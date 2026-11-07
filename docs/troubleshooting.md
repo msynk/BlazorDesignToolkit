@@ -17,8 +17,19 @@ Generate the Tailwind output in reference mode (default) with a prefix, load the
 utilities you use belong to mapped namespaces.
 
 **Bootstrap buttons keep the old color at runtime.**
-`.btn-*` colors are compiled from Sass. Use the `bootstrap-scss` output for brand colors; runtime `--bs-*` overrides only
-affect what Bootstrap reads at runtime. See [integrations.md](integrations.md#bootstrap-53-blazordesigntoolkittokensbootstrap).
+`.btn-*` colors are compiled from Sass. Generate the `bootstrap-themes` output (or `bootstrap-css`) and load it *after*
+`bootstrap.css`: its component bridge points `.btn-*`, `.btn-outline-*`, `.text-bg-*` and the components that use
+`$component-active-bg` at runtime variables computed for every theme and mode. SVG icons that Bootstrap embeds with
+compiled colors keep them. See [integrations.md](integrations.md#bootstrap-53-blazordesigntoolkittokensbootstrap).
+
+**A controlled component jumps back to its old value.**
+When you pass `Value` and handle `ValueChanged`, the component is controlled: if your handler does not store the new
+value (and you re-render), the change is reverted, as with Blazor's own inputs. Use `@bind-Value`, store the value in the
+handler, or pass only `DefaultValue` and `ValueChanged` for an uncontrolled component that just reports changes.
+
+**A virtualized listbox or tree renders every row, or jumps while scrolling.**
+Give it a height (`max-height` and `overflow: auto`; the starter styles do) so it is the scroll container, and keep every
+row exactly `ItemSize` pixels tall.
 
 **BDT5005 "Contrast cannot be determined".**
 The color is outside sRGB, uses `none`, or the background is translucent without a `backdrop`. Configure
@@ -55,4 +66,5 @@ Yes. `BlazorDesignToolkit.Primitives` has no dependency on tokens or theming.
 Yes. `BlazorDesignToolkit.Tokens` and `BlazorDesignToolkit.Theming` are plain .NET libraries (trimming- and AOT-compatible).
 
 **Does the toolkit send telemetry or access the network?**
-No. Resolver file references cannot leave the configured root, and remote references are rejected.
+No telemetry. Network access happens only if you opt in to remote sources (`HttpResolverSourceLoader`; CLI `"remote"`),
+and then only for HTTPS URLs under the prefixes you allow. Resolver file references cannot leave the configured root.

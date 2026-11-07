@@ -50,6 +50,9 @@ public sealed class ColorValue : TokenValue
     /// <summary>Gamma-encoded sRGB (unclipped; check <see cref="SrgbColor.IsInGamut"/>).</summary>
     public SrgbColor ToSrgb() => ColorMath.ToSrgb(ColorSpace, Components, Alpha);
 
+    /// <summary>sRGB within gamut: unchanged when representable, otherwise CSS Color 4 gamut-mapped (see <see cref="ColorMath.GamutMapToSrgb"/>).</summary>
+    public SrgbColor ToSrgbGamutMapped() => ColorMath.GamutMapToSrgb(ColorSpace, Components, Alpha);
+
     public ColorValue ConvertTo(string colorSpace)
     {
         var converted = ColorMath.Convert(ColorSpace, Components, colorSpace);

@@ -228,6 +228,32 @@ public class BootstrapTests
 
 public class FluentTests
 {
+    [Fact]
+    public void Catalog_equals_the_fluent_token_package()
+    {
+        var tools = Fixture.RequireTools();
+        var package = Path.Combine(tools, "node_modules", "@fluentui", "tokens", "lib-commonjs", "index.cjs");
+        if (!File.Exists(package)) Assert.Skip("@fluentui/tokens is not installed. Run 'npm ci' in tests/integration-tools.");
+        var (exit, output) = Fixture.RunNode(tools, tools, "-e",
+            "const t = require(process.argv[1]); console.log(require(process.argv[2]).version); console.log(Object.keys(t.tokens).join(' '));",
+            package, Path.Combine(tools, "node_modules", "@fluentui", "tokens", "package.json"));
+        Assert.True(exit == 0, output);
+        var lines = output.Split((char[])[' ', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Assert.Equal(FluentTokenCatalog.SourceVersion, lines[0]);
+        Assert.Equal(lines.Skip(1).Order(StringComparer.Ordinal), FluentTokenCatalog.Tokens.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Catalog_assigns_types_by_token_family()
+    {
+        Assert.Equal(467, FluentTokenCatalog.Tokens.Count);
+        Assert.Equal(TokenTypes.Color, FluentTokenCatalog.Tokens["colorNeutralForeground2BrandHover"][0]);
+        Assert.Equal(TokenTypes.Dimension, FluentTokenCatalog.Tokens["spacingHorizontalMNudge"][0]);
+        Assert.Equal(TokenTypes.Dimension, FluentTokenCatalog.Tokens["lineHeightHero1000"][0]);
+        Assert.Equal(TokenTypes.Number, FluentTokenCatalog.Tokens["zIndexPopup"][0]);
+        Assert.Equal(TokenTypes.CubicBezier, FluentTokenCatalog.Tokens["curveEasyEaseMax"][0]);
+    }
+
     private static readonly TargetMapping[] s_mappings =
     [
         new("colorNeutralForeground1", "color.text.default"),

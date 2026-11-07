@@ -4,8 +4,9 @@
    until dismissed, and every toast has a dismiss button. Render once in the layout. *@
 @implements IDisposable
 @inject ToastService Toasts
+@inject IServiceProvider Services
 
-<section @attributes="AdditionalAttributes" aria-label="@Label"
+<section @attributes="AdditionalAttributes" aria-label="@(Label ?? Strings.ToastRegionLabel)"
          @onmouseenter="Pause" @onmouseleave="Resume" @onfocusin="Pause" @onfocusout="Resume">
     <ol data-toasts="">
         @foreach (var toast in Toasts.Toasts)
@@ -33,7 +34,7 @@
                 </div>
                 @if (ToastTemplate is null)
                 {
-                    <button type="button" data-toast-dismiss="" aria-label="@DismissLabel" @onclick="() => Toasts.Dismiss(t.Id)">×</button>
+                    <button type="button" data-toast-dismiss="" aria-label="@(DismissLabel ?? Strings.ToastDismiss)" @onclick="() => Toasts.Dismiss(t.Id)">×</button>
                 }
             </li>
         }
@@ -43,8 +44,11 @@
 @code {
     private bool _paused;
 
-    [Parameter] public string Label { get; set; } = "Notifications";
-    [Parameter] public string DismissLabel { get; set; } = "Dismiss notification";
+    /// <summary>Accessible name of the region; default from <see cref="PrimitiveStrings.ToastRegionLabel"/>.</summary>
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? DismissLabel { get; set; }
+
+    private PrimitiveStrings Strings => (PrimitiveStrings?)Services.GetService(typeof(PrimitiveStrings)) ?? PrimitiveStrings.Default;
     [Parameter] public RenderFragment<ToastContext>? ToastTemplate { get; set; }
     [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 

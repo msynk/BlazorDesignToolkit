@@ -28,7 +28,9 @@ public sealed record TailwindExportOptions
 /// Generates a Tailwind CSS v4 <c>@theme</c> block from tokens. Every mapping is type-checked against the namespace
 /// (for example <c>radius</c> requires dimensions, <c>shadow</c> requires shadows); mismatches are reported, never coerced.
 /// In reference mode the block uses <c>@theme inline</c> so utilities resolve to the runtime theme variables and follow
-/// theme and mode switches. Supported: Tailwind CSS 4.0 and later. Tailwind 3 JavaScript configs are not generated.
+/// theme and mode switches. Supported: Tailwind CSS 4.0 and later; for Tailwind 3 use <see cref="TailwindConfigExporter"/>.
+/// Breakpoint and container sizes are always written as literal values, because Tailwind uses them in media and container
+/// queries, where <c>var()</c> is not allowed.
 /// </summary>
 public static class TailwindThemeExporter
 {
@@ -55,52 +57,26 @@ public static class TailwindThemeExporter
         ["ease"] = [TokenTypes.CubicBezier],
     };
 
+    /// <summary>Namespaces whose values Tailwind evaluates at build time inside @media/@container queries.</summary>
+    internal static readonly HashSet<string> LiteralOnlyNamespaces = new(StringComparer.Ordinal) { "breakpoint", "container" };
+
     public static TokenExportOutput Export(ResolvedTokenSet tokens, TailwindExportOptions options)
     {
         var bag = new DiagnosticBag();
         var lines = new List<string>();
-        var names = new Dictionary<string, TokenPath>(StringComparer.Ordinal);
-        if (options.Values == IntegrationValueMode.Reference && string.IsNullOrEmpty(options.Css.Prefix))
-        {
-            bag.Report(DiagnosticCatalog.InvalidConfiguration,
-                "Reference mode needs a CSS prefix for the runtime variables (for example \"ds\"); otherwise Tailwind theme variables such as --color-x would reference themselves.",
-                remediation: "Set the 'prefix' setting to the prefix used by your token stylesheet.");
-            return new TokenExportOutput("", bag.ToSortedList());
-        }
+        if (!CheckPrefix(options, bag)) return new TokenExportOutput("", bag.ToSortedList());
         foreach (var mapping in options.Mappings)
         {
-            if (!Namespaces.TryGetValue(mapping.Namespace, out var types))
+            if (!Namespaces.ContainsKey(mapping.Namespace))
             {
                 bag.Report(DiagnosticCatalog.InvalidMapping, $"'{mapping.Namespace}' is not a supported Tailwind v4 theme namespace.",
                     expected: string.Join(", ", Namespaces.Keys), actual: mapping.Namespace);
                 continue;
             }
             if (options.ResetMappedNamespaces) AddLine(lines, $"--{mapping.Namespace}-*: initial;");
-            var strip = TokenPath.Parse(mapping.StripPrefix ?? LiteralPrefix(mapping.Tokens));
-            var matched = tokens.Tokens.Where(t => TokenPathPattern.IsMatch(mapping.Tokens, t.Path.ToString())).ToList();
-            if (matched.Count == 0)
+            foreach (var (token, suffix) in Match(tokens, mapping, bag))
             {
-                bag.Report(DiagnosticCatalog.InvalidMapping, $"Tailwind mapping '{mapping.Tokens}' → {mapping.Namespace} matches no tokens.", actual: mapping.Tokens);
-            }
-            foreach (var token in matched)
-            {
-                if (!token.IsValid) continue;
-                if (!types.Contains(token.Type!))
-                {
-                    bag.Report(DiagnosticCatalog.MappingTypeMismatch,
-                        $"Tailwind namespace '{mapping.Namespace}' accepts {string.Join(" or ", types)}, but '{token.Path}' is a {token.Type}.",
-                        token.Path.ToString(), token.Location, expected: string.Join(" | ", types), actual: token.Type);
-                    continue;
-                }
-                var relative = token.Path.StartsWith(strip) && token.Path.Length > strip.Length ? token.Path.RelativeTo(strip) : token.Path;
-                var suffix = string.Join("-", relative.Segments.Where(static s => s != TokenPath.RootTokenName).Select(CssExporter.ToKebab));
                 var name = suffix.Length == 0 ? $"--{mapping.Namespace}" : $"--{mapping.Namespace}-{suffix}";
-                if (names.TryGetValue(name, out var existing))
-                {
-                    bag.Report(DiagnosticCatalog.NameCollision, $"'{token.Path}' and '{existing}' both map to Tailwind variable {name}.", token.Path.ToString(), token.Location);
-                    continue;
-                }
-                names[name] = token.Path;
                 foreach (var line in Declarations(name, token, mapping.Namespace, options, bag)) AddLine(lines, line);
             }
         }
@@ -115,6 +91,49 @@ public static class TailwindThemeExporter
         foreach (var line in lines) sb.Append("  ").Append(line).Append('\n');
         sb.Append("}\n");
         return new TokenExportOutput(sb.ToString(), bag.ToSortedList());
+    }
+
+    internal static bool CheckPrefix(TailwindExportOptions options, DiagnosticBag bag)
+    {
+        if (options.Values != IntegrationValueMode.Reference || !string.IsNullOrEmpty(options.Css.Prefix)) return true;
+        bag.Report(DiagnosticCatalog.InvalidConfiguration,
+            "Reference mode needs a CSS prefix for the runtime variables (for example \"ds\"); otherwise Tailwind theme variables such as --color-x would reference themselves.",
+            remediation: "Set the 'prefix' setting to the prefix used by your token stylesheet.");
+        return false;
+    }
+
+    /// <summary>Tokens matched by <paramref name="mapping"/> with the utility-name suffix each one gets; reports type mismatches and collisions.</summary>
+    internal static IEnumerable<(ResolvedToken Token, string Suffix)> Match(ResolvedTokenSet tokens, TailwindMapping mapping, DiagnosticBag bag)
+    {
+        var types = Namespaces[mapping.Namespace];
+        var names = new Dictionary<string, TokenPath>(StringComparer.Ordinal);
+        var strip = TokenPath.Parse(mapping.StripPrefix ?? LiteralPrefix(mapping.Tokens));
+        var matched = tokens.Tokens.Where(t => TokenPathPattern.IsMatch(mapping.Tokens, t.Path.ToString())).ToList();
+        if (matched.Count == 0)
+        {
+            bag.Report(DiagnosticCatalog.InvalidMapping, $"Tailwind mapping '{mapping.Tokens}' → {mapping.Namespace} matches no tokens.", actual: mapping.Tokens);
+        }
+        foreach (var token in matched)
+        {
+            if (!token.IsValid) continue;
+            if (!types.Contains(token.Type!))
+            {
+                bag.Report(DiagnosticCatalog.MappingTypeMismatch,
+                    $"Tailwind namespace '{mapping.Namespace}' accepts {string.Join(" or ", types)}, but '{token.Path}' is a {token.Type}.",
+                    token.Path.ToString(), token.Location, expected: string.Join(" | ", types), actual: token.Type);
+                continue;
+            }
+            var relative = token.Path.StartsWith(strip) && token.Path.Length > strip.Length ? token.Path.RelativeTo(strip) : token.Path;
+            var suffix = string.Join("-", relative.Segments.Where(static s => s != TokenPath.RootTokenName).Select(CssExporter.ToKebab));
+            if (names.TryGetValue(suffix, out var existing))
+            {
+                bag.Report(DiagnosticCatalog.NameCollision, $"'{token.Path}' and '{existing}' both map to Tailwind name '{mapping.Namespace}{(suffix.Length == 0 ? "" : "-" + suffix)}'.",
+                    token.Path.ToString(), token.Location);
+                continue;
+            }
+            names[suffix] = token.Path;
+            yield return (token, suffix);
+        }
     }
 
     private static void AddLine(List<string> lines, string line)
@@ -147,11 +166,12 @@ public static class TailwindThemeExporter
             yield return $"{name}: {string.Join(", ", layers)};";
             yield break;
         }
-        var value = IntegrationSupport.Format(token, options.Values, options.Css, bag);
+        var mode = LiteralOnlyNamespaces.Contains(ns) ? IntegrationValueMode.Literal : options.Values;
+        var value = IntegrationSupport.Format(token, mode, options.Css, bag);
         if (value is not null) yield return $"{name}: {value};";
     }
 
-    private static string LiteralPrefix(string pattern)
+    internal static string LiteralPrefix(string pattern)
     {
         var segments = pattern.Split('.').TakeWhile(static s => !s.Contains('*'));
         return string.Join('.', segments);
@@ -171,9 +191,9 @@ public sealed class TailwindTokenExporter : ITokenExporter
         ["colorFormat"] = "Color format for literal mode: 'auto', 'hex' or 'native'.",
     };
 
-    public TokenExportOutput Export(TokenExportContext context)
+    /// <summary>Reads <c>{ "mappings": [ { "tokens": "color.**", "namespace": "color", "stripPrefix": "color" } ] }</c>.</summary>
+    public static List<TailwindMapping> ReadMappings(TokenExportContext context, DiagnosticBag bag)
     {
-        var bag = new DiagnosticBag();
         var mappings = new List<TailwindMapping>();
         if (context.Configuration?["mappings"] is SourceArray arr)
         {
@@ -184,7 +204,14 @@ public sealed class TailwindTokenExporter : ITokenExporter
                 else bag.Report(DiagnosticCatalog.InvalidConfiguration, "Tailwind mappings need \"tokens\" and \"namespace\".", location: item.Location);
             }
         }
-        else bag.Report(DiagnosticCatalog.InvalidConfiguration, "The tailwind exporter needs a \"mappings\" array in its configuration.");
+        else bag.Report(DiagnosticCatalog.InvalidConfiguration, "The Tailwind exporters need a \"mappings\" array in their configuration.");
+        return mappings;
+    }
+
+    public TokenExportOutput Export(TokenExportContext context)
+    {
+        var bag = new DiagnosticBag();
+        var mappings = ReadMappings(context, bag);
         var output = TailwindThemeExporter.Export(context.Tokens, new TailwindExportOptions
         {
             Mappings = mappings,

@@ -2,13 +2,14 @@
 
   <PropertyGroup>
     <RootNamespace>BlazorDesignToolkit.Tokens.Bootstrap</RootNamespace>
-    <Description>Bootstrap 5.3 integration for BlazorDesignToolkit design tokens: generates type-checked Sass variables and runtime CSS custom-property overrides, including -rgb companions.</Description>
+    <Description>Bootstrap 5.3 integration for BlazorDesignToolkit design tokens: type-checked Sass variables, and runtime --bs-* variables for every theme and mode with a component bridge so compiled components follow theme switches.</Description>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorDesignToolkit.Tokens\BlazorDesignToolkit.Tokens.csproj" />
+    <ProjectReference Include="..\BlazorDesignToolkit.Theming\BlazorDesignToolkit.Theming.csproj" />
   </ItemGroup>
 
 </Project>

@@ -7,8 +7,9 @@ namespace BlazorDesignToolkit.Primitives;
 /// <summary>Common behavior of menu items: registration, roving focus, Enter/Space activation, disabled handling.</summary>
 public abstract class MenuItemBase : PrimitiveBase, ICompositeItem
 {
-    private ElementReference _element;
     private string _id = "";
+
+    protected ElementReference Element { get; private set; }
 
     [CascadingParameter] internal Menu.MenuContext Context { get; set; } = default!;
     [Parameter] public bool Disabled { get; set; }
@@ -33,18 +34,24 @@ public abstract class MenuItemBase : PrimitiveBase, ICompositeItem
         Track(Context);
     }
 
-    internal ValueTask FocusAsync() => _element.FocusAsync();
+    internal ValueTask FocusAsync() => Element.FocusAsync();
 
     protected abstract Task OnActivateAsync();
 
-    private async Task ActivateAsync()
+    /// <summary>Extra attributes of the item element (for example aria-haspopup on submenu triggers).</summary>
+    protected virtual IEnumerable<KeyValuePair<string, object>>? ExtraAttributes => null;
+
+    protected virtual async Task ActivateAsync()
     {
         if (Disabled) return;
         await OnActivateAsync();
-        if (ClosesMenu) await Context.Owner.CloseAsync();
+        if (ClosesMenu) await Context.Owner.CloseAllAsync();
     }
 
-    private Task OnKeyDownAsync(KeyboardEventArgs e) => e.Key is "Enter" or " " ? ActivateAsync() : Task.CompletedTask;
+    protected virtual Task OnKeyDownAsync(KeyboardEventArgs e) => e.Key is "Enter" or " " ? ActivateAsync() : Task.CompletedTask;
+
+    /// <summary>Pointer hover: moving to another item closes a sibling submenu.</summary>
+    protected virtual Task OnPointerEnterAsync() => Context.OpenSub is { } sub ? sub.CloseAsync() : Task.CompletedTask;
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
@@ -69,8 +76,10 @@ public abstract class MenuItemBase : PrimitiveBase, ICompositeItem
         builder.AddAttribute(11, "onclick", EventCallback.Factory.Create(this, ActivateAsync));
         builder.AddAttribute(12, "onkeydown", EventCallback.Factory.Create<KeyboardEventArgs>(this, OnKeyDownAsync));
         builder.AddAttribute(13, "onfocus", EventCallback.Factory.Create(this, () => Context.Active = this));
-        builder.AddElementReferenceCapture(14, r => _element = r);
-        builder.AddContent(15, ChildContent);
+        builder.AddAttribute(14, "onpointerenter", EventCallback.Factory.Create(this, OnPointerEnterAsync));
+        builder.AddMultipleAttributes(15, ExtraAttributes);
+        builder.AddElementReferenceCapture(16, r => Element = r);
+        builder.AddContent(17, ChildContent);
         builder.CloseElement();
     }
 
@@ -162,5 +171,48 @@ public sealed class MenuSeparator : PrimitiveBase
         builder.AddMultipleAttributes(1, Attributes("role"));
         builder.AddAttribute(2, "role", "separator");
         builder.CloseElement();
+    }
+}
+
+/// <summary>
+/// The menuitem that opens a <see cref="MenuSub"/> (aria-haspopup="menu", aria-expanded). Place it inside MenuSub, before
+/// MenuSubContent.
+/// </summary>
+public sealed class MenuSubTrigger : MenuItemBase
+{
+    [CascadingParameter] internal MenuSub Sub { get; set; } = default!;
+
+    protected override string Role => "menuitem";
+    protected override bool ClosesMenu => false;
+
+    protected override void OnInitialized()
+    {
+        if (Sub is null) throw new InvalidOperationException("MenuSubTrigger must be placed inside MenuSub.");
+        base.OnInitialized();
+        Sub.Context.TriggerId = ElementId;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) Sub.Context.Trigger = Element;
+    }
+
+    protected override IEnumerable<KeyValuePair<string, object>>? ExtraAttributes =>
+    [
+        new("aria-haspopup", "menu"),
+        new("aria-expanded", Sub.IsOpen ? "true" : "false"),
+        new("aria-controls", Sub.Context.MenuId),
+        new("data-submenu-trigger", ""),
+    ];
+
+    protected override Task OnActivateAsync() => Sub.OpenAsync(Menu.MenuFocus.First);
+
+    protected override Task OnKeyDownAsync(KeyboardEventArgs e)
+        => e.Key is "ArrowRight" or "Enter" or " " ? Sub.OpenAsync(Menu.MenuFocus.First) : Task.CompletedTask;
+
+    protected override async Task OnPointerEnterAsync()
+    {
+        if (Disabled) return;
+        await Sub.OpenAsync(null);
     }
 }

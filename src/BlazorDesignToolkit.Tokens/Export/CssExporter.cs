@@ -20,10 +20,18 @@ public enum CssColorFormat
 {
     /// <summary>sRGB colors as hex when they are exact 8-bit values, otherwise the CSS function matching the token's color space (lossless).</summary>
     Auto,
-    /// <summary>Always hex (#rrggbb / #rrggbbaa). Out-of-gamut colors are clipped and reported (BDT7003).</summary>
+    /// <summary>Always hex (#rrggbb / #rrggbbaa). Out-of-gamut colors are gamut-mapped (see <see cref="CssExportOptions.GamutMapping"/>) and reported (BDT7003).</summary>
     Hex,
     /// <summary>Always the CSS function matching the token's color space, e.g. <c>oklch()</c> or <c>color(display-p3 …)</c>.</summary>
     Native,
+}
+
+public enum GamutMapping
+{
+    /// <summary>CSS Color Module Level 4 gamut mapping: reduce OKLCh chroma, keep lightness and hue (what browsers are specified to do).</summary>
+    Css,
+    /// <summary>Clamp each sRGB channel to [0, 1]. Can shift hue and lightness noticeably.</summary>
+    Clip,
 }
 
 public enum CssNameStyle
@@ -43,6 +51,8 @@ public sealed record CssExportOptions
     public CssNameStyle NameStyle { get; init; } = CssNameStyle.KebabCase;
     public CssReferenceMode References { get; init; } = CssReferenceMode.Resolve;
     public CssColorFormat ColorFormat { get; init; } = CssColorFormat.Auto;
+    /// <summary>How colors outside sRGB are brought into gamut when an sRGB-only format (hex) is required.</summary>
+    public GamutMapping GamutMapping { get; init; } = GamutMapping.Css;
     public string Selector { get; init; } = ":root";
     /// <summary>Wraps the output in <c>@layer {Layer} { … }</c> when set.</summary>
     public string? Layer { get; init; }
@@ -406,8 +416,11 @@ public static class CssExporter
                 var srgb = c.ToSrgb();
                 if (!srgb.IsInGamut)
                 {
-                    bag.Report(DiagnosticCatalog.OutOfGamut, $"'{TokenPathText}' ({c.ColorSpace}) is outside the sRGB gamut and was clipped for hex output.",
+                    var mapped = options.GamutMapping == GamutMapping.Clip ? srgb.Clip() : c.ToSrgbGamutMapped();
+                    bag.Report(DiagnosticCatalog.OutOfGamut,
+                        $"'{TokenPathText}' ({c.ColorSpace}) is outside the sRGB gamut and was {(options.GamutMapping == GamutMapping.Clip ? "clipped" : "gamut-mapped")} to {mapped.ToHex()} for hex output.",
                         TokenPathText, token?.Location, actual: c.ColorSpace, remediation: "Use ColorFormat Auto or Native to keep wide-gamut colors.");
+                    return mapped.ToHex();
                 }
                 return srgb.ToHex();
             }

@@ -33,7 +33,13 @@ public sealed class ThemeManifestResult(ThemeCatalog? catalog, IReadOnlyList<Dia
 /// </example>
 public static class ThemeManifest
 {
-    public static async Task<ThemeManifestResult> LoadAsync(string path, JsonParseOptions? parseOptions = null, CancellationToken cancellationToken = default)
+    public static Task<ThemeManifestResult> LoadAsync(string path, JsonParseOptions? parseOptions = null, CancellationToken cancellationToken = default)
+        => LoadAsync(path, parseOptions, null, cancellationToken);
+
+    /// <summary>Loads a manifest file. <paramref name="createLoader"/> receives the manifest directory and returns the loader for
+    /// referenced files (default: a <see cref="FileSystemResolverSourceLoader"/> restricted to that directory).</summary>
+    public static async Task<ThemeManifestResult> LoadAsync(string path, JsonParseOptions? parseOptions, Func<string, IResolverSourceLoader>? createLoader,
+        CancellationToken cancellationToken = default)
     {
         var full = Path.GetFullPath(path);
         var parsed = await SourceJsonParser.ParseFileAsync(full, parseOptions, cancellationToken).ConfigureAwait(false);
@@ -45,7 +51,8 @@ public static class ThemeManifest
             return new ThemeManifestResult(null, bag.ToSortedList(), []);
         }
         var directory = Path.GetDirectoryName(full)!;
-        return await LoadAsync(root, directory, new FileSystemResolverSourceLoader(directory, parseOptions), parsed.Diagnostics, cancellationToken).ConfigureAwait(false);
+        var loader = createLoader?.Invoke(directory) ?? new FileSystemResolverSourceLoader(directory, parseOptions);
+        return await LoadAsync(root, directory, loader, parsed.Diagnostics, cancellationToken).ConfigureAwait(false);
     }
 
     public static async Task<ThemeManifestResult> LoadAsync(SourceObject root, string? baseDirectory, IResolverSourceLoader loader,

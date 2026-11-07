@@ -1,24 +1,58 @@
 @* Applies a different theme (and axis values) to a subtree without JavaScript, for previews or embedded brands.
-   All axis attributes are rendered so that the scope does not inherit stale values from ancestors. *@
+   All axis attributes are rendered so that the scope does not inherit stale values from ancestors. Overrides are written
+   as inline custom properties on the scope element (only the declarations whose values change), so they apply to the
+   subtree only. *@
+@using BlazorDesignToolkit.Tokens.Diagnostics
+@using BlazorDesignToolkit.Tokens.Json
 @inject ThemeCatalog Catalog
 @inject ThemingOptions Options
 
-<div @attributes="Attributes">@ChildContent</div>
+<div @attributes="_attributes">@ChildContent</div>
 
 @code {
+    private IReadOnlyDictionary<string, object> _attributes = new Dictionary<string, object>();
+    private (string ThemeId, IReadOnlyDictionary<string, string>? Axes, IReadOnlyDictionary<string, SourceNode>? Overrides, string? Style)? _computedFor;
+    private string _overrideStyle = "";
+
     [Parameter, EditorRequired] public string ThemeId { get; set; } = "";
     /// <summary>Axis values for the scope. Missing axes use their defaults; <c>system</c> is supported.</summary>
     [Parameter] public IReadOnlyDictionary<string, string>? Axes { get; set; }
+    /// <summary>
+    /// Token overrides for this subtree: token path → DTCG <c>$value</c> (for example
+    /// <c>["color.brand.primary"] = SourceJsonParser.Parse("{ \"colorSpace\": \"srgb\", \"components\": [1, 0, 0] }").Root</c>).
+    /// Invalid overrides are ignored and reported through <see cref="OverrideDiagnostics"/>.
+    /// </summary>
+    [Parameter] public IReadOnlyDictionary<string, SourceNode>? Overrides { get; set; }
+    /// <summary>Receives the diagnostics of <see cref="Overrides"/> whenever they are recomputed.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<Diagnostic>> OverrideDiagnostics { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
-    private IReadOnlyDictionary<string, object> Attributes
+    protected override async Task OnParametersSetAsync()
     {
-        get
+        var style = AdditionalAttributes?.TryGetValue("style", out var s) == true ? s?.ToString() : null;
+        var key = (ThemeId, Axes, Overrides, style);
+        IReadOnlyList<Diagnostic>? diagnostics = null;
+        if (_computedFor is not { } previous || previous.ThemeId != ThemeId || !ReferenceEquals(previous.Axes, Axes) || !ReferenceEquals(previous.Overrides, Overrides))
         {
-            var result = new Dictionary<string, object>(AdditionalAttributes ?? new Dictionary<string, object>(), StringComparer.Ordinal);
-            foreach (var (k, v) in ThemeRootAttributes.For(Catalog, new ThemeSelection(ThemeId, Axes), Options.Css)) result[k] = v;
-            return result;
+            _overrideStyle = "";
+            if (Overrides is { Count: > 0 })
+            {
+                var selection = new ThemeSelection(ThemeId, Axes);
+                var declarations = ThemeStylesheetGenerator.GetOverrideDeclarations(Catalog, selection, ThemeOverrides.ToTree(Overrides), Options.Css, out var found);
+                _overrideStyle = string.Concat(declarations.Select(static d => $"{d.Name}: {d.Value}; "));
+                diagnostics = found;
+            }
         }
+        _computedFor = key;
+
+        var result = new Dictionary<string, object>(AdditionalAttributes ?? new Dictionary<string, object>(), StringComparer.Ordinal);
+        foreach (var (k, v) in ThemeRootAttributes.For(Catalog, new ThemeSelection(ThemeId, Axes), Options.Css)) result[k] = v;
+        var combined = (_overrideStyle + (style ?? "")).Trim();
+        if (combined.Length > 0) result["style"] = combined;
+        else result.Remove("style");
+        _attributes = result;
+
+        if (diagnostics is not null && OverrideDiagnostics.HasDelegate) await OverrideDiagnostics.InvokeAsync(diagnostics);
     }
 }

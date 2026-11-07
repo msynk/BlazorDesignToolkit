@@ -1,0 +1,93 @@
+name: Release
+
+# Publishes the NuGet packages for a version tag (v1.2.3 or v1.2.3-preview.1). Nothing runs on ordinary pushes.
+# Requirements before the first release:
+#   - a repository secret NUGET_API_KEY (an API key scoped to the BlazorDesignToolkit.* package ids), and
+#   - an environment named "nuget" with required reviewers, so that every push to nuget.org is approved by a person.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to build (packages are attached to a draft GitHub release; nothing is pushed to nuget.org)
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: version
+        name: Determine version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then v="${{ inputs.version }}"; else v="${GITHUB_REF_NAME#v}"; fi
+          echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || { echo "Invalid version '$v'"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - run: npm ci --prefix tests/integration-tools --no-audit --no-fund
+      - run: dotnet build BlazorDesignToolkit.slnx -c Release -p:Version=${{ steps.version.outputs.version }}
+      - name: Tests
+        run: |
+          for project in Tokens Theming Primitives Integrations Cli; do
+            dotnet test tests/BlazorDesignToolkit.$project.Tests -c Release --no-build
+          done
+      - name: Quality gates
+        run: dotnet run --project src/BlazorDesignToolkit.Cli -c Release --no-build -- check --config samples/bdt.config.json
+      - name: Pack (with package validation and SourceLink)
+        run: dotnet pack BlazorDesignToolkit.slnx -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: artifacts/*
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts
+      - name: Create GitHub release (draft for manual runs)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ needs.build.outputs.version }}"
+          flags="--generate-notes"
+          case "$v" in *-*) flags="$flags --prerelease";; esac
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then flags="$flags --draft --target ${{ github.sha }}"; fi
+          gh release create "v$v" artifacts/* --title "v$v" $flags
+
+  nuget:
+    if: github.event_name == 'push'
+    needs: [build, github-release]
+    runs-on: ubuntu-latest
+    environment: nuget
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: artifacts
+      - name: Push to nuget.org
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate

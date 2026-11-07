@@ -26,7 +26,7 @@
 
     protected override void OnInitialized() => _pressed.Initialize(DefaultPressed || Pressed);
 
-    protected override void OnParametersSet() => _pressed.Sync(Pressed);
+    protected override void OnParametersSet() => _pressed.Sync(Pressed, IsProvided(nameof(Pressed)));
 
     private Task ToggleAsync() => Disabled ? Task.CompletedTask : _pressed.SetAsync(!Current, Controlled, PressedChanged);
 }

@@ -89,12 +89,17 @@ public sealed record ThemeState
 
     public string ThemeId => Selection.ThemeId;
 
-    public SourceObject? OverridesTree => Overrides.IsEmpty ? null : BuildTree(Overrides);
+    public SourceObject? OverridesTree => Overrides.IsEmpty ? null : ThemeOverrides.ToTree(Overrides);
+}
 
-    private static SourceObject BuildTree(ImmutableSortedDictionary<string, SourceNode> overrides)
+/// <summary>Helpers for runtime token overrides (token path → DTCG <c>$value</c>).</summary>
+public static class ThemeOverrides
+{
+    /// <summary>Builds the partial token tree that <see cref="ThemeCatalog.Resolve(ThemeSelection, SourceObject?, CancellationToken)"/> layers on top of a theme.</summary>
+    public static SourceObject ToTree(IEnumerable<KeyValuePair<string, SourceNode>> overrides)
     {
         var tree = SourceObject.Empty;
-        foreach (var (path, value) in overrides)
+        foreach (var (path, value) in overrides.OrderBy(static o => o.Key, StringComparer.Ordinal))
         {
             var segments = TokenPath.Parse(path).Segments;
             SourceObject node = SourceObject.Create(("$value", value));

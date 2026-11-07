@@ -1,0 +1,295 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Date Picker Dialog: a text input for typing a date (parsed with the culture's short date pattern on blur or
+   Enter), and a button (aria-haspopup="dialog") that opens a modal dialog with a month grid (role="grid").
+   In the grid: arrows move by day/week (RTL-aware), Home/End to the start/end of the week, Page Up/Down by month,
+   Shift+Page Up/Down by year, Enter/Space choose the date and close, Escape closes; focus returns to the button. Tab cycles
+   inside the dialog. The month heading is a polite live region. Min/Max and IsDateDisabled restrict choices
+   (aria-disabled; they stay reachable by keyboard so the calendar can be explored). Texts come from PrimitiveStrings. *@
+@using System.Globalization
+@inherits PrimitiveBase
+
+<div data-date-picker="" data-disabled="@(IsDisabled ? "" : null)" @attributes='Attributes("id", "type", "value")'>
+    <input type="text" @ref="_input"
+           id="@_id"
+           autocomplete="off"
+           placeholder="@(Placeholder ?? EffectiveCulture.DateTimeFormat.ShortDatePattern.ToLowerInvariant())"
+           aria-describedby="@DescribedBy"
+           aria-invalid="@(Field?.Invalid == true || _invalidText ? "true" : null)"
+           aria-required="@(Required || Field?.Required == true ? "true" : null)"
+           aria-label="@Label"
+           disabled="@IsDisabled"
+           name="@Name"
+           @bind:get="_text" @bind:set="OnTextChanged" @bind:event="oninput"
+           @onblur="CommitTextAsync"
+           @onkeydown="OnInputKeyDownAsync" />
+    <span id="@($"{_id}-format")" hidden>@FormatHint</span>
+    <button type="button" @ref="_button"
+            aria-label="@ButtonLabel"
+            aria-haspopup="dialog"
+            aria-expanded="@(_open ? "true" : "false")"
+            aria-controls="@DialogId"
+            disabled="@IsDisabled"
+            data-date-picker-button=""
+            @onclick="ToggleAsync">@(ButtonContent ?? (b => b.AddContent(0, "📅")))</button>
+    <div role="dialog" aria-modal="true" popover="auto" @ref="_dialog"
+         id="@DialogId"
+         aria-labelledby="@(_open ? HeadingId : null)"
+         aria-label="@(_open ? null : Strings.DatePickerDialogLabel)"
+         aria-describedby="@($"{_id}-help")"
+         data-date-picker-dialog=""
+         data-state="@(_open ? "open" : "closed")">
+        @if (_open)
+        {
+            <div data-date-picker-header="">
+                <button type="button" data-date-picker-nav="previous-year" aria-label="@Strings.DatePickerPreviousYear" @onclick="() => ShowMonthAsync(_month.AddYears(-1))">«</button>
+                <button type="button" data-date-picker-nav="previous-month" aria-label="@Strings.DatePickerPreviousMonth" @onclick="() => ShowMonthAsync(_month.AddMonths(-1))">‹</button>
+                <h2 id="@HeadingId" aria-live="polite" data-date-picker-heading="">@_month.ToString(EffectiveCulture.DateTimeFormat.YearMonthPattern, EffectiveCulture)</h2>
+                <button type="button" data-date-picker-nav="next-month" aria-label="@Strings.DatePickerNextMonth" @onclick="() => ShowMonthAsync(_month.AddMonths(1))">›</button>
+                <button type="button" data-date-picker-nav="next-year" aria-label="@Strings.DatePickerNextYear" @onclick="() => ShowMonthAsync(_month.AddYears(1))">»</button>
+            </div>
+            <table role="grid" aria-labelledby="@HeadingId" @ref="_grid"
+                   data-bdt-keys="ArrowLeft ArrowRight ArrowUp ArrowDown Home End PageUp PageDown Enter Space"
+                   @onkeydown="OnGridKeyDownAsync">
+                <thead>
+                    <tr>
+                        @foreach (var day in CalendarMath.WeekDays(FirstDayOfWeek))
+                        {
+                            <th scope="col" abbr="@EffectiveCulture.DateTimeFormat.GetDayName(day)" aria-label="@EffectiveCulture.DateTimeFormat.GetDayName(day)">@EffectiveCulture.DateTimeFormat.GetShortestDayName(day)</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var days = CalendarMath.MonthGrid(_month, FirstDayOfWeek); }
+                    @for (var week = 0; week < 6; week++)
+                    {
+                        <tr>
+                            @for (var d = 0; d < 7; d++)
+                            {
+                                var date = days[week * 7 + d];
+                                if (date.Month != _month.Month)
+                                {
+                                    <td data-outside=""></td>
+                                    continue;
+                                }
+                                var disabled = IsUnavailable(date);
+                                var selected = Current == date;
+                                <td id="@CellId(date)"
+                                    tabindex="@(date == _focused ? "0" : "-1")"
+                                    aria-selected="@(selected ? "true" : null)"
+                                    aria-current="@(date == Today ? "date" : null)"
+                                    aria-disabled="@(disabled ? "true" : null)"
+                                    aria-label="@date.ToString("D", EffectiveCulture)"
+                                    data-date="@date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
+                                    data-selected="@(selected ? "" : null)"
+                                    data-today="@(date == Today ? "" : null)"
+                                    data-disabled="@(disabled ? "" : null)"
+                                    @onclick="() => ChooseAsync(date)">@date.Day.ToString(EffectiveCulture)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        <p id="@($"{_id}-help")" data-date-picker-help="" hidden="@(!ShowKeyboardHelp)">@Strings.DatePickerKeyboardHelp</p>
+    </div>
+</div>
+
+@code {
+    private readonly Controllable<DateOnly?> _value = new(null);
+    private readonly JsResource _overlay = new();
+    private JsResource? _trap;
+    private JsResource? _gridKeys;
+    private ElementReference _input;
+    private ElementReference _button;
+    private ElementReference _dialog;
+    private ElementReference _grid;
+    private DotNetObjectReference<DatePicker>? _reference;
+    private string _id = "";
+    private string _text = "";
+    private bool _editing;
+    private bool _invalidText;
+    private bool _open;
+    private bool _shown;
+    private bool _focusPending;
+    private DateOnly _month;
+    private DateOnly _focused;
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter] public DateOnly? Value { get; set; }
+    [Parameter] public EventCallback<DateOnly?> ValueChanged { get; set; }
+    [Parameter] public DateOnly? DefaultValue { get; set; }
+    [Parameter] public DateOnly? Min { get; set; }
+    [Parameter] public DateOnly? Max { get; set; }
+    /// <summary>Dates that cannot be chosen (for example weekends or booked days).</summary>
+    [Parameter] public Func<DateOnly, bool>? IsDateDisabled { get; set; }
+    /// <summary>Culture for names, first day of week and parsing. Default: the current culture.</summary>
+    [Parameter] public CultureInfo? Culture { get; set; }
+    /// <summary>"Today" for highlighting (aria-current="date"); default: the local date. Set it for deterministic rendering.</summary>
+    [Parameter] public DateOnly? Today { get; set; }
+    [Parameter] public TextDirection Direction { get; set; } = TextDirection.Ltr;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public RenderFragment? ButtonContent { get; set; }
+    /// <summary>Show the keyboard instructions in the dialog (they are always its accessible description). Default false.</summary>
+    [Parameter] public bool ShowKeyboardHelp { get; set; }
+
+    private bool IsDisabled => Disabled || Field?.Disabled == true;
+    private DateOnly? Current => _value.Get(Value, ValueChanged.HasDelegate);
+    private CultureInfo EffectiveCulture => Culture ?? CultureInfo.CurrentCulture;
+    private DayOfWeek FirstDayOfWeek => EffectiveCulture.DateTimeFormat.FirstDayOfWeek;
+    private DateOnly TodayValue => Today ?? DateOnly.FromDateTime(DateTime.Now);
+    private string DialogId => _id + "-dialog";
+    private string HeadingId => _id + "-heading";
+    private string CellId(DateOnly date) => $"{_id}-{date:yyyyMMdd}";
+    private string FormatHint => EffectiveCulture.DateTimeFormat.ShortDatePattern;
+    private string? DescribedBy => string.Join(' ', new[] { Field?.DescribedBy, $"{_id}-format" }.Where(static s => !string.IsNullOrEmpty(s)));
+    private string ButtonLabel => Current is { } d ? $"{Strings.DatePickerOpen}, {Strings.DatePickerSelected(d, EffectiveCulture)}" : Strings.DatePickerOpen;
+
+    protected override void OnInitialized()
+    {
+        _id = Field?.ControlId ?? ProvidedId ?? Ids.Next("date");
+        _value.Initialize(DefaultValue ?? Value);
+        TrackField(Field);
+    }
+
+    protected override void OnParametersSet()
+    {
+        _value.Sync(Value, IsProvided(nameof(Value)));
+        if (!_editing) _text = Current is { } d ? d.ToString(EffectiveCulture.DateTimeFormat.ShortDatePattern, EffectiveCulture) : "";
+    }
+
+    private bool IsUnavailable(DateOnly date)
+        => (Min is { } min && date < min) || (Max is { } max && date > max) || (IsDateDisabled?.Invoke(date) ?? false);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_open && !_shown)
+        {
+            _shown = true;
+            _reference ??= DotNetObjectReference.Create(this);
+            await _overlay.OpenAsync(() => Js.TrackAsync("showPopover", _dialog, _button, _reference, new { placement = "bottom-start", focus = false, restoreFocus = true }));
+            _trap = new JsResource();
+            await _trap.OpenAsync(() => Js.TrackAsync("trapFocus", _dialog));
+            _gridKeys = new JsResource();
+            await _gridKeys.OpenAsync(() => Js.TrackAsync("preventKeys", _grid));
+        }
+        else if (!_open && _shown)
+        {
+            _shown = false;
+            if (_gridKeys is not null) await _gridKeys.CloseAsync(Js);
+            if (_trap is not null) await _trap.CloseAsync(Js);
+            await _overlay.CloseAsync(Js);
+        }
+        if (_open && _focusPending)
+        {
+            _focusPending = false;
+            await Js.InvokeVoidAsync("focusById", CellId(_focused), true);
+        }
+    }
+
+    private Task ToggleAsync() => _open ? CloseAsync() : OpenAsync();
+
+    private Task OpenAsync()
+    {
+        if (IsDisabled) return Task.CompletedTask;
+        var start = Current ?? CalendarMath.Clamp(TodayValue, Min, Max);
+        _focused = start;
+        _month = new DateOnly(start.Year, start.Month, 1);
+        _open = true;
+        _focusPending = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseAsync()
+    {
+        _open = false;
+        return Task.CompletedTask;
+    }
+
+    private Task ShowMonthAsync(DateOnly month)
+    {
+        _month = new DateOnly(month.Year, month.Month, 1);
+        // Keep the focusable day inside the shown month.
+        var day = Math.Min(_focused.Day, DateTime.DaysInMonth(_month.Year, _month.Month));
+        _focused = new DateOnly(_month.Year, _month.Month, day);
+        return Task.CompletedTask;
+    }
+
+    private async Task ChooseAsync(DateOnly date)
+    {
+        if (IsUnavailable(date)) return;
+        _editing = false;
+        _invalidText = false;
+        _open = false;
+        if (Current != date) await _value.SetAsync(date, ValueChanged.HasDelegate, ValueChanged);
+        _text = Current is { } d ? d.ToString(EffectiveCulture.DateTimeFormat.ShortDatePattern, EffectiveCulture) : "";
+    }
+
+    private async Task OnGridKeyDownAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Enter" or " ":
+                await ChooseAsync(_focused);
+                return;
+            case "Escape":
+                await CloseAsync();
+                return;
+        }
+        if (CalendarMath.Move(e.Key, e.ShiftKey, _focused, FirstDayOfWeek, Direction == TextDirection.Rtl) is not { } next) return;
+        _focused = next;
+        if (next.Year != _month.Year || next.Month != _month.Month) _month = new DateOnly(next.Year, next.Month, 1);
+        _focusPending = true;
+    }
+
+    private void OnTextChanged(string? text)
+    {
+        _text = text ?? "";
+        _editing = true;
+        _invalidText = false;
+    }
+
+    private async Task CommitTextAsync()
+    {
+        if (!_editing) return;
+        _editing = false;
+        var parsed = CalendarMath.Parse(_text, EffectiveCulture);
+        if (_text.Trim().Length == 0)
+        {
+            if (Current is not null) await _value.SetAsync(null, ValueChanged.HasDelegate, ValueChanged);
+            return;
+        }
+        if (parsed is not { } date || IsUnavailable(date))
+        {
+            // Keep the text so the user can correct it; mark the field invalid (aria-invalid).
+            _invalidText = true;
+            return;
+        }
+        if (Current != date) await _value.SetAsync(date, ValueChanged.HasDelegate, ValueChanged);
+        _text = date.ToString(EffectiveCulture.DateTimeFormat.ShortDatePattern, EffectiveCulture);
+    }
+
+    private async Task OnInputKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await CommitTextAsync();
+        else if (e.Key == "ArrowDown" && e.AltKey) await OpenAsync();
+    }
+
+    /// <summary>Called by the browser on light dismiss (Escape, outside click).</summary>
+    [JSInvokable]
+    public Task OnPopoverToggle(bool open) => open ? Task.CompletedTask : InvokeAsync(() =>
+    {
+        if (!_open) return;
+        _open = false;
+        StateHasChanged();
+    });
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _reference?.Dispose();
+    }
+}

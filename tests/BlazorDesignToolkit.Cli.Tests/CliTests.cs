@@ -65,6 +65,21 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public async Task Remote_sources_are_opt_in_and_validated()
+    {
+        var dir = Path.Combine(_root, "remote");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "t.tokens.json"), """{ "a": { "$type": "number", "$value": 1 } }""");
+        File.WriteAllText(Path.Combine(dir, "bdt.config.json"), """{ "tokens": ["t.tokens.json"], "remote": { "allow": ["http://tokens.example.com/"] } }""");
+        var (exit, output, error) = await RunIn(dir, ["validate"]);
+        Assert.Equal(2, exit);
+        Assert.Contains("must be an absolute https:// URL", output + error);
+
+        File.WriteAllText(Path.Combine(dir, "bdt.config.json"), """{ "tokens": ["t.tokens.json"], "remote": { "allow": ["https://tokens.example.com/design/"], "timeoutSeconds": 10 } }""");
+        Assert.Equal(0, (await RunIn(dir, ["validate"])).Exit);
+    }
+
+    [Fact]
     public async Task Validate_json_report_contains_contrast_results_and_summary()
     {
         var (exit, output, _) = await Run("validate", "--format", "json", "--report", "reports/validation.json");

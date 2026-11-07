@@ -25,7 +25,20 @@
     </ChildContent>
 </Example>
 
+<Example Title="Virtualized tree (2,000 nodes)">
+    <ChildContent>
+        <TreeView TItem="string" Items="Folders" ChildrenSelector="@FolderChildren" Virtualize="true" ItemSize="32" @bind-Value="_file"
+                  aria-label="Files" data-testid="virtual-tree" />
+        <p role="status">File: @(_file ?? "none")</p>
+    </ChildContent>
+</Example>
+
 @code {
+    private static readonly IReadOnlyList<string> Folders = Enumerable.Range(1, 100).Select(i => $"Folder {i:000}").ToList();
+    private static IEnumerable<string>? FolderChildren(string node)
+        => !node.Contains('/') ? Enumerable.Range(1, 19).Select(i => $"{node} / file {i:00}") : null;
+    private string? _file;
+
     private Node? _selected;
 
     [CascadingParameter] private ThemeManager Manager { get; set; } = default!;

@@ -3,7 +3,10 @@
    aria-activedescendant and scrolled into view. Keys: Up/Down (Left/Right when horizontal), Home/End, type-to-select,
    Space toggles (multiple), Shift+Up/Down extends the selection, Ctrl+A selects all. In single-selection mode the
    selection follows focus unless SelectionFollowsFocus is false (then Enter or Space selects). Give the listbox an
-   accessible name with aria-label, aria-labelledby or a FormField label. *@
+   accessible name with aria-label, aria-labelledby or a FormField label.
+   Virtualize renders only the visible options (uniform ItemSize; the listbox must be the scroll container, e.g. with a
+   max-height): options carry aria-setsize/aria-posinset, and keyboard moves scroll the target option into the rendered range. *@
+@using Microsoft.AspNetCore.Components.Web.Virtualization
 @typeparam TItem
 @inherits PrimitiveBase
 
@@ -19,19 +22,37 @@
      aria-describedby="@Field?.DescribedBy"
      aria-invalid="@(Field?.Invalid == true ? "true" : null)"
      aria-required="@(Field?.Required == true ? "true" : null)"
-     data-bdt-keys="@(Orientation == Orientation.Horizontal ? "ArrowLeft ArrowRight Home End Space Ctrl+a Meta+a" : "ArrowUp ArrowDown Home End Space Ctrl+a Meta+a")"
+     data-virtualized="@(Virtualize ? "" : null)"
+     data-bdt-keys="@(Orientation == Orientation.Horizontal ? "ArrowLeft ArrowRight Home End Space Ctrl+a Meta+a" : "ArrowUp ArrowDown Home End PageUp PageDown Space Ctrl+a Meta+a")"
      @onkeydown="OnKeyDownAsync"
      @onfocus="OnFocus">
-    @for (var i = 0; i < _list.Items.Count; i++)
+    @if (Virtualize)
     {
-        var index = i;
-        var item = _list.Items[i];
+        <Virtualize TItem="int" Items="_indices" ItemSize="ItemSize" OverscanCount="OverscanCount" Context="index">
+            @Option(index)
+        </Virtualize>
+    }
+    else
+    {
+        @for (var i = 0; i < _list.Items.Count; i++)
+        {
+            @Option(i)
+        }
+    }
+</div>
+
+@code {
+    private RenderFragment Option(int index) => __builder =>
+    {
+        var item = _list.Items[index];
         var selected = IsSelected(item);
-        var disabled = _list.IsDisabled(i);
+        var disabled = _list.IsDisabled(index);
         var active = index == _list.ActiveIndex;
         <div role="option" id="@OptionId(index)" @key="item"
              aria-selected="@(selected ? "true" : "false")"
              aria-disabled="@(disabled ? "true" : null)"
+             aria-setsize="@(Virtualize ? _list.Items.Count : null)"
+             aria-posinset="@(Virtualize ? index + 1 : null)"
              data-highlighted="@(active ? "" : null)"
              data-state="@(selected ? "checked" : "unchecked")"
              @onclick="() => OnOptionClickAsync(index)">
@@ -44,10 +65,9 @@
                 @_list.Label(item)
             }
         </div>
-    }
-</div>
+    };
 
-@code {
+    private readonly List<int> _indices = [];
     private readonly OptionList<TItem> _list = new();
     private readonly Controllable<TItem?> _value = new(default);
     private readonly Controllable<IReadOnlyCollection<TItem>> _values = new([]);
@@ -72,6 +92,13 @@
     [Parameter] public Orientation Orientation { get; set; } = Orientation.Vertical;
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public bool Loop { get; set; }
+    /// <summary>Render only the visible options (for long lists). Requires a uniform <see cref="ItemSize"/>.</summary>
+    [Parameter] public bool Virtualize { get; set; }
+    /// <summary>Height of one option in CSS pixels (vertical) when virtualized. Default 36.</summary>
+    [Parameter] public float ItemSize { get; set; } = 36;
+    [Parameter] public int OverscanCount { get; set; } = 5;
+    /// <summary>Options moved by Page Up/Page Down. Default 10.</summary>
+    [Parameter] public int PageSize { get; set; } = 10;
 
     private bool IsDisabled => Disabled || Field?.Disabled == true;
     private TItem? CurrentValue => _value.Get(Value, ValueChanged.HasDelegate);
@@ -92,9 +119,14 @@
 
     protected override void OnParametersSet()
     {
-        _value.Sync(Value);
-        if (Values is not null) _values.Sync(Values);
+        _value.Sync(Value, IsProvided(nameof(Value)));
+        if (Values is not null) _values.Sync(Values, IsProvided(nameof(Values)));
         _list.Update(Items, ItemLabel, ItemDisabled);
+        if (_indices.Count != _list.Items.Count)
+        {
+            _indices.Clear();
+            for (var i = 0; i < _list.Items.Count; i++) _indices.Add(i);
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -103,7 +135,8 @@
         if (_list.ActiveIndex >= 0 && _list.ActiveIndex != _scrolledIndex)
         {
             _scrolledIndex = _list.ActiveIndex;
-            await Js.InvokeVoidAsync("scrollIntoViewById", OptionId(_list.ActiveIndex));
+            if (Virtualize) await Js.InvokeVoidAsync("scrollToIndex", _element, _list.ActiveIndex, ItemSize);
+            else await Js.InvokeVoidAsync("scrollIntoViewById", OptionId(_list.ActiveIndex));
         }
     }
 
@@ -131,6 +164,17 @@
     private async Task OnKeyDownAsync(KeyboardEventArgs e)
     {
         if (IsDisabled || _list.Items.Count == 0) return;
+        if (e.Key is "PageUp" or "PageDown" && Orientation == Orientation.Vertical)
+        {
+            // Move by a page (PageSize options), skipping disabled ones.
+            var start = _list.HasActive ? _list.ActiveIndex : 0;
+            var target = Math.Clamp(start + (e.Key == "PageDown" ? PageSize : -PageSize), 0, _list.Items.Count - 1);
+            var step = e.Key == "PageDown" ? -1 : 1;
+            while (_list.IsDisabled(target) && target != start) target += step;
+            _list.ActiveIndex = target;
+            if (!Multiple && SelectionFollowsFocus) await ActivateAsync(target, toggle: false);
+            return;
+        }
         var intent = KeyboardNavigation.Intent(e.Key, Orientation);
         if (intent != NavigationIntent.None)
         {

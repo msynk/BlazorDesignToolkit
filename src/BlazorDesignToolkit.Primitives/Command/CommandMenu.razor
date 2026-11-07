@@ -5,25 +5,26 @@
    a render still in flight while the user types cannot overwrite the characters typed in the meantime. *@
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
+@inject IServiceProvider Services
 
 <Dialog Open="_open" OpenChanged="SetOpenAsync">
-    <DialogContent @attributes="AdditionalAttributes" aria-label="@Label">
+    <DialogContent @attributes="AdditionalAttributes" aria-label="@EffectiveLabel">
         <input type="text" role="combobox" @ref="_input"
                id="@InputId"
-               aria-label="@Label"
+               aria-label="@EffectiveLabel"
                aria-autocomplete="list"
                aria-expanded="true"
                aria-controls="@ListId"
                aria-activedescendant="@(_list.HasActive ? OptionId(_list.ActiveIndex) : null)"
                autocomplete="off"
-               placeholder="@Placeholder"
+               placeholder="@(Placeholder ?? Strings.CommandMenuPlaceholder)"
                data-bdt-keys="ArrowDown ArrowUp Enter"
                @bind:get="_query" @bind:set="OnInput" @bind:event="oninput"
                @onkeydown="OnKeyDownAsync" />
-        <div role="listbox" id="@ListId" aria-label="@Label">
+        <div role="listbox" id="@ListId" aria-label="@EffectiveLabel">
             @if (_list.Items.Count == 0)
             {
-                <div role="presentation" data-empty="">@EmptyText</div>
+                <div role="presentation" data-empty="">@(EmptyText ?? Strings.CommandMenuEmpty)</div>
             }
             @foreach (var group in _list.Items.Select((c, i) => (Command: c, Index: i)).GroupBy(x => x.Command.Group ?? ""))
             {
@@ -67,9 +68,10 @@
     private string _id = Ids.Next("command");
 
     [Parameter, EditorRequired] public IEnumerable<CommandItem> Commands { get; set; } = [];
-    [Parameter] public string Label { get; set; } = "Command menu";
-    [Parameter] public string Placeholder { get; set; } = "Type a command or search…";
-    [Parameter] public string EmptyText { get; set; } = "No matching commands";
+    /// <summary>Accessible name; default from <see cref="PrimitiveStrings.CommandMenuLabel"/>.</summary>
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? EmptyText { get; set; }
     /// <summary>Text announced (politely) when the number of matching commands changes; override to localize.</summary>
     [Parameter] public Func<int, string>? ResultsAnnouncement { get; set; }
     /// <summary>Global shortcut; null disables it. "Ctrl" also matches Cmd on macOS.</summary>
@@ -78,6 +80,8 @@
     [Parameter] public EventCallback<bool> OpenChanged { get; set; }
     [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
+    private PrimitiveStrings Strings => (PrimitiveStrings?)Services.GetService(typeof(PrimitiveStrings)) ?? PrimitiveStrings.Default;
+    private string EffectiveLabel => Label ?? Strings.CommandMenuLabel;
     private string InputId => _id + "-input";
     private string ListId => _id + "-list";
     private string OptionId(int index) => $"{_id}-option-{index}";
@@ -124,7 +128,7 @@
         var ordered = matches.GroupBy(c => c.Group ?? "").SelectMany(g => g).ToList();
         _list.Update(ordered, static c => c.Label, static c => c.Disabled);
         _list.ActiveIndex = KeyboardNavigation.Move(-1, _list.Items.Count, _list.IsDisabled, NavigationIntent.First);
-        _status = _open ? (ResultsAnnouncement ?? (static n => n == 1 ? "1 command available." : $"{n} commands available."))(_list.Items.Count) : "";
+        _status = _open ? (ResultsAnnouncement ?? Strings.CommandMenuResults)(_list.Items.Count) : "";
     }
 
     private async Task SetOpenAsync(bool open)

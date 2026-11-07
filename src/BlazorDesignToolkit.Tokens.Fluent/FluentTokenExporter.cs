@@ -7,56 +7,15 @@ using BlazorDesignToolkit.Tokens.Values;
 namespace BlazorDesignToolkit.Tokens.Fluent;
 
 /// <summary>
-/// Fluent 2 design-token names (as exposed by <c>@fluentui/tokens</c> 1.x and consumed as CSS custom properties by
-/// Fluent UI Web Components 3.x and the Fluent UI Blazor library built on them) with the token types each one accepts.
-/// The catalog covers the alias tokens most design systems map; names outside it are rejected rather than guessed.
+/// Every Fluent 2 design token (as exposed by <c>@fluentui/tokens</c> and consumed as CSS custom properties by Fluent UI Web
+/// Components 3.x and the Fluent UI Blazor library built on them) with the token type it accepts. The list is generated from
+/// the package (see <see cref="SourceVersion"/>); names outside it are rejected rather than guessed.
 /// </summary>
-public static class FluentTokenCatalog
+public static partial class FluentTokenCatalog
 {
-    public static IReadOnlyDictionary<string, string[]> Tokens { get; } = Build();
-
-    private static Dictionary<string, string[]> Build()
-    {
-        var map = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        void Add(string type, params string[] names) { foreach (var n in names) map[n] = [type]; }
-
-        Add(TokenTypes.Color,
-            "colorNeutralForeground1", "colorNeutralForeground2", "colorNeutralForeground3", "colorNeutralForeground4",
-            "colorNeutralForegroundDisabled", "colorNeutralForegroundInverted", "colorNeutralForegroundOnBrand",
-            "colorBrandForeground1", "colorBrandForeground2", "colorBrandForegroundLink", "colorBrandForegroundLinkHover",
-            "colorNeutralBackground1", "colorNeutralBackground1Hover", "colorNeutralBackground1Pressed", "colorNeutralBackground1Selected",
-            "colorNeutralBackground2", "colorNeutralBackground3", "colorNeutralBackground4", "colorNeutralBackground5", "colorNeutralBackground6",
-            "colorNeutralBackgroundInverted", "colorNeutralBackgroundDisabled", "colorSubtleBackground", "colorSubtleBackgroundHover",
-            "colorTransparentBackground", "colorBackgroundOverlay",
-            "colorBrandBackground", "colorBrandBackgroundHover", "colorBrandBackgroundPressed", "colorBrandBackgroundSelected", "colorBrandBackground2",
-            "colorNeutralStroke1", "colorNeutralStroke2", "colorNeutralStroke3", "colorNeutralStrokeAccessible", "colorNeutralStrokeDisabled",
-            "colorBrandStroke1", "colorBrandStroke2", "colorStrokeFocus1", "colorStrokeFocus2",
-            "colorStatusSuccessBackground1", "colorStatusSuccessForeground1", "colorStatusSuccessBorder1",
-            "colorStatusWarningBackground1", "colorStatusWarningForeground1", "colorStatusWarningBorder1",
-            "colorStatusDangerBackground1", "colorStatusDangerForeground1", "colorStatusDangerBorder1",
-            "colorNeutralShadowAmbient", "colorNeutralShadowKey");
-        Add(TokenTypes.Dimension,
-            "borderRadiusNone", "borderRadiusSmall", "borderRadiusMedium", "borderRadiusLarge", "borderRadiusXLarge", "borderRadiusCircular",
-            "strokeWidthThin", "strokeWidthThick", "strokeWidthThicker", "strokeWidthThickest",
-            "fontSizeBase100", "fontSizeBase200", "fontSizeBase300", "fontSizeBase400", "fontSizeBase500", "fontSizeBase600",
-            "fontSizeHero700", "fontSizeHero800", "fontSizeHero900", "fontSizeHero1000",
-            // Fluent line heights are lengths (e.g. 20px), not unitless multipliers.
-            "lineHeightBase100", "lineHeightBase200", "lineHeightBase300", "lineHeightBase400", "lineHeightBase500", "lineHeightBase600",
-            "lineHeightHero700", "lineHeightHero800", "lineHeightHero900", "lineHeightHero1000");
-        foreach (var axis in new[] { "Horizontal", "Vertical" })
-        {
-            foreach (var size in new[] { "None", "XXS", "XS", "SNudge", "S", "MNudge", "M", "L", "XL", "XXL", "XXXL" })
-                map[$"spacing{axis}{size}"] = [TokenTypes.Dimension];
-        }
-        Add(TokenTypes.FontFamily, "fontFamilyBase", "fontFamilyMonospace", "fontFamilyNumeric");
-        Add(TokenTypes.FontWeight, "fontWeightRegular", "fontWeightMedium", "fontWeightSemibold", "fontWeightBold");
-        Add(TokenTypes.Duration, "durationUltraFast", "durationFaster", "durationFast", "durationNormal", "durationGentle", "durationSlow", "durationSlower", "durationUltraSlow");
-        Add(TokenTypes.CubicBezier, "curveAccelerateMax", "curveAccelerateMid", "curveAccelerateMin", "curveDecelerateMax", "curveDecelerateMid",
-            "curveDecelerateMin", "curveEasyEaseMax", "curveEasyEase", "curveLinear");
-        Add(TokenTypes.Shadow, "shadow2", "shadow4", "shadow8", "shadow16", "shadow28", "shadow64", "shadow2Brand", "shadow4Brand", "shadow8Brand",
-            "shadow16Brand", "shadow28Brand", "shadow64Brand");
-        return map;
-    }
+    public static IReadOnlyDictionary<string, string[]> Tokens { get; } = Generated()
+        .SelectMany(static g => g.Names.Select(n => (Name: n, g.Type)))
+        .ToDictionary(static e => e.Name, static e => new[] { e.Type }, StringComparer.Ordinal);
 }
 
 public sealed record FluentExportOptions

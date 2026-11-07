@@ -105,6 +105,38 @@
     }
 
     [Fact]
+    public void Controlled_components_revert_changes_the_parent_does_not_accept()
+    {
+        var cut = Render<RejectingHost>();
+        cut.FindAll("input[type=radio]")[0].Change("a");
+        Assert.Equal("1", cut.Find("#changes").TextContent);
+        // The parent re-rendered without accepting "a": the group reverts and restores the browser's native radio state.
+        Assert.Equal("unchecked", cut.FindAll("input[type=radio]")[0].Attr("data-state"));
+        Assert.Equal("checked", cut.FindAll("input[type=radio]")[1].Attr("data-state"));
+        var sync = Assert.Single(Module.Invocations, i => i.Identifier == "syncRadioGroup");
+        Assert.Equal(cut.FindAll("input[type=radio]")[0].Attr("name"), sync.Arguments[0]);
+
+        cut.Find("input[type=checkbox]").Change(true);
+        Assert.Equal("2", cut.Find("#changes").TextContent);
+        Assert.Equal("unchecked", cut.Find("input[type=checkbox]").Attr("data-state"));
+    }
+
+    [Fact]
+    public void Default_value_with_change_handler_stays_uncontrolled()
+    {
+        var changes = 0;
+        var cut = Render(@<RadioGroup TValue="string" DefaultValue="@("b")" ValueChanged="_ => changes++" aria-label="Size">
+            <label><Radio Value="@("a")" /> Small</label>
+            <label><Radio Value="@("b")" /> Medium</label>
+        </RadioGroup>);
+        cut.FindAll("input[type=radio]")[0].Change("a");
+        cut.Render();
+        Assert.Equal(1, changes);
+        Assert.Equal("checked", cut.FindAll("input[type=radio]")[0].Attr("data-state"));
+        Assert.Equal(0, Calls("syncRadioGroup"));
+    }
+
+    [Fact]
     public void VisuallyHidden_keeps_content_for_assistive_technology()
     {
         var cut = Render(@<VisuallyHidden>Loading</VisuallyHidden>);

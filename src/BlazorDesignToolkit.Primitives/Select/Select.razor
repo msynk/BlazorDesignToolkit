@@ -73,7 +73,7 @@
     private string _id = "";
     private bool _open;
     private bool _shown;
-    private int _popupHandle;
+    private readonly JsResource _overlay = new();
     private int _scrolledIndex = -1;
 
     [CascadingParameter] private FormFieldContext? Field { get; set; }
@@ -112,7 +112,7 @@
 
     protected override void OnParametersSet()
     {
-        _value.Sync(Value);
+        _value.Sync(Value, IsProvided(nameof(Value)));
         _list.Update(Items, ItemLabel, ItemDisabled);
     }
 
@@ -123,12 +123,12 @@
         {
             _shown = true;
             _reference ??= DotNetObjectReference.Create(this);
-            _popupHandle = await Js.TrackAsync("showPopover", _popup, _button, _reference, new { placement = Placement, focus = false, restoreFocus = true });
+            await _overlay.OpenAsync(() => Js.TrackAsync("showPopover", _popup, _button, _reference, new { placement = Placement, focus = false, restoreFocus = true }));
         }
         else if (!_open && _shown)
         {
             _shown = false;
-            await Js.ReleaseAsync(_popupHandle);
+            await _overlay.CloseAsync(Js);
         }
         if (_open && _list.ActiveIndex >= 0 && _list.ActiveIndex != _scrolledIndex)
         {

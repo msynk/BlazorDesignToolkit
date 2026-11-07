@@ -127,7 +127,7 @@ Generated with `bdt rules --markdown`. "DTCG requirement" marks rules that enfor
 | BDT6010 | Invalid theme selection | Themes | error |  | A selected axis value is not declared by the theme. |
 | BDT7001 | Unsupported conversion | Export | warning |  | The token cannot be represented in the export target and was skipped. |
 | BDT7002 | Output name collision | Export | error |  | Two tokens map to the same output name. |
-| BDT7003 | Color outside target gamut | Export | warning |  | The color cannot be represented exactly in the requested output format and was gamut-clipped. |
+| BDT7003 | Color outside target gamut | Export | warning |  | The color cannot be represented exactly in the requested output format; it was gamut-mapped (CSS Color 4) or clipped, as configured. |
 | BDT7004 | Invalid integration mapping | Export | error |  | An integration mapping references an unknown token or unknown target variable. |
 | BDT7005 | Integration mapping type mismatch | Export | error |  | A token mapped to an integration variable does not have the type that variable requires. |
 | BDT7006 | Invalid identifier | Export | error |  | A configured prefix, theme identifier or attribute name is not a valid identifier for the target. |

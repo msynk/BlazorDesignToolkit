@@ -12,12 +12,17 @@ Optional CSS: `BlazorDesignToolkit.Primitives.StarterStyles` (`_content/BlazorDe
 - **Styling hooks.** `data-state` (`open|closed`, `checked|unchecked|indeterminate`, `active|inactive`, `on|off`),
   `data-disabled`, `data-highlighted`, `data-orientation`, `data-side` (placed popups), plus ARIA attributes. No class names
   are imposed.
-- **Binding.** `@bind-Value`, `@bind-Open`, `@bind-Checked`… work as with Blazor inputs: the component keeps its value,
-  raises `…Changed`, and adopts a new value when the parent passes one. `Default…` parameters set the initial value.
-  Text inputs (`Combobox`, `CommandMenu`) and `Checkbox` bind their DOM value with `@bind:get`/`@bind:set`, so text typed
-  while a server render is in flight is never overwritten, and a checkbox whose change the parent rejects shows its
-  real state again. `RadioGroup` is the exception: if a controlled parent rejects a selection, the browser keeps showing
-  the clicked radio as checked until the selection changes (Blazor cannot track native radio state).
+- **Binding.** `@bind-Value`, `@bind-Open`, `@bind-Checked`… work as with Blazor inputs. A component is **controlled** when
+  the parent passes the value *and* handles the change: a change the parent does not accept (it re-renders with the old
+  value) is reverted, including the native state of checkboxes and radios. With only `Default…` and/or `…Changed` the
+  component is **uncontrolled**: it keeps its own value and reports changes. Text inputs (`Combobox`, `CommandMenu`,
+  `NumberField`, `DatePicker`) and `Checkbox` bind their DOM value with `@bind:get`/`@bind:set`, so text typed while a
+  server render is in flight is never overwritten.
+- **Texts.** Built-in accessible names, announcements and empty states come from `PrimitiveStrings` (English). Derive from
+  it, override what you need (from resources or an `IStringLocalizer`, using `CultureInfo.CurrentUICulture`), and register
+  it: `services.AddHeadlessPrimitives().AddSingleton<PrimitiveStrings, MyStrings>()` (scoped for per-user cultures).
+  Component parameters (`Label`, `EmptyText`, …) still win for one instance. Number and date formats follow the
+  component's `Culture` (default: the current culture).
 - **Ids.** Generated (`bdt-…`) and unique; pass `id`/`Id` to control them. All id references are kept consistent.
 - **Render modes.** Interactive Server and Interactive WebAssembly are supported and tested. During static rendering and
   prerendering the markup is correct but not interactive (Disclosure panels, for example, keep their initial state).
@@ -108,8 +113,9 @@ Keyboard tables below follow the WAI-ARIA Authoring Practices Guide (APG). WCAG 
   destructive action.
 - **Keyboard:** Tab/Shift+Tab within the dialog; Escape closes.
 - **WCAG:** 2.1.2 No Keyboard Trap (Escape and buttons always close), 2.4.3, 4.1.2.
-- **Limitation:** some browsers close a dialog on a repeated Escape even when closing is prevented (anti-abuse close
-  watchers); keep `CloseOnEscape` true unless data loss must be prevented.
+- **`CloseOnEscape=false`:** Escape is ignored. Browsers' close watchers may close a dialog on a repeated Escape even when
+  closing is prevented; the dialog then reopens immediately and focus returns to where it was, so the component's state
+  stays authoritative. With `CloseOnEscape=true`, a dialog closed by the browser updates `Open` accordingly.
 
 ## Popover
 
@@ -119,8 +125,9 @@ Keyboard tables below follow the WAI-ARIA Authoring Practices Guide (APG). WCAG 
 - **Behavior:** top layer, native light dismiss (Escape, outside click); positioned next to the trigger and flipped when
   space is short; focus moves into the content and returns to the trigger when closed from inside.
 - **Keyboard:** Enter/Space open; Tab moves through content; Escape closes.
-- **Limitation:** without Popover API support (pre-2024 browsers) a fallback positions the element in place and emulates
-  light dismiss, without top-layer stacking.
+- **Without the Popover API** (pre-2024 browsers) a fallback hides closed popups, positions open ones in place (fixed,
+  high z-index) and emulates light dismiss (outside pointer press, Escape). There is no top layer, so an ancestor with
+  `overflow: hidden` or a transform can clip the popup. Covered by a browser test that removes the API.
 
 ## Tooltip
 
@@ -137,8 +144,13 @@ Keyboard tables below follow the WAI-ARIA Authoring Practices Guide (APG). WCAG 
   `Orientation`, `Disabled`, `Loop`.
 - **Markup:** focusable `role=listbox` with `aria-activedescendant`, `aria-multiselectable`; options `role=option`,
   `aria-selected`, `aria-disabled`; the active option scrolls into view.
-- **Keyboard:** ↑/↓ (←/→ horizontal), Home/End, type-to-select; Space toggles (multiple); Shift+↑/↓ extends; Ctrl/⌘+A
-  selects all. In single selection with `SelectionFollowsFocus`, focusing the listbox selects the first option when none is.
+- **Keyboard:** ↑/↓ (←/→ horizontal), Home/End, Page Up/Page Down (`PageSize`=10), type-to-select; Space toggles
+  (multiple); Shift+↑/↓ extends; Ctrl/⌘+A selects all. In single selection with `SelectionFollowsFocus`, focusing the
+  listbox selects the first option when none is.
+- **Virtualization:** `Virtualize`=true renders only the options in view (Blazor `Virtualize`; `ItemSize` in CSS px, uniform
+  heights; `OverscanCount`). The listbox must be the scroll container (a height or `max-height` and `overflow: auto`; the
+  starter styles do this). Options carry `aria-setsize`/`aria-posinset`, and keyboard moves scroll the target option into
+  the rendered range before it becomes the active descendant. Tested with 10,000 options.
 
 ## Select
 
@@ -168,6 +180,20 @@ Keyboard tables below follow the WAI-ARIA Authoring Practices Guide (APG). WCAG 
   returns focus to the trigger; Tab closes and moves on.
 - **Focus:** real DOM focus moves between items (roving). Item order is synchronized with the DOM, so items nested in
   other components keep the visual order.
+- **Submenus:** `MenuSub` containing `MenuSubTrigger` (a `menuitem` with `aria-haspopup="menu"`, `aria-expanded`,
+  `aria-controls`) and `MenuSubContent` (the nested `role=menu`, labelled by its trigger; `Placement`="right-start"). → / Enter /
+  Space open the submenu on its first item; ← / Escape close it and return focus to the trigger; activating any item closes
+  every menu up to the root; Tab closes all. Hovering the trigger opens it without moving focus; hovering a sibling closes it.
+  Submenus nest.
+
+## Menubar
+
+- **Components:** `Menubar` (`role=menubar`, horizontal; give it an `aria-label`) containing `Menu`s whose trigger is a
+  `MenubarTrigger` (`role=menuitem`, `aria-haspopup="menu"`, `aria-expanded`, roving `tabindex`).
+- **Keyboard:** ←/→ move between triggers (wrapping) and, while a menu is open, open the adjacent menu on its first item
+  (also from an item without a submenu); Home/End first/last trigger; ↓/Enter/Space open on the first item, ↑ on the last;
+  Escape closes and returns focus to the trigger. Only one menu of a menubar is open; while one is open, hovering another
+  trigger switches to it.
 
 ## Combobox
 
@@ -193,7 +219,48 @@ Keyboard tables below follow the WAI-ARIA Authoring Practices Guide (APG). WCAG 
 - **Markup:** `role=tree`, `role=treeitem` with `aria-level`, `aria-setsize`, `aria-posinset`, `aria-expanded` (parents
   only), `aria-selected`; children in `role=group`; one item in the tab sequence.
 - **Keyboard:** ↑/↓ visible items; → expands or moves to the first child; ← collapses or moves to the parent; Home/End;
-  Enter/Space select; `*` expands siblings; type-to-select.
+  Page Up/Page Down (`PageSize`=10); Enter/Space select; `*` expands siblings; type-to-select.
+- **Virtualization:** `Virtualize`=true renders the visible rows as a flat list of treeitems (valid ARIA, since every row has
+  `aria-level`/`aria-setsize`/`aria-posinset`) and only those in view (`ItemSize`, uniform heights). Rows come and go while
+  scrolling, so focus stays on the tree and the active row is `aria-activedescendant` (`data-highlighted`); indent rows
+  with `--bdt-tree-level`. Tested with 2,000 nodes.
+
+## Slider
+
+- **Components:** `Slider` (`Value`/`ValueChanged`, `DefaultValue`, `ValueCommitted`, `Min`=0, `Max`=100, `Step`=1, `LargeStep`
+  (default a tenth of the range), `Orientation`, `Direction`, `Disabled`, `Label`, `ValueText`, `Name`) and `RangeSlider`
+  (`Start`/`End` with their `…Changed` and `Default…`, `MinDistance`, `StartLabel`/`EndLabel`).
+- **Markup:** a focusable `role=slider` thumb with `aria-valuenow/min/max`, `aria-valuetext` (from `ValueText`, for values that
+  need units or words), `aria-orientation`; labelled by the FormField label. The range slider is a `role=group` with two
+  sliders whose min/max are constrained by each other (APG multi-thumb slider). Styling: `--bdt-slider-value` (or
+  `--bdt-slider-start`/`--bdt-slider-end`) as percentages, `data-dragging`.
+- **Keyboard:** →/↑ increase, ←/↓ decrease (horizontal arrows reversed in RTL), Page Up/Down by `LargeStep`, Home/End min/max.
+- **Pointer:** press or drag anywhere on the slider; the browser reports the position once per animation frame and the
+  nearest thumb follows. `ValueCommitted` fires on release and after each key press.
+
+## Number field
+
+- **Component:** `NumberField` — `Value`/`ValueChanged` (`double?`), `DefaultValue`, `Min`, `Max`, `Step`=1, `LargeStep`,
+  `Nullable`=true, `Format` (.NET format string), `Culture`, `ShowButtons`=true, `ReadOnly`, `Required`, `ValueText`, `Name`.
+- **Markup:** APG spinbutton: an editable `<input role="spinbutton" inputmode="decimal">` with `aria-valuenow/min/max` and
+  `aria-valuetext`; increment/decrement buttons are not in the tab sequence and control the input (`aria-controls`).
+- **Keyboard:** ↑/↓ by `Step`, Page Up/Down by `LargeStep`. Typed text is parsed with the culture on Enter or blur; values
+  are clamped and snapped to `Min + n × Step`; text that is not a number reverts. Home/End move the caret (the text is
+  editable), as is common for editable spinbuttons.
+
+## Date picker
+
+- **Component:** `DatePicker` — `Value`/`ValueChanged` (`DateOnly?`), `DefaultValue`, `Min`, `Max`, `IsDateDisabled`, `Culture`,
+  `Today`, `Direction`, `Disabled`, `Required`, `Label`, `Name`, `Placeholder`, `ButtonContent`, `ShowKeyboardHelp`.
+- **Markup:** APG Date Picker Dialog: a text input (described by the culture's date pattern), a button
+  (`aria-haspopup="dialog"`, named "Choose date" plus the selected date) and a modal `role=dialog` with month/year
+  navigation buttons, a heading that is a polite live region, and a `role=grid` month: weekday column headers named with
+  full day names, day cells named with the full date, `aria-selected`, `aria-current="date"`, `aria-disabled`.
+- **Keyboard (grid):** ←/→ day (RTL-aware), ↑/↓ week, Home/End start/end of week, Page Up/Down month, Shift+Page Up/Down
+  year, Enter/Space choose and close, Escape close; Tab cycles inside the dialog; focus returns to the button.
+  Alt+↓ in the input opens the calendar.
+- **Text entry:** parsed with the culture's short date pattern (then any culture format) on Enter or blur; invalid or
+  unavailable dates keep the text and set `aria-invalid`.
 
 ## Toasts and announcements
 

@@ -33,10 +33,29 @@
     </ChildContent>
 </Example>
 
+<Example Title="Escape does not close">
+    <Description><p>An editor with unsaved changes: Escape is ignored (also on a repeated Escape, which some browsers would otherwise use to force-close the dialog); the buttons close it.</p></Description>
+    <ChildContent>
+        <button type="button" @onclick="() => _editorOpen = true" data-testid="editor-open">Edit notes…</button>
+        <Dialog @bind-Open="_editorOpen" CloseOnEscape="false">
+            <DialogContent class="dialog" data-testid="editor-dialog">
+                <DialogTitle>Edit notes</DialogTitle>
+                <FormField>
+                    <FormLabel>Notes</FormLabel>
+                    <FieldInput Value="@_notes" />
+                </FormField>
+                <DialogClose>Done</DialogClose>
+            </DialogContent>
+        </Dialog>
+    </ChildContent>
+</Example>
+
 <KeyboardTable Rows="@Keys" />
 
 @code {
     private bool _open;
+    private bool _editorOpen;
+    private string _notes = "Draft";
     private string? _name = "Ada";
     private string _status = "";
 

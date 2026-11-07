@@ -1,0 +1,16 @@
+@* A parent that controls a radio group and a checkbox but rejects every change (for example while a confirmation is pending). *@
+<RadioGroup TValue="string" Value="@RadioValue" ValueChanged="OnRadioChanged" aria-label="Size">
+    <label><Radio Value="@("a")" /> Small</label>
+    <label><Radio Value="@("b")" /> Medium</label>
+</RadioGroup>
+<label><Checkbox Checked="@Checked" CheckedChanged="OnCheckedChanged" /> Accept</label>
+<p id="changes">@Changes</p>
+
+@code {
+    [Parameter] public string RadioValue { get; set; } = "b";
+    [Parameter] public bool Checked { get; set; }
+    public int Changes { get; private set; }
+
+    private void OnRadioChanged(string? value) => Changes++;
+    private void OnCheckedChanged(bool value) => Changes++;
+}

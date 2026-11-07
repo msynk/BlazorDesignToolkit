@@ -1,0 +1,79 @@
+{
+  "$comment": "Benchmark baseline for the CI regression gate. Regenerate with: dotnet run -c Release --project benchmarks/BlazorDesignToolkit.Benchmarks -- --update-baseline benchmarks/baseline.json",
+  "allocationTolerance": 0.1,
+  "timeFactor": 4,
+  "benchmarks": {
+    "ThemeBenchmarks.Compose": {
+      "allocatedBytes": 540040,
+      "meanNanoseconds": 230658
+    },
+    "ThemeBenchmarks.OverrideDeclarations": {
+      "allocatedBytes": 1292640,
+      "meanNanoseconds": 453825
+    },
+    "ThemeBenchmarks.Stylesheet": {
+      "allocatedBytes": 14543744,
+      "meanNanoseconds": 7775255
+    },
+    "TokenSetBenchmarks.ExportCss(Tokens=100)": {
+      "allocatedBytes": 200104,
+      "meanNanoseconds": 53926
+    },
+    "TokenSetBenchmarks.ExportCss(Tokens=2000)": {
+      "allocatedBytes": 3916489,
+      "meanNanoseconds": 2433545
+    },
+    "TokenSetBenchmarks.ExportCss(Tokens=20000)": {
+      "allocatedBytes": 39247060,
+      "meanNanoseconds": 31080366
+    },
+    "TokenSetBenchmarks.Parse(Tokens=100)": {
+      "allocatedBytes": 278664,
+      "meanNanoseconds": 102870
+    },
+    "TokenSetBenchmarks.Parse(Tokens=2000)": {
+      "allocatedBytes": 5549565,
+      "meanNanoseconds": 3169391
+    },
+    "TokenSetBenchmarks.Parse(Tokens=20000)": {
+      "allocatedBytes": 55974591,
+      "meanNanoseconds": 81238800
+    },
+    "TokenSetBenchmarks.Resolve(Tokens=100)": {
+      "allocatedBytes": 185272,
+      "meanNanoseconds": 60625
+    },
+    "TokenSetBenchmarks.Resolve(Tokens=2000)": {
+      "allocatedBytes": 3690251,
+      "meanNanoseconds": 4761592
+    },
+    "TokenSetBenchmarks.Resolve(Tokens=20000)": {
+      "allocatedBytes": 37058226,
+      "meanNanoseconds": 61605744
+    },
+    "TokenSetBenchmarks.Validate(Tokens=100)": {
+      "allocatedBytes": 97280,
+      "meanNanoseconds": 30012
+    },
+    "TokenSetBenchmarks.Validate(Tokens=2000)": {
+      "allocatedBytes": 2477584,
+      "meanNanoseconds": 822983
+    },
+    "TokenSetBenchmarks.Validate(Tokens=20000)": {
+      "allocatedBytes": 30667728,
+      "meanNanoseconds": 14376375
+    },
+    "TokenSetBenchmarks.WriteJson(Tokens=100)": {
+      "allocatedBytes": 365512,
+      "meanNanoseconds": 64459
+    },
+    "TokenSetBenchmarks.WriteJson(Tokens=2000)": {
+      "allocatedBytes": 7127258,
+      "meanNanoseconds": 7346231
+    },
+    "TokenSetBenchmarks.WriteJson(Tokens=20000)": {
+      "allocatedBytes": 69638818,
+      "meanNanoseconds": 119113692
+    }
+  }
+}

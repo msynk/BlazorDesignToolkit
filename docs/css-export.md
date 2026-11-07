@@ -15,7 +15,8 @@ or `bdt export --to css --set prefix=ds --set layer=tokens -o tokens.css tokens/
 | `Prefix` (`prefix`) | `""` | `--{prefix}-color-text-default`. Letters, digits, `-`, `_` only (BDT7006). |
 | `NameStyle` (`nameStyle`) | `KebabCase` | `fontSize` → `font-size`; `Preserve` keeps segments and escapes invalid characters. |
 | `References` (`references`) | `Resolve` | `Preserve` writes `var(--target)` for aliases and aliased composite parts whose targets are exported. |
-| `ColorFormat` (`colorFormat`) | `Auto` | `Auto`: sRGB as hex when 8-bit exact, `rgb(r g b / a)` for exact channels with alpha, otherwise the CSS function of the token's space (`oklch()`, `color(display-p3 …)`). `Hex`: always hex, clipping and reporting out-of-gamut colors (BDT7003). `Native`: always the space's CSS function. |
+| `ColorFormat` (`colorFormat`) | `Auto` | `Auto`: sRGB as hex when 8-bit exact, `rgb(r g b / a)` for exact channels with alpha, otherwise the CSS function of the token's space (`oklch()`, `color(display-p3 …)`). `Hex`: always hex; colors outside sRGB are gamut-mapped (see `GamutMapping`) and reported (BDT7003). `Native`: always the space's CSS function. |
+| `GamutMapping` (`gamutMapping`) | `Css` | How hex output brings colors outside sRGB into gamut. `Css`: the CSS Color 4 algorithm (reduce OKLCh chroma, keep lightness and hue; what browsers are specified to do). `Clip`: clamp each channel (can shift hue). |
 | `Selector` (`selector`) | `:root` | Rule selector. |
 | `Layer` (`layer`) | none | Wraps the output in `@layer`. |
 | `ExpandComposites` (`expandComposites`) | `true` | Also writes `-font-family`, `-font-size`, … for typography, `-width/-style/-color` for borders, `-duration/-delay/-timing-function` for transitions. |

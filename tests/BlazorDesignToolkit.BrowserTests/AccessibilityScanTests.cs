@@ -12,7 +12,7 @@ public class AccessibilityScanTests(DemoServer server) : IAsyncDisposable
     public static readonly TheoryData<string> Pages = new(
         "/", "/tokens", "/themes", "/editor", "/import-export", "/validation", "/coverage", "/integrations", "/design-system", "/accessibility",
         "/primitives/controls", "/primitives/forms", "/primitives/tabs", "/primitives/disclosure", "/primitives/dialog", "/primitives/popover",
-        "/primitives/listbox", "/primitives/menu", "/primitives/tree", "/primitives/feedback");
+        "/primitives/listbox", "/primitives/menu", "/primitives/inputs", "/primitives/tree", "/primitives/feedback");
 
     private static readonly AxeRunOptions s_wcag = new()
     {
@@ -98,5 +98,34 @@ public class AccessibilityScanTests(DemoServer server) : IAsyncDisposable
         await page.GetByTestId("toast-error").ClickAsync();
         await page.Locator("[data-toasts] li").First.WaitForAsync();
         await AssertNoViolationsAsync(page, "toasts");
+
+        await page.OpenAsync("/primitives/menu");
+        await page.GetByTestId("submenu-trigger").ClickAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Menuitem, new() { Name = "Copy link" })).ToBeFocusedAsync();
+        await page.Keyboard.PressAsync("ArrowDown");
+        await Assertions.Expect(page.GetByTestId("send-to")).ToBeFocusedAsync();
+        await page.Keyboard.PressAsync("ArrowRight");
+        await page.GetByTestId("send-to-menu").Locator("[role=menuitem]").First.WaitForAsync();
+        await AssertNoViolationsAsync(page, "open submenu");
+        await page.Keyboard.PressAsync("Escape");
+        await page.Keyboard.PressAsync("Escape");
+        await page.GetByTestId("menubar").GetByRole(AriaRole.Menuitem, new() { Name = "File" }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "New" }).WaitForAsync();
+        await AssertNoViolationsAsync(page, "open menubar menu");
+
+        await page.OpenAsync("/primitives/inputs");
+        await page.GetByRole(AriaRole.Button, new() { Name = "Choose date" }).ClickAsync();
+        await page.GetByRole(AriaRole.Grid).WaitForAsync();
+        await AssertNoViolationsAsync(page, "open date picker");
+
+        await page.OpenAsync("/");
+        var input = page.GetByRole(AriaRole.Combobox, new() { Name = "Command menu" });
+        for (var attempt = 0; attempt < 5 && !await input.IsVisibleAsync(); attempt++)
+        {
+            await page.Keyboard.PressAsync("Control+k");
+            try { await input.WaitForAsync(new LocatorWaitForOptions { Timeout = 2000 }); } catch (TimeoutException) { }
+        }
+        await page.Keyboard.TypeAsync("the");
+        await AssertNoViolationsAsync(page, "open command menu");
     }
 }

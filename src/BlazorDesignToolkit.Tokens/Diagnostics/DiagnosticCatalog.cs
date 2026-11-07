@@ -160,7 +160,7 @@ public static class DiagnosticCatalog
     public static readonly DiagnosticDescriptor NameCollision = new("BDT7002", "Output name collision", ExportCategory, DiagnosticSeverity.Error,
         "Two tokens map to the same output name.", "Rename one token or adjust the naming options.");
     public static readonly DiagnosticDescriptor OutOfGamut = new("BDT7003", "Color outside target gamut", ExportCategory, DiagnosticSeverity.Warning,
-        "The color cannot be represented exactly in the requested output format and was gamut-clipped.");
+        "The color cannot be represented exactly in the requested output format; it was gamut-mapped (CSS Color 4) or clipped, as configured.");
     public static readonly DiagnosticDescriptor InvalidMapping = new("BDT7004", "Invalid integration mapping", ExportCategory, DiagnosticSeverity.Error,
         "An integration mapping references an unknown token or unknown target variable.");
     public static readonly DiagnosticDescriptor MappingTypeMismatch = new("BDT7005", "Integration mapping type mismatch", ExportCategory, DiagnosticSeverity.Error,

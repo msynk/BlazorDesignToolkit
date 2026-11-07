@@ -56,10 +56,21 @@
 
     internal RadioGroupState State { get; } = new();
 
+    private bool _resyncRadios;
+
     protected override void OnParametersSet()
     {
-        _value.Sync(Value);
+        // After a reverted (rejected) change the browser still shows the clicked radio checked, and Blazor cannot see native
+        // radio state; restore it from the rendered data-state attributes once the revert has rendered.
+        if (_value.Sync(Value, IsProvided(nameof(Value)))) _resyncRadios = true;
         State.NotifyStateChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_resyncRadios) return;
+        _resyncRadios = false;
+        await Js.InvokeVoidAsync("syncRadioGroup", GroupName);
     }
 
     internal bool IsSelected(TValue? value) => EqualityComparer<TValue?>.Default.Equals(Current, value);
@@ -67,7 +78,11 @@
     internal async Task SelectAsync(TValue? value)
     {
         if (IsDisabled) return;
-        await _value.SetAsync(value, ValueChanged.HasDelegate, ValueChanged);
+        if (await _value.SetAsync(value, ValueChanged.HasDelegate, ValueChanged))
+        {
+            _resyncRadios = true;
+            StateHasChanged();
+        }
         State.NotifyStateChanged();
     }
 }

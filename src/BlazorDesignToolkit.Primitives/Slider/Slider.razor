@@ -1,0 +1,131 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Slider: a focusable role="slider" thumb with aria-valuenow/min/max (and aria-valuetext when ValueText is set).
+   Right/Up increase and Left/Down decrease by Step (reversed horizontally in RTL), Page Up/Down by LargeStep, Home/End go
+   to Min/Max. Pointer: press or drag anywhere on the slider (handled in the browser, sent to .NET once per frame).
+   Styling hooks: --bdt-slider-value (percent) on the root and the thumb, data-orientation, data-disabled, data-dragging.
+   Name it with a FormField label, Label, or aria-labelledby. *@
+@inherits PrimitiveBase
+
+<div @ref="_root" @attributes='Attributes("aria-label", "aria-labelledby", "aria-valuetext", "role", "id")'
+     data-slider=""
+     data-orientation="@(Orientation == Orientation.Vertical ? "vertical" : "horizontal")"
+     data-disabled="@(IsDisabled ? "" : null)"
+     data-dragging="@(_dragging ? "" : null)"
+     style="--bdt-slider-value: @Percent(Current)%">
+    <div data-slider-track=""><div data-slider-range=""></div></div>
+    <div role="slider" @ref="_thumb"
+         id="@_id"
+         tabindex="@(IsDisabled ? "-1" : "0")"
+         aria-valuemin="@Format(Min)"
+         aria-valuemax="@Format(Max)"
+         aria-valuenow="@Format(Current)"
+         aria-valuetext="@ValueText?.Invoke(Current)"
+         aria-orientation="@(Orientation == Orientation.Vertical ? "vertical" : "horizontal")"
+         aria-label="@Label"
+         aria-labelledby="@(Label is null ? Field?.LabelId ?? LabelledBy : null)"
+         aria-describedby="@Field?.DescribedBy"
+         aria-disabled="@(IsDisabled ? "true" : null)"
+         aria-invalid="@(Field?.Invalid == true ? "true" : null)"
+         data-slider-thumb=""
+         data-bdt-keys="ArrowLeft ArrowRight ArrowUp ArrowDown PageUp PageDown Home End"
+         style="--bdt-slider-value: @Percent(Current)%"
+         @onkeydown="OnKeyDownAsync"></div>
+    @if (Name is not null)
+    {
+        <input type="hidden" name="@Name" value="@Format(Current)" />
+    }
+</div>
+
+@code {
+    private readonly Controllable<double> _value = new(0);
+    private ElementReference _root;
+    private ElementReference _thumb;
+    private DotNetObjectReference<Slider>? _reference;
+    private string _id = "";
+    private bool _dragging;
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter] public double Value { get; set; }
+    [Parameter] public EventCallback<double> ValueChanged { get; set; }
+    [Parameter] public double? DefaultValue { get; set; }
+    /// <summary>Raised when the user finishes a change (pointer released, or a key press).</summary>
+    [Parameter] public EventCallback<double> ValueCommitted { get; set; }
+    [Parameter] public double Min { get; set; }
+    [Parameter] public double Max { get; set; } = 100;
+    [Parameter] public double Step { get; set; } = 1;
+    /// <summary>Page Up/Page Down increment. Default: a tenth of the range, rounded to whole steps (at least one step).</summary>
+    [Parameter] public double? LargeStep { get; set; }
+    [Parameter] public Orientation Orientation { get; set; } = Orientation.Horizontal;
+    [Parameter] public TextDirection Direction { get; set; } = TextDirection.Ltr;
+    [Parameter] public bool Disabled { get; set; }
+    /// <summary>Accessible name of the thumb when there is no FormField label.</summary>
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? LabelledBy { get; set; }
+    /// <summary>Human-readable value (aria-valuetext), e.g. <c>v => $"{v} °C"</c>. Use it when the number alone is not meaningful.</summary>
+    [Parameter] public Func<double, string>? ValueText { get; set; }
+    /// <summary>Form field name: a hidden input carries the value.</summary>
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsDisabled => Disabled || Field?.Disabled == true;
+    private double Current => _value.Get(Value, ValueChanged.HasDelegate);
+    private double Large => LargeStep ?? SliderMath.DefaultLargeStep(Min, Max, Step);
+
+    protected override void OnInitialized()
+    {
+        _id = Field?.ControlId ?? ProvidedId ?? Ids.Next("slider");
+        _value.Initialize(SliderMath.Snap(DefaultValue ?? Value, Min, Max, Step));
+        TrackField(Field);
+        if (Field is not null)
+        {
+            Field.LabelTargetsControl = false; // a div is not labelable: the label is referenced with aria-labelledby
+            Field.NotifyChanged();
+        }
+    }
+
+    protected override void OnParametersSet() => _value.Sync(Value, IsProvided(nameof(Value)));
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _reference = DotNetObjectReference.Create(this);
+        await Js.TrackAsync("preventKeys", _thumb);
+        await Js.TrackAsync("attachSlider", _root, _reference, new { vertical = Orientation == Orientation.Vertical, rtl = Direction == TextDirection.Rtl });
+    }
+
+    private static string Format(double value) => value.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+    private string Percent(double value) => SliderMath.ToPercent(value, Min, Max).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    private async Task SetAsync(double value, bool commit)
+    {
+        var snapped = SliderMath.Snap(value, Min, Max, Step);
+        if (snapped != Current) await _value.SetAsync(snapped, ValueChanged.HasDelegate, ValueChanged);
+        if (commit && ValueCommitted.HasDelegate) await ValueCommitted.InvokeAsync(Current);
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (IsDisabled) return;
+        if (SliderMath.KeyValue(e.Key, Current, Min, Max, Step, Large, Orientation, Direction) is { } next) await SetAsync(next, commit: true);
+    }
+
+    /// <summary>Pointer input from the browser: <paramref name="fraction"/> along the track, phase start/move/end.</summary>
+    [JSInvokable]
+    public Task OnPointer(double fraction, string phase) => InvokeAsync(async () =>
+    {
+        if (IsDisabled) return;
+        // Apply the value before awaiting anything else: later pointer events may be processed while this call waits,
+        // and must not be overwritten by an older position.
+        if (phase == "start") _dragging = true;
+        if (phase == "end") _dragging = false;
+        var setting = SetAsync(SliderMath.FromFraction(fraction, Min, Max, Step), commit: phase == "end");
+        if (phase == "start") await _thumb.FocusAsync();
+        await setting;
+        StateHasChanged();
+    });
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _reference?.Dispose();
+    }
+}

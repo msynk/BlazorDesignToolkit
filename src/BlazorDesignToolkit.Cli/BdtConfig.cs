@@ -1,5 +1,6 @@
 using BlazorDesignToolkit.Tokens.Diagnostics;
 using BlazorDesignToolkit.Tokens.Json;
+using BlazorDesignToolkit.Tokens.Resolution;
 using BlazorDesignToolkit.Tokens.Validation;
 using Microsoft.Extensions.FileSystemGlobbing;
 
@@ -29,6 +30,8 @@ internal sealed class BdtConfig
     public DiagnosticPolicy Policy { get; init; } = DiagnosticPolicy.Default;
     public IReadOnlyList<OutputConfig> Outputs { get; init; } = [];
     public CoverageConfig? Coverage { get; init; }
+    /// <summary>Remote source policy; null (the default) means no network access.</summary>
+    public RemoteSourceOptions? Remote { get; init; }
 
     public string Resolve(string relative) => System.IO.Path.GetFullPath(System.IO.Path.Combine(BaseDirectory, relative));
 
@@ -77,7 +80,7 @@ internal sealed class BdtConfig
 
     public static BdtConfig Read(SourceObject root, string baseDirectory, string? sourcePath, DiagnosticBag bag)
     {
-        ValidationConfig.CheckKeys(root, bag, "bdt.config.json", "$schema", "$description", "tokens", "themes", "parse", "validation", "policy", "outputs", "coverage");
+        ValidationConfig.CheckKeys(root, bag, "bdt.config.json", "$schema", "$description", "tokens", "themes", "parse", "validation", "policy", "outputs", "coverage", "remote");
         var parse = JsonParseOptions.Default;
         var legacy = false;
         var units = new HashSet<string>(StringComparer.Ordinal);
@@ -118,8 +121,28 @@ internal sealed class BdtConfig
                 ValidationConfig.Strings(c["entryPoints"]), (c["prefix"] as SourceString)?.Value, (c["minimumPercent"] as SourceNumber)?.Value);
         }
 
+        RemoteSourceOptions? remote = null;
+        if (root["remote"] is SourceObject r)
+        {
+            ValidationConfig.CheckKeys(r, bag, "remote", "allow", "timeoutSeconds");
+            var prefixes = new List<Uri>();
+            foreach (var prefix in ValidationConfig.Strings(r["allow"]))
+            {
+                if (Uri.TryCreate(prefix, UriKind.Absolute, out var uri)) prefixes.Add(uri);
+                else bag.Report(DiagnosticCatalog.InvalidConfiguration, $"Remote prefix '{prefix}' is not an absolute URL.", actual: prefix, location: r.Location);
+            }
+            remote = new RemoteSourceOptions
+            {
+                AllowedPrefixes = prefixes,
+                Timeout = r["timeoutSeconds"] is SourceNumber t ? TimeSpan.FromSeconds(t.Value) : TimeSpan.FromSeconds(30),
+                ParseOptions = parse,
+            };
+            if (remote.Validate() is { } error) bag.Report(DiagnosticCatalog.InvalidConfiguration, error, location: r.Location);
+        }
+
         return new BdtConfig
         {
+            Remote = remote,
             BaseDirectory = baseDirectory,
             SourcePath = sourcePath,
             Tokens = ValidationConfig.Strings(root["tokens"]),

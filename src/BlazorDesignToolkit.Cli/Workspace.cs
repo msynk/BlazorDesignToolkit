@@ -19,6 +19,8 @@ internal sealed record EvaluationUnit(string? Scope, ThemeSelection? Selection, 
 /// <summary>Everything loaded from a configuration: tokens or themes, validation options, and helpers to export.</summary>
 internal sealed class Workspace
 {
+    private static readonly Lazy<HttpClient> SharedHttpClient = new(HttpResolverSourceLoader.CreateHttpClient);
+
     private Workspace(BdtConfig config) => Config = config;
 
     public BdtConfig Config { get; }
@@ -60,7 +62,9 @@ internal sealed class Workspace
 
         if (config.Themes is { } themes)
         {
-            var result = await ThemeManifest.LoadAsync(config.Resolve(themes), config.Parse, cancellationToken);
+            var result = await ThemeManifest.LoadAsync(config.Resolve(themes), config.Parse, config.Remote is { } remote
+                ? directory => new HttpResolverSourceLoader(SharedHttpClient.Value, remote, new FileSystemResolverSourceLoader(directory, config.Parse))
+                : null, cancellationToken);
             bag.AddRange(result.Diagnostics);
             ws.InputFiles.Add(config.Resolve(themes));
             ws.InputFiles.AddRange(result.Files);
@@ -132,6 +136,7 @@ internal sealed class Workspace
     public static TokenExporterRegistry CreateRegistry()
         => TokenExporterRegistry.CreateDefault()
             .Register(new TailwindTokenExporter())
+            .Register(new TailwindConfigTokenExporter())
             .Register(new BootstrapTokenExporter(BootstrapOutput.Scss))
             .Register(new BootstrapTokenExporter(BootstrapOutput.Css))
             .Register(new FluentTokenExporter());
@@ -142,11 +147,24 @@ internal sealed class Workspace
         ["layer"] = "Wrap the output in @layer <name>.",
         ["references"] = "'preserve' (default) or 'resolve'.",
         ["colorFormat"] = "'auto' (default), 'hex' or 'native'.",
+        ["gamutMapping"] = "'css' (default) or 'clip' for colors outside sRGB in hex output.",
         ["themeAttribute"] = "Attribute carrying the theme id. Default 'data-theme'.",
         ["axisAttributePrefix"] = "Prefix of axis attributes. Default 'data-'.",
         ["systemMediaQueries"] = "Emit @media variants for the 'system' value. Default true.",
         ["colorScheme"] = "Emit the color-scheme property for the mode axis. Default true.",
         ["comments"] = "Emit token descriptions as comments. Default false.",
+    };
+
+    public static readonly IReadOnlyDictionary<string, string> BootstrapThemesSettings = new Dictionary<string, string>
+    {
+        ["prefix"] = "Prefix of the runtime token variables referenced in reference mode.",
+        ["values"] = "'reference' (default) or 'literal'.",
+        ["themeAttribute"] = "Attribute carrying the theme id. Default 'data-theme'.",
+        ["axisAttributePrefix"] = "Prefix of axis attributes. Default 'data-'.",
+        ["systemMediaQueries"] = "Emit @media variants for the 'system' value. Default true.",
+        ["darkAxis"] = "Axis whose value selects Bootstrap's dark variants. Default 'mode'.",
+        ["darkValue"] = "Value of that axis meaning dark. Default 'dark'.",
+        ["componentBridge"] = "Append rules that make compiled components (.btn-*, …) read the runtime variables. Default true.",
     };
 
     /// <summary>Generates one configured output. Returns null content when generation is impossible.</summary>
@@ -180,11 +198,44 @@ internal sealed class Workspace
                 return (result.Css, bag.ToSortedList());
             }
 
+            if (string.Equals(output.Format, "bootstrap-themes", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var key in output.Settings.Keys.Where(k => !BootstrapThemesSettings.ContainsKey(k)))
+                    bag.Report(DiagnosticCatalog.InvalidConfiguration, $"Unknown setting '{key}' for the 'bootstrap-themes' exporter.", actual: key, location: output.Location);
+                if (Catalog is null)
+                {
+                    bag.Report(DiagnosticCatalog.InvalidConfiguration, "The 'bootstrap-themes' output requires a theme manifest (\"themes\").", location: output.Location);
+                    return (null, bag.ToSortedList());
+                }
+                var context = new TokenExportContext(Catalog.Resolve(Catalog.DefaultSelection).Tokens, output.Settings);
+                var mappings = IntegrationSupport.ReadTargetMappings(output.Configuration, bag);
+                if (mappings.Count == 0) bag.Report(DiagnosticCatalog.InvalidConfiguration, "The 'bootstrap-themes' output needs a \"mappings\" object in its configuration.", location: output.Location);
+                var options = new BootstrapExportOptions
+                {
+                    Mappings = mappings,
+                    Output = BootstrapOutput.Css,
+                    Values = context.GetEnum("values", IntegrationValueMode.Reference),
+                    Css = CssExportOptions.Default with { Prefix = context.Get("prefix") ?? "" },
+                    DarkAxis = context.Get("darkAxis") ?? "mode",
+                    DarkValue = context.Get("darkValue") ?? "dark",
+                    IncludeComponentBridge = context.GetBool("componentBridge", true),
+                };
+                var theme = ThemeCssOptions.Default with
+                {
+                    ThemeAttribute = context.Get("themeAttribute") ?? "data-theme",
+                    AxisAttributePrefix = context.Get("axisAttributePrefix") ?? "data-",
+                    IncludeSystemMediaQueries = context.GetBool("systemMediaQueries", true),
+                };
+                var themed = BootstrapRuntime.ExportThemes(Catalog, options, theme);
+                bag.AddRange(themed.Diagnostics);
+                return (themed.Content, bag.ToSortedList());
+            }
+
             var exporter = registry.Find(output.Format);
             if (exporter is null)
             {
                 bag.Report(DiagnosticCatalog.InvalidConfiguration, $"Unknown output format '{output.Format}'.", location: output.Location,
-                    expected: string.Join(", ", registry.All.Select(static e => e.Format).Prepend("theme-css")), actual: output.Format);
+                    expected: string.Join(", ", registry.All.Select(static e => e.Format).Prepend("bootstrap-themes").Prepend("theme-css")), actual: output.Format);
                 return (null, bag.ToSortedList());
             }
             bag.AddRange(TokenExporterRegistry.ValidateSettings(exporter, output.Settings));

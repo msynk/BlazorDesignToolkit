@@ -1,0 +1,81 @@
+@page "/primitives/inputs"
+@using System.Globalization
+
+<PageTitle>Slider, number field, date picker · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Slider, number field and date picker</h1>
+
+<Example Title="Slider">
+    <ChildContent>
+        <FormField>
+            <FormLabel>Volume</FormLabel>
+            <Slider Min="0" Max="100" Step="5" @bind-Value="_volume" ValueText="@(v => $"{v} percent")" data-testid="slider" />
+        </FormField>
+        <p role="status">Volume: @_volume %</p>
+        <KeyboardTable Rows="@SliderKeys" />
+    </ChildContent>
+</Example>
+
+<Example Title="Range slider">
+    <ChildContent>
+        <FormField>
+            <FormLabel>Price range</FormLabel>
+            <RangeSlider Min="0" Max="1000" Step="10" MinDistance="50" @bind-Start="_from" @bind-End="_to"
+                         StartLabel="Minimum price" EndLabel="Maximum price" ValueText="@(v => v.ToString("C0", CultureInfo.GetCultureInfo("en-US")))" data-testid="range" />
+        </FormField>
+        <p role="status">From @_from to @_to</p>
+    </ChildContent>
+</Example>
+
+<Example Title="Number field (spinbutton)">
+    <ChildContent>
+        <FormField>
+            <FormLabel>Quantity</FormLabel>
+            <FormDescription>Between 1 and 20, in steps of 0.5.</FormDescription>
+            <NumberField Min="1" Max="20" Step="0.5" @bind-Value="_quantity" data-testid="number" />
+        </FormField>
+        <p role="status">Quantity: @(_quantity?.ToString() ?? "empty")</p>
+        <KeyboardTable Rows="@([("Up / Down", "Increase or decrease by one step."), ("Page Up / Page Down", "Increase or decrease by ten steps."), ("Type, then Enter or Tab", "Parse the typed number with the current culture.")])" />
+    </ChildContent>
+</Example>
+
+<Example Title="Date picker">
+    <Description><p>Weekends cannot be chosen. Dates before today are disabled.</p></Description>
+    <ChildContent>
+        <FormField>
+            <FormLabel>Delivery date</FormLabel>
+            <DatePicker @bind-Value="_date" Culture="@CultureInfo.GetCultureInfo("en-US")" Min="@_today" Today="@_today"
+                        IsDateDisabled="@(d => d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)" ShowKeyboardHelp="true" data-testid="date" />
+        </FormField>
+        <p role="status">Delivery: @(_date?.ToString("D", CultureInfo.GetCultureInfo("en-US")) ?? "not chosen")</p>
+        <KeyboardTable Rows="@DateKeys" />
+    </ChildContent>
+</Example>
+
+@code {
+    private double _volume = 40;
+    private double _from = 200;
+    private double _to = 600;
+    private double? _quantity = 2;
+    private DateOnly? _date;
+    // Fixed so that the example (and its tests) behave the same on every day.
+    private readonly DateOnly _today = new(2026, 11, 2);
+
+    private static readonly IReadOnlyList<(string, string)> SliderKeys =
+    [
+        ("Right / Up", "Increase by one step."),
+        ("Left / Down", "Decrease by one step."),
+        ("Page Up / Page Down", "Increase or decrease by a tenth of the range."),
+        ("Home / End", "Minimum or maximum."),
+    ];
+
+    private static readonly IReadOnlyList<(string, string)> DateKeys =
+    [
+        ("Enter / Space on the button", "Opens the calendar on the selected (or first available) date."),
+        ("Arrows", "Previous or next day or week."),
+        ("Home / End", "First or last day of the week."),
+        ("Page Up / Page Down", "Previous or next month; with Shift, previous or next year."),
+        ("Enter / Space", "Chooses the date and closes the calendar."),
+        ("Escape", "Closes the calendar; focus returns to the button."),
+    ];
+}

@@ -17,6 +17,17 @@
     </ChildContent>
 </Example>
 
+<Example Title="Virtualized listbox (10,000 options)">
+    <Description><p>Only the visible options are rendered; each carries aria-setsize and aria-posinset.</p></Description>
+    <ChildContent>
+        <FormField>
+            <FormLabel>Ticket</FormLabel>
+            <Listbox TItem="string" Items="Tickets" Virtualize="true" ItemSize="36" @bind-Value="_ticket" data-testid="virtual-listbox" />
+        </FormField>
+        <p role="status">Ticket: @(_ticket ?? "none")</p>
+    </ChildContent>
+</Example>
+
 <Example Title="Select">
     <ChildContent>
         <FormField>
@@ -41,6 +52,9 @@
 </Example>
 
 @code {
+    private static readonly IReadOnlyList<string> Tickets = Enumerable.Range(1, 10_000).Select(i => $"Ticket #{i:00000}").ToList();
+    private string? _ticket;
+
     private IReadOnlyCollection<string> _languages = ["C#"];
     private string? _country;
     private string? _city;

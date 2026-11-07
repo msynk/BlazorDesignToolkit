@@ -60,12 +60,45 @@ public static class TokenFlattener
 
     public static FlatTokenSet Flatten(TokenGroup root)
     {
-        var state = new State(root);
+        // A group may extend a group that exists only through another extension. Such targets are not in the source tree,
+        // so they are looked up in the result of the previous pass; passes repeat until the result is stable. Documents
+        // without such targets need a single pass. A chain that keeps growing is circular.
+        var state = new State(root, null);
         var effective = state.Compute(root);
+        var signature = state.HasMissingTargets ? Signature(effective) : "";
+        var maxPasses = state.HasMissingTargets ? 2 + CountExtends(root) : 0;
+        for (var pass = 1; state.HasMissingTargets && pass < maxPasses; pass++)
+        {
+            var next = new State(root, effective);
+            var nextEffective = next.Compute(root);
+            var nextSignature = Signature(nextEffective);
+            var stable = nextSignature == signature;
+            state = next;
+            effective = nextEffective;
+            signature = nextSignature;
+            if (stable) break;
+            if (pass == maxPasses - 1) state.ReportUnstable();
+        }
         var tokens = new List<FlatToken>();
         var groups = new HashSet<TokenPath>();
         Collect(effective, null, null, tokens, groups);
         return new FlatTokenSet(tokens, groups, state.Bag.ToSortedList());
+    }
+
+    private static int CountExtends(TokenGroup group)
+        => (group.Extends is null ? 0 : 1) + group.Children.OfType<TokenGroup>().Sum(CountExtends);
+
+    private static string Signature(EffectiveGroup group)
+    {
+        var sb = new System.Text.StringBuilder();
+        Append(group);
+        return sb.ToString();
+
+        void Append(EffectiveNode node)
+        {
+            sb.Append(node.Path.ToString()).Append(node is EffectiveToken ? ':' : '/').Append('|');
+            if (node is EffectiveGroup g) foreach (var child in g.Children) Append(child);
+        }
     }
 
     private static void Collect(EffectiveGroup group, string? inheritedType, TokenDeprecation? inheritedDeprecation, List<FlatToken> tokens, HashSet<TokenPath> groups)
@@ -113,8 +146,24 @@ public static class TokenFlattener
             => new EffectiveGroup(newPath, Type, Deprecation, Children.Select(c => c.Repath(newPath.Append(c.Name))).ToList());
     }
 
-    private sealed class State(TokenGroup root)
+    private sealed class State(TokenGroup root, EffectiveGroup? previous)
     {
+        private readonly List<(TokenGroup Group, TokenPath Target)> _resolvedFromPrevious = [];
+
+        /// <summary>True when an $extends target was not found in the source tree (it may exist only through extension).</summary>
+        public bool HasMissingTargets { get; private set; }
+
+        /// <summary>Reports the groups whose inherited targets did not stabilize as circular.</summary>
+        public void ReportUnstable()
+        {
+            foreach (var (group, target) in _resolvedFromPrevious)
+            {
+                Report(DiagnosticCatalog.CircularExtends, group,
+                    $"$extends of '{group.Path}' references '{target}', which only exists through a chain of extensions that does not terminate.",
+                    group.Extends ?? "", [group.Path.ToString(), target.ToString()]);
+            }
+        }
+
         private readonly Dictionary<TokenGroup, EffectiveGroup> _memo = new(ReferenceEqualityComparer.Instance);
         private readonly List<TokenGroup> _inProgress = [];
         private readonly HashSet<string> _reportedCycles = new(StringComparer.Ordinal);
@@ -245,9 +294,75 @@ public static class TokenFlattener
                     Report(DiagnosticCatalog.InvalidExtends, group, $"$extends of '{group.Path}' references the token '{target}'; $extends must reference a group.", raw);
                     return null;
                 default:
+                    HasMissingTargets = true;
+                    if (DependsOn(target, group.Path))
+                    {
+                        Report(DiagnosticCatalog.CircularExtends, group,
+                            $"$extends of '{group.Path}' references '{target}', which only exists through an extension that depends on '{group.Path}'.",
+                            raw, [group.Path.ToString(), target.ToString()]);
+                        return null;
+                    }
+                    switch (previous is null ? null : FindEffective(previous, target))
+                    {
+                        case EffectiveGroup inherited:
+                            _resolvedFromPrevious.Add((group, target));
+                            return inherited;
+                        case EffectiveToken:
+                            Report(DiagnosticCatalog.InvalidExtends, group, $"$extends of '{group.Path}' references the token '{target}'; $extends must reference a group.", raw);
+                            return null;
+                    }
                     Report(DiagnosticCatalog.InvalidExtends, group, $"$extends of '{group.Path}' references '{target}', which does not exist.", raw);
                     return null;
             }
+        }
+
+        /// <summary>
+        /// True when the groups that could provide <paramref name="target"/> (its ancestors in the source tree and, transitively,
+        /// the groups they extend) include <paramref name="group"/>, one of its ancestors or one of its descendants.
+        /// </summary>
+        private bool DependsOn(TokenPath target, TokenPath group)
+        {
+            var queue = new Queue<TokenPath>([target]);
+            var seen = new HashSet<TokenPath>();
+            while (queue.Count > 0)
+            {
+                var path = queue.Dequeue();
+                if (!seen.Add(path)) continue;
+                for (var length = path.Length; length >= 1; length--)
+                {
+                    var prefix = new TokenPath(path.Segments.Take(length));
+                    if (root.Find(prefix) is not TokenGroup { Extends: { } extends }) continue;
+                    if (!TryParseTarget(extends, out var next)) continue;
+                    if (next.StartsWith(group) || group.StartsWith(next)) return true;
+                    // What the extension provides below the prefix is looked up in the extended group.
+                    queue.Enqueue(new TokenPath(next.Segments.Concat(path.Segments.Skip(length))));
+                    queue.Enqueue(next);
+                }
+            }
+            return false;
+        }
+
+        private static bool TryParseTarget(string raw, out TokenPath target)
+        {
+            if (ReferenceSyntax.TryParseAlias(raw, out target)) return true;
+            if (raw.StartsWith('#') && JsonPointer.TryParse(raw, out var segments, out _) && !segments.Contains("$value"))
+            {
+                target = new TokenPath(segments);
+                return true;
+            }
+            target = default;
+            return false;
+        }
+
+        private static EffectiveNode? FindEffective(EffectiveGroup root, TokenPath path)
+        {
+            EffectiveNode current = root;
+            foreach (var segment in path.Segments)
+            {
+                if (current is not EffectiveGroup g || g.Find(segment) is not { } child) return null;
+                current = child;
+            }
+            return current;
         }
 
         private void ReportCycle(TokenGroup group)

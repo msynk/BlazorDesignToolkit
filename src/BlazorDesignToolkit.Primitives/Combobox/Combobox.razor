@@ -31,7 +31,7 @@
     {
         @if (_list.Items.Count == 0)
         {
-            <div role="presentation" data-empty="">@(EmptyContent ?? (RenderFragment)(b => b.AddContent(0, "No results")))</div>
+            <div role="presentation" data-empty="">@(EmptyContent ?? (RenderFragment)(b => b.AddContent(0, Strings.ComboboxNoResults)))</div>
         }
         @for (var i = 0; i < _list.Items.Count; i++)
         {
@@ -70,7 +70,7 @@
     private string _status = "";
     private bool _open;
     private bool _shown;
-    private int _popupHandle;
+    private readonly JsResource _overlay = new();
     private int _scrolledIndex = -1;
     private Func<TItem, string> _label = static i => i?.ToString() ?? "";
 
@@ -97,7 +97,6 @@
     /// <summary>Text announced (politely) when the number of results changes; override to localize.</summary>
     [Parameter] public Func<int, string>? ResultsAnnouncement { get; set; }
 
-    private static string DefaultAnnouncement(int count) => count == 1 ? "1 result available." : $"{count} results available.";
 
     private static bool DefaultFilter(TItem item, string text) => true;
 
@@ -115,7 +114,7 @@
 
     protected override void OnParametersSet()
     {
-        _value.Sync(Value);
+        _value.Sync(Value, IsProvided(nameof(Value)));
         _label = ItemLabel ?? (static i => i?.ToString() ?? "");
         if (!_open && Current is not null) _text = _label(Current);
         Refilter();
@@ -133,7 +132,7 @@
         _list.Update(items, _label, ItemDisabled);
         if (_open)
         {
-            _status = (ResultsAnnouncement ?? DefaultAnnouncement)(_list.Items.Count);
+            _status = (ResultsAnnouncement ?? Strings.ComboboxResults)(_list.Items.Count);
         }
     }
 
@@ -143,12 +142,12 @@
         if (_open && !_shown)
         {
             _shown = true;
-            _popupHandle = await Js.TrackAsync("showPopover", _popup, _input, null, new { placement = Placement, focus = false, restoreFocus = false });
+            await _overlay.OpenAsync(() => Js.TrackAsync("showPopover", _popup, _input, null, new { placement = Placement, focus = false, restoreFocus = false }));
         }
         else if (!_open && _shown)
         {
             _shown = false;
-            await Js.ReleaseAsync(_popupHandle);
+            await _overlay.CloseAsync(Js);
         }
         if (_open && _list.ActiveIndex >= 0 && _list.ActiveIndex != _scrolledIndex)
         {

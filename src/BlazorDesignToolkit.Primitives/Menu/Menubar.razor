@@ -1,0 +1,86 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Menubar: a horizontal role="menubar" whose items are MenubarTriggers, each opening the Menu it belongs to.
+   One trigger is in the tab sequence (roving tabindex). Left/Right move between triggers (wrapping) and, while a menu is
+   open, open the adjacent menu; Home/End go to the first/last trigger; Down/Enter/Space open a menu on its first item, Up on
+   its last; Escape closes the menu and returns focus to its trigger. Label the menubar with aria-label. *@
+@inherits PrimitiveBase
+
+<CascadingValue Value="Context" IsFixed="true">
+    <div role="menubar" aria-orientation="horizontal" @ref="_element"
+         @attributes='Attributes("role", "aria-orientation")'
+         data-bdt-keys="ArrowLeft ArrowRight Home End"
+         @onkeydown="OnKeyDownAsync">
+        @ChildContent
+    </div>
+</CascadingValue>
+
+@code {
+    private ElementReference _element;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal MenubarContext Context { get; } = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Context.Triggers.Rendered = true;
+        if (firstRender)
+        {
+            Context.Element = _element;
+            Context.Js = Js;
+            await Js.TrackAsync("preventKeys", _element);
+        }
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        var intent = e.Key switch
+        {
+            "ArrowLeft" => NavigationIntent.Previous,
+            "ArrowRight" => NavigationIntent.Next,
+            "Home" => NavigationIntent.First,
+            "End" => NavigationIntent.Last,
+            _ => NavigationIntent.None,
+        };
+        if (intent == NavigationIntent.None) return;
+        await Context.SyncOrderAsync();
+        var current = Context.Triggers.Focused ?? Context.Triggers.FindById(await Js.InvokeAsync<string?>("activeElementId")) ?? Context.Current;
+        var target = Context.Triggers.Navigate(current, intent, loop: true);
+        if (target is null) return;
+        Context.Current = target;
+        Context.NotifyStateChanged();
+        await target.FocusAsync();
+    }
+
+    internal sealed class MenubarContext : PrimitiveContext
+    {
+        public CompositeRegistry<MenubarTrigger> Triggers { get; } = new();
+        public List<Menu> Menus { get; } = [];
+        public MenubarTrigger? Current { get; set; }
+        public Menu? OpenMenu { get; set; }
+        public ElementReference Element { get; set; }
+        public PrimitivesJs? Js { get; set; }
+
+        /// <summary>The trigger in the tab sequence: the last focused one, else the first enabled one.</summary>
+        public MenubarTrigger? TabStop => Current is { IsDisabled: false } ? Current : Triggers.Items.FirstOrDefault(t => !t.IsDisabled);
+
+        public async Task SyncOrderAsync()
+        {
+            if (Triggers.OrderDirty && Js is not null) Triggers.ApplyOrder(await Js.InvokeAsync<string[]>("domOrder", Element, "[data-menubar-trigger]"));
+        }
+
+        /// <summary>From an open menu: close it and open the adjacent menu of the menubar on its first item.</summary>
+        public async Task MoveAsync(Menu from, int delta)
+        {
+            await SyncOrderAsync();
+            var current = Triggers.Items.FirstOrDefault(t => t.Owner == from);
+            var target = Triggers.Navigate(current, delta > 0 ? NavigationIntent.Next : NavigationIntent.Previous, loop: true);
+            if (target is null || target == current) return;
+            await from.CloseAsync();
+            Current = target;
+            NotifyStateChanged();
+            await target.FocusAsync();
+            await target.Owner.OpenAsync(Menu.MenuFocus.First);
+        }
+    }
+}

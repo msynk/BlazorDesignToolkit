@@ -1,0 +1,280 @@
+@inherits PrimitiveTestBase
+@using System.Globalization
+@using Microsoft.Extensions.DependencyInjection
+
+@code {
+    // ---- Slider ----------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Slider_exposes_value_and_follows_apg_keys()
+    {
+        double value = 0;
+        var commits = 0;
+        var cut = Render(@<FormField><FormLabel>Volume</FormLabel>
+            <Slider Min="0" Max="100" Step="5" DefaultValue="50" ValueChanged="v => value = v" ValueCommitted="_ => commits++" ValueText="@(v => $"{v} percent")" />
+        </FormField>);
+        var thumb = cut.Find("[role=slider]");
+        Assert.Equal("50", thumb.Attr("aria-valuenow"));
+        Assert.Equal("0", thumb.Attr("aria-valuemin"));
+        Assert.Equal("100", thumb.Attr("aria-valuemax"));
+        Assert.Equal("50 percent", thumb.Attr("aria-valuetext"));
+        Assert.Equal(cut.Find("label").Id, thumb.Attr("aria-labelledby"));
+        thumb.KeyDown(Key("ArrowRight"));
+        Assert.Equal(55, value);
+        cut.Find("[role=slider]").KeyDown(Key("PageUp"));
+        Assert.Equal(65, value); // default large step: a tenth of the range
+        cut.Find("[role=slider]").KeyDown(Key("End"));
+        Assert.Equal(100, value);
+        cut.Find("[role=slider]").KeyDown(Key("Home"));
+        Assert.Equal(0, value);
+        Assert.Equal(4, commits);
+        Assert.Contains("--bdt-slider-value: 0%", cut.Find("[data-slider]").Attr("style"));
+        Assert.Equal(1, Calls("attachSlider"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Slider_reverses_horizontal_keys_in_rtl_and_snaps_pointer_values()
+    {
+        double value = 0;
+        var cut = Render(@<Slider Label="Balance" Min="-1" Max="1" Step="0.1" DefaultValue="0" Direction="TextDirection.Rtl" ValueChanged="v => value = v" />);
+        cut.Find("[role=slider]").KeyDown(Key("ArrowRight"));
+        Assert.Equal(-0.1, value, 10);
+        cut.InvokeAsync(() => cut.FindComponent<Slider>().Instance.OnPointer(0.873, "end"));
+        Assert.Equal(0.7, value, 10); // -1 + 0.873 * 2 = 0.746 → snapped to 0.7
+        Assert.Equal(0.3, SliderMath.Snap(0.1 + 0.2, 0, 1, 0.1)); // no floating-point drift
+    }
+
+    [Fact]
+    public void Range_slider_keeps_thumbs_ordered_and_constrains_each_thumb()
+    {
+        (double Start, double End) committed = default;
+        var cut = Render(@<RangeSlider Label="Price" Min="0" Max="1000" Step="10" DefaultStart="200" DefaultEnd="300" MinDistance="50"
+                                      ValueCommitted="v => committed = v" />);
+        var thumbs = cut.FindAll("[role=slider]");
+        Assert.Equal("Minimum", thumbs[0].Attr("aria-label"));
+        Assert.Equal("250", thumbs[0].Attr("aria-valuemax")); // end − MinDistance
+        Assert.Equal("250", thumbs[1].Attr("aria-valuemin"));
+        thumbs[0].KeyDown(Key("End"));
+        Assert.Equal((250d, 300d), committed);
+        cut.FindAll("[role=slider]")[1].KeyDown(Key("Home"));
+        Assert.Equal((250d, 300d), committed); // the end thumb cannot pass start + MinDistance
+        Assert.Equal("group", cut.Find("[data-slider]").Attr("role"));
+        AssertAccessible(cut.Markup);
+    }
+
+    // ---- Number field ------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Number_field_is_a_spinbutton_with_steps_bounds_and_culture_parsing()
+    {
+        double? value = null;
+        var cut = Render(@<FormField><FormLabel>Quantity</FormLabel>
+            <NumberField Min="0" Max="10" Step="0.5" DefaultValue="2" Culture="@(CultureInfo.GetCultureInfo("de-DE"))" ValueChanged="v => value = v" />
+        </FormField>);
+        var input = cut.Find("input[role=spinbutton]");
+        Assert.Equal("2", input.Attr("aria-valuenow"));
+        Assert.Equal("0", input.Attr("aria-valuemin"));
+        Assert.Equal("10", input.Attr("aria-valuemax"));
+        Assert.Equal(cut.Find("label").Attr("for"), input.Id);
+        input.KeyDown(Key("ArrowUp"));
+        Assert.Equal(2.5, value);
+        Assert.Equal("2,5", cut.Find("input[role=spinbutton]").Attr("value"));
+        cut.Find("input[role=spinbutton]").KeyDown(Key("PageUp"));
+        Assert.Equal(7.5, value);
+        cut.Find("input[role=spinbutton]").Input("12,26");
+        cut.Find("input[role=spinbutton]").Blur();
+        Assert.Equal(10, value); // clamped
+        cut.Find("input[role=spinbutton]").Input("abc");
+        cut.Find("input[role=spinbutton]").Blur();
+        Assert.Equal(10, value); // not a number: reverts
+        Assert.Equal("10", cut.Find("input[role=spinbutton]").Attr("value"));
+        Assert.True(cut.Find("[data-number-field-increment]").HasAttribute("disabled"));
+        Assert.Equal("-1", cut.Find("[data-number-field-decrement]").Attr("tabindex"));
+        Assert.Equal("Decrease", cut.Find("[data-number-field-decrement]").Attr("aria-label"));
+        cut.Find("[data-number-field-decrement]").Click();
+        Assert.Equal(9.5, value);
+        AssertAccessible(cut.Markup);
+    }
+
+    // ---- Date picker -------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Date_picker_grid_follows_apg_keys_and_selects()
+    {
+        DateOnly? value = null;
+        var cut = Render(@<FormField><FormLabel>Arrival</FormLabel>
+            <DatePicker DefaultValue="new DateOnly(2026, 1, 30)" Today="new DateOnly(2026, 1, 15)" Culture="@(CultureInfo.GetCultureInfo("en-US"))"
+                        Min="new DateOnly(2026, 1, 5)" IsDateDisabled="@(d => d.DayOfWeek == DayOfWeek.Sunday)" ValueChanged="v => value = v" />
+        </FormField>);
+        Assert.Equal("1/30/2026", cut.Find("input").Attr("value"));
+        var button = cut.Find("[data-date-picker-button]");
+        Assert.Equal("dialog", button.Attr("aria-haspopup"));
+        button.Click();
+        Assert.Equal("January 2026", cut.Find("[data-date-picker-heading]").TextContent);
+        Assert.Equal("Sun", cut.FindAll("th")[0].Attr("abbr")![..3]); // en-US weeks start on Sunday
+        var focused = cut.Find("td[tabindex='0']");
+        Assert.Equal("2026-01-30", focused.Attr("data-date"));
+        Assert.Equal("true", focused.Attr("aria-selected"));
+        Assert.Equal("date", cut.Find("td[data-date='2026-01-15']").Attr("aria-current"));
+        Assert.Equal("true", cut.Find("td[data-date='2026-01-04']").Attr("aria-disabled")); // before Min (and a Sunday)
+
+        cut.Find("table[role=grid]").KeyDown(Key("ArrowRight"));
+        cut.Find("table[role=grid]").KeyDown(Key("ArrowDown")); // Jan 31 → Feb 7: the month follows
+        Assert.Equal("February 2026", cut.Find("[data-date-picker-heading]").TextContent);
+        Assert.Equal("2026-02-07", cut.Find("td[tabindex='0']").Attr("data-date"));
+        cut.Find("table[role=grid]").KeyDown(Key("PageUp", shift: true));
+        Assert.Equal("February 2025", cut.Find("[data-date-picker-heading]").TextContent);
+        cut.Find("table[role=grid]").KeyDown(Key("PageDown", shift: true));
+        cut.Find("table[role=grid]").KeyDown(Key("Home"));
+        Assert.Equal("2026-02-01", cut.Find("td[tabindex='0']").Attr("data-date")); // Sunday: disabled, so Enter does nothing
+        cut.Find("table[role=grid]").KeyDown(Key("Enter"));
+        Assert.Null(value);
+        cut.Find("table[role=grid]").KeyDown(Key("ArrowRight"));
+        cut.Find("table[role=grid]").KeyDown(Key("Enter"));
+        Assert.Equal(new DateOnly(2026, 2, 2), value);
+        Assert.Equal("closed", cut.Find("[role=dialog]").Attr("data-state"));
+        Assert.Equal("2/2/2026", cut.Find("input").Attr("value"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Date_picker_parses_typed_dates_with_the_culture_and_flags_invalid_text()
+    {
+        DateOnly? value = null;
+        var cut = Render(@<DatePicker Label="Date" Culture="@(CultureInfo.GetCultureInfo("de-DE"))" ValueChanged="v => value = v" />);
+        var input = cut.Find("input");
+        Assert.Equal("dd.mm.yyyy", input.Attr("placeholder"));
+        input.Input("24.12.2026");
+        input.Blur();
+        Assert.Equal(new DateOnly(2026, 12, 24), value);
+        cut.Find("input").Input("31.02.2026");
+        cut.Find("input").Blur();
+        Assert.Equal("true", cut.Find("input").Attr("aria-invalid"));
+        Assert.Equal(new DateOnly(2026, 12, 24), value);
+        Assert.Equal(DayOfWeek.Monday, CalendarMath.MonthGrid(new DateOnly(2026, 12, 1), CultureInfo.GetCultureInfo("de-DE").DateTimeFormat.FirstDayOfWeek)[0].DayOfWeek);
+    }
+
+    // ---- Submenus and menubar ----------------------------------------------------------------------------------
+
+    [Fact]
+    public void Submenu_trigger_has_popup_state_and_opens_with_right_arrow()
+    {
+        var picked = "";
+        var cut = Render(@<Menu>
+            <MenuTrigger>Actions</MenuTrigger>
+            <MenuContent>
+                <MenuItem OnSelect="@(() => picked = "copy")">Copy</MenuItem>
+                <MenuSub>
+                    <MenuSubTrigger>Share</MenuSubTrigger>
+                    <MenuSubContent>
+                        <MenuItem OnSelect="@(() => picked = "email")">Email</MenuItem>
+                        <MenuItem>Link</MenuItem>
+                    </MenuSubContent>
+                </MenuSub>
+            </MenuContent>
+        </Menu>);
+        cut.Find("button").Click();
+        var subTrigger = cut.Find("[data-submenu-trigger]");
+        Assert.Equal("menu", subTrigger.Attr("aria-haspopup"));
+        Assert.Equal("false", subTrigger.Attr("aria-expanded"));
+        subTrigger.KeyDown(Key("ArrowRight"));
+        subTrigger = cut.Find("[data-submenu-trigger]");
+        Assert.Equal("true", subTrigger.Attr("aria-expanded"));
+        var menus = cut.FindAll("[role=menu]");
+        Assert.Equal(2, menus.Count);
+        Assert.Equal(subTrigger.Id, menus[1].Attr("aria-labelledby"));
+        Assert.Equal(subTrigger.Attr("aria-controls"), menus[1].Id);
+        // Left arrow in the submenu closes it only.
+        menus[1].KeyDown(Key("ArrowLeft"));
+        Assert.Equal("false", cut.Find("[data-submenu-trigger]").Attr("aria-expanded"));
+        Assert.Equal("true", cut.Find("button").Attr("aria-expanded"));
+        // Activating a submenu item closes every menu.
+        cut.Find("[data-submenu-trigger]").KeyDown(Key("Enter"));
+        cut.FindAll("[role=menu]")[1].QuerySelector("[role=menuitem]")!.Click();
+        Assert.Equal("email", picked);
+        Assert.Equal("false", cut.Find("button").Attr("aria-expanded"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Menubar_has_one_tab_stop_and_moves_between_menus()
+    {
+        var cut = Render(@<Menubar aria-label="Editor">
+            <Menu><MenubarTrigger>File</MenubarTrigger><MenuContent><MenuItem>New</MenuItem><MenuItem>Open</MenuItem></MenuContent></Menu>
+            <Menu><MenubarTrigger>Edit</MenubarTrigger><MenuContent><MenuItem>Undo</MenuItem></MenuContent></Menu>
+            <Menu><MenubarTrigger>View</MenubarTrigger><MenuContent><MenuItem>Zoom</MenuItem></MenuContent></Menu>
+        </Menubar>);
+        var triggers = cut.FindAll("[data-menubar-trigger]");
+        Assert.Equal("menubar", cut.Find("[role=menubar]").Attr("role"));
+        Assert.All(triggers, t => Assert.Equal("menuitem", t.Attr("role")));
+        Assert.Equal(["0", "-1", "-1"], triggers.Select(t => t.Attr("tabindex")));
+        triggers[0].Focus();
+        triggers[0].KeyDown(Key("ArrowRight"));
+        Assert.Equal(["-1", "0", "-1"], cut.FindAll("[data-menubar-trigger]").Select(t => t.Attr("tabindex")));
+        cut.FindAll("[data-menubar-trigger]")[1].KeyDown(Key("ArrowDown"));
+        Assert.Equal("true", cut.FindAll("[data-menubar-trigger]")[1].Attr("aria-expanded"));
+        // Right arrow inside the open menu opens the next menu of the menubar.
+        cut.Find("[role=menu][data-state=open]").KeyDown(Key("ArrowRight"));
+        Assert.Equal("false", cut.FindAll("[data-menubar-trigger]")[1].Attr("aria-expanded"));
+        Assert.Equal("true", cut.FindAll("[data-menubar-trigger]")[2].Attr("aria-expanded"));
+        Assert.Equal("0", cut.FindAll("[data-menubar-trigger]")[2].Attr("tabindex"));
+        AssertAccessible(cut.Markup);
+    }
+
+    // ---- Virtualization ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Virtualized_listbox_and_tree_expose_size_and_position()
+    {
+        var items = Enumerable.Range(1, 5000).Select(i => $"Item {i}").ToList();
+        string? value = null;
+        var cut = Render(@<Listbox TItem="string" Items="items" Virtualize="true" ItemSize="32" ValueChanged="v => value = v" aria-label="Items" />);
+        var options = cut.FindAll("[role=option]");
+        Assert.True(options.Count < 500, $"{options.Count} options rendered");
+        Assert.Equal("5000", options[0].Attr("aria-setsize"));
+        Assert.Equal("1", options[0].Attr("aria-posinset"));
+        cut.Find("[role=listbox]").Focus();
+        cut.Find("[role=listbox]").KeyDown(Key("End"));
+        Assert.Equal("Item 5000", value);
+        Assert.Contains(Module.Invocations, i => i.Identifier == "scrollToIndex" && (int)i.Arguments[1]! == 4999);
+
+        var tree = Render(@<TreeView TItem="string" Items="@(new[] { "a", "b" })" ChildrenSelector="@(n => n.Length < 3 ? new[] { n + "1", n + "2" } : null)"
+                                     ExpandedItems="@(new[] { "a" })" Virtualize="true" aria-label="Tree" />);
+        var rows = tree.FindAll("[role=treeitem]");
+        Assert.Equal(["a", "a1", "a2", "b"], rows.Select(r => r.TextContent));
+        Assert.Equal(["1", "2", "2", "1"], rows.Select(r => r.Attr("aria-level")));
+        Assert.Equal(["1", "1", "2", "2"], rows.Select(r => r.Attr("aria-posinset")));
+        Assert.Empty(tree.FindAll("[role=group]"));
+        tree.Find("[role=tree]").Focus();
+        Assert.Equal(rows[0].Id, tree.Find("[role=tree]").Attr("aria-activedescendant"));
+        tree.Find("[role=tree]").KeyDown(Key("End"));
+        Assert.Equal(tree.FindAll("[role=treeitem]")[3].Id, tree.Find("[role=tree]").Attr("aria-activedescendant"));
+        Assert.Contains(Module.Invocations, i => i.Identifier == "revealAndFocus");
+    }
+
+    // ---- Localized strings -------------------------------------------------------------------------------------
+
+    private sealed class GermanStrings : PrimitiveStrings
+    {
+        public override string ToastRegionLabel => "Benachrichtigungen";
+        public override string ComboboxNoResults => "Keine Treffer";
+        public override string NumberFieldIncrement => "Erhöhen";
+    }
+
+    [Fact]
+    public void Registered_strings_replace_the_built_in_texts_and_parameters_still_win()
+    {
+        Services.AddSingleton<PrimitiveStrings, GermanStrings>();
+        Services.AddHeadlessPrimitives();
+        var cut = Render(@<div>
+            <ToastRegion />
+            <ToastRegion Label="Meldungen" />
+            <NumberField Label="Menge" />
+        </div>);
+        var regions = cut.FindAll("section");
+        Assert.Equal("Benachrichtigungen", regions[0].Attr("aria-label"));
+        Assert.Equal("Meldungen", regions[1].Attr("aria-label"));
+        Assert.Equal("Erhöhen", cut.Find("[data-number-field-increment]").Attr("aria-label"));
+    }
+}

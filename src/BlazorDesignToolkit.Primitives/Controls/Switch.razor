@@ -46,7 +46,7 @@
         TrackField(Field);
     }
 
-    protected override void OnParametersSet() => _checked.Sync(Checked);
+    protected override void OnParametersSet() => _checked.Sync(Checked, IsProvided(nameof(Checked)));
 
     private Task ToggleAsync() => Disabled || Field?.Disabled == true ? Task.CompletedTask : _checked.SetAsync(!Current, Controlled, CheckedChanged);
 }

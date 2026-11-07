@@ -223,6 +223,68 @@ public static class ColorMath
         return new SrgbColor(rgb[0], rgb[1], rgb[2], alpha);
     }
 
+    /// <summary>
+    /// Converts to gamma-encoded sRGB and brings out-of-gamut colors into gamut with the CSS Color Module Level 4 gamut
+    /// mapping algorithm (§13.2): chroma is reduced in OKLCh, keeping lightness and hue, until the clipped result is within
+    /// one just-noticeable difference (ΔEOK 0.02) of the reduced color. In-gamut colors are returned unchanged; alpha is
+    /// clamped to [0, 1].
+    /// </summary>
+    public static SrgbColor GamutMapToSrgb(string space, IReadOnlyList<double?> components, double alpha = 1)
+    {
+        var a = Math.Clamp(alpha, 0, 1);
+        var direct = ToSrgb(space, components, a);
+        if (direct.IsInGamut) return direct.Clip();
+        var lch = Convert(space, components, ColorSpaces.Oklch);
+        double l = lch[0], c = lch[1], h = lch[2];
+        if (l >= 1) return new SrgbColor(1, 1, 1, a);
+        if (l <= 0) return new SrgbColor(0, 0, 0, a);
+
+        const double jnd = 0.02;
+        const double epsilon = 0.0001;
+        var clipped = ClipOklch(l, c, h);
+        if (DeltaEOk(clipped, l, c, h) < jnd) return clipped with { A = a };
+
+        double min = 0, max = c;
+        var minInGamut = true;
+        while (max - min > epsilon)
+        {
+            var chroma = (min + max) / 2;
+            var candidate = OklchToSrgb(l, chroma, h);
+            if (minInGamut && candidate.IsInGamut)
+            {
+                min = chroma;
+                continue;
+            }
+            clipped = candidate.Clip();
+            var e = DeltaEOk(clipped, l, chroma, h);
+            if (e < jnd)
+            {
+                if (jnd - e < epsilon) break;
+                minInGamut = false;
+                min = chroma;
+            }
+            else
+            {
+                max = chroma;
+            }
+        }
+        return clipped with { A = a };
+
+        static SrgbColor OklchToSrgb(double l, double c, double h) => ToSrgb(ColorSpaces.Oklch, [l, c, h]);
+        static SrgbColor ClipOklch(double l, double c, double h) => OklchToSrgb(l, c, h).Clip();
+    }
+
+    /// <summary>ΔEOK (Euclidean distance in OKLab) between an sRGB color and an OKLCh color.</summary>
+    private static double DeltaEOk(SrgbColor srgb, double l, double c, double h)
+    {
+        var lab = Convert(ColorSpaces.Srgb, [srgb.R, srgb.G, srgb.B], ColorSpaces.Oklab);
+        var radians = h * Math.PI / 180;
+        var dl = lab[0] - l;
+        var da = lab[1] - c * Math.Cos(radians);
+        var db = lab[2] - c * Math.Sin(radians);
+        return Math.Sqrt(dl * dl + da * da + db * db);
+    }
+
     // ---- Transfer functions ------------------------------------------------------------------------------------
     public static double SrgbToLinear(double v)
     {

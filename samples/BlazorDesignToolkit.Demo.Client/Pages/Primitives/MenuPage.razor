@@ -28,10 +28,66 @@
 
 <KeyboardTable Rows="@Keys" />
 
+<Example Title="Submenu">
+    <ChildContent>
+        <Menu>
+            <MenuTrigger data-testid="submenu-trigger">Share</MenuTrigger>
+            <MenuContent data-testid="submenu-root">
+                <MenuItem TextValue="Copy link" OnSelect="@(() => _last = "Copy link")">Copy link</MenuItem>
+                <MenuSub>
+                    <MenuSubTrigger TextValue="Send to" data-testid="send-to">Send to</MenuSubTrigger>
+                    <MenuSubContent data-testid="send-to-menu">
+                        <MenuItem TextValue="Email" OnSelect="@(() => _last = "Email")">Email</MenuItem>
+                        <MenuItem TextValue="Chat" OnSelect="@(() => _last = "Chat")">Chat</MenuItem>
+                    </MenuSubContent>
+                </MenuSub>
+                <MenuItem TextValue="Embed" OnSelect="@(() => _last = "Embed")">Embed</MenuItem>
+            </MenuContent>
+        </Menu>
+        <KeyboardTable Rows="@([("Right / Enter / Space (on Send to)", "Opens the submenu on its first item."), ("Left / Escape (in the submenu)", "Closes the submenu; focus returns to Send to."), ("Enter (on an item)", "Activates it and closes all menus.")])" />
+    </ChildContent>
+</Example>
+
+<Example Title="Menubar">
+    <ChildContent>
+        <Menubar aria-label="Editor" data-testid="menubar">
+            <Menu>
+                <MenubarTrigger>File</MenubarTrigger>
+                <MenuContent>
+                    <MenuItem TextValue="New" OnSelect="@(() => _last = "New")">New</MenuItem>
+                    <MenuItem TextValue="Open" OnSelect="@(() => _last = "Open")">Open…</MenuItem>
+                    <MenuSub>
+                        <MenuSubTrigger TextValue="Export">Export</MenuSubTrigger>
+                        <MenuSubContent>
+                            <MenuItem TextValue="PDF" OnSelect="@(() => _last = "Export PDF")">PDF</MenuItem>
+                            <MenuItem TextValue="HTML" OnSelect="@(() => _last = "Export HTML")">HTML</MenuItem>
+                        </MenuSubContent>
+                    </MenuSub>
+                </MenuContent>
+            </Menu>
+            <Menu>
+                <MenubarTrigger>Edit</MenubarTrigger>
+                <MenuContent>
+                    <MenuItem TextValue="Undo" OnSelect="@(() => _last = "Undo")">Undo</MenuItem>
+                    <MenuItem TextValue="Redo" OnSelect="@(() => _last = "Redo")">Redo</MenuItem>
+                </MenuContent>
+            </Menu>
+            <Menu>
+                <MenubarTrigger>View</MenubarTrigger>
+                <MenuContent>
+                    <MenuCheckboxItem TextValue="Ruler" @bind-IsChecked="_ruler">Ruler</MenuCheckboxItem>
+                </MenuContent>
+            </Menu>
+        </Menubar>
+        <KeyboardTable Rows="@([("Left / Right", "Moves between menus; while a menu is open, opens the adjacent one."), ("Down / Enter / Space", "Opens the menu on its first item."), ("Up", "Opens the menu on its last item."), ("Home / End", "First or last menu."), ("Escape", "Closes the menu; focus returns to the menubar.")])" />
+    </ChildContent>
+</Example>
+
 @code {
     private string? _last;
     private bool _pinned;
     private string? _sort = "name";
+    private bool _ruler;
 
     private static readonly IReadOnlyList<(string, string)> Keys =
     [

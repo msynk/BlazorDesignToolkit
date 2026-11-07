@@ -1,0 +1,96 @@
+@namespace BlazorDesignToolkit.Primitives
+@* A top-level item of a Menubar (role="menuitem" with aria-haspopup="menu") that opens the Menu it is placed in. *@
+@inherits PrimitiveBase
+@implements ICompositeItem
+
+<button type="button" @ref="_element"
+        @attributes='Attributes("role", "aria-haspopup", "aria-expanded", "aria-controls", "tabindex", "type", "id")'
+        id="@Context.TriggerId"
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded="@(Context.Owner.IsOpen ? "true" : "false")"
+        aria-controls="@Context.MenuId"
+        aria-disabled="@(Disabled ? "true" : null)"
+        tabindex="@(Bar.TabStop == this ? "0" : "-1")"
+        data-state="@(Context.Owner.IsOpen ? "open" : "closed")"
+        data-menubar-trigger=""
+        data-bdt-keys="ArrowDown ArrowUp Enter Space"
+        @onclick="OnClickAsync"
+        @onkeydown="OnKeyDownAsync"
+        @onpointerenter="OnPointerEnterAsync"
+        @onfocus="OnFocus"
+        @onblur="() => Bar.Triggers.OnBlur(this)">
+    @ChildContent
+</button>
+
+@code {
+    private ElementReference _element;
+
+    [CascadingParameter] internal Menu.MenuContext Context { get; set; } = default!;
+    [CascadingParameter] internal Menubar.MenubarContext Bar { get; set; } = default!;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    public string ElementId => Context.TriggerId;
+    public bool IsDisabled => Disabled;
+    public string? TypeaheadLabel => null;
+    internal Menu Owner => (Menu)Context.Owner;
+
+    protected override void OnInitialized()
+    {
+        if (Context is null || Bar is null) throw new InvalidOperationException("MenubarTrigger must be placed inside a Menu inside a Menubar.");
+        Bar.Triggers.Register(this);
+        Track(Context);
+        Track(Bar);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        Context.Trigger = _element;
+        await Js.TrackAsync("preventKeys", _element);
+    }
+
+    internal ValueTask FocusAsync() => _element.FocusAsync();
+
+    private void OnFocus()
+    {
+        Bar.Triggers.OnFocus(this);
+        if (Bar.Current == this) return;
+        Bar.Current = this;
+        Bar.NotifyStateChanged();
+    }
+
+    private Task OnClickAsync(MouseEventArgs e)
+    {
+        if (Disabled) return Task.CompletedTask;
+        if (Context.Owner.IsOpen) return Context.Owner.CloseAsync();
+        Context.OpenedByPointer = e.Detail > 0;
+        return Context.Owner.OpenAsync(Menu.MenuFocus.First);
+    }
+
+    private Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (Disabled) return Task.CompletedTask;
+        return e.Key switch
+        {
+            "ArrowDown" or "Enter" or " " => Context.Owner.OpenAsync(Menu.MenuFocus.First),
+            "ArrowUp" => Context.Owner.OpenAsync(Menu.MenuFocus.Last),
+            _ => Task.CompletedTask,
+        };
+    }
+
+    /// <summary>While another menu of the menubar is open, hovering a trigger switches to its menu.</summary>
+    private async Task OnPointerEnterAsync()
+    {
+        if (Disabled || Context.Owner.IsOpen || Bar.OpenMenu is null) return;
+        await FocusAsync();
+        await Context.Owner.OpenAsync(null);
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        Bar?.Triggers.Unregister(this);
+        return base.DisposeAsync();
+    }
+}

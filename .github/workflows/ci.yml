@@ -45,6 +45,21 @@ jobs:
             reports
             artifacts/*.nupkg
 
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Benchmark regression gate (allocations within 10 %, time within 4x of benchmarks/baseline.json)
+        run: dotnet run -c Release --project benchmarks/BlazorDesignToolkit.Benchmarks -- --gate benchmarks/baseline.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: BenchmarkDotNet.Artifacts/results
+
   browser-tests:
     runs-on: ubuntu-latest
     strategy:

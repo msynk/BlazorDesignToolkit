@@ -202,11 +202,27 @@ public abstract class PrimitiveBase : ComponentBase, IAsyncDisposable
     private PrimitivesJs? _js;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] private IServiceProvider Services { get; set; } = default!;
+
+    /// <summary>Built-in texts: the registered <see cref="PrimitiveStrings"/> or the English defaults.</summary>
+    protected PrimitiveStrings Strings => (PrimitiveStrings?)Services.GetService(typeof(PrimitiveStrings)) ?? PrimitiveStrings.Default;
 
     /// <summary>Additional attributes (class, style, data-*, aria-label…) splatted on the primitive's main element.</summary>
     [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
     protected PrimitivesJs Js => _js ??= new PrimitivesJs(JSRuntime);
+
+    private readonly HashSet<string> _provided = new(StringComparer.Ordinal);
+
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        _provided.Clear();
+        foreach (var parameter in parameters) _provided.Add(parameter.Name);
+        return base.SetParametersAsync(parameters);
+    }
+
+    /// <summary>True when the parent passed <paramref name="parameterName"/> in its latest render (controlled state).</summary>
+    protected bool IsProvided(string parameterName) => _provided.Contains(parameterName);
 
     protected bool IsDisposed { get; private set; }
 
@@ -261,12 +277,39 @@ public abstract class PrimitiveContext
 /// new value passed by the parent (for example through <c>@bind-Value</c>) replaces it. Works whether or not the parent
 /// re-renders after the change.
 /// </summary>
+/// <summary>
+/// A JavaScript resource opened in OnAfterRenderAsync (an overlay, a focus trap). The open call is kept as a task so that a
+/// close requested before it has returned its handle (OnAfterRenderAsync calls can overlap) still releases the resource.
+/// </summary>
+public sealed class JsResource
+{
+    private Task<int>? _opening;
+
+    public bool IsOpen => _opening is not null;
+
+    public async Task OpenAsync(Func<ValueTask<int>> open)
+    {
+        _opening = open().AsTask();
+        await _opening;
+    }
+
+    public async Task CloseAsync(PrimitivesJs js)
+    {
+        if (_opening is not { } opening) return;
+        _opening = null;
+        await js.ReleaseAsync(await opening);
+    }
+}
+
 public sealed class Controllable<T>
 {
     private T _value;
     private T _lastParameter = default!;
     private bool _initialized;
     private bool _synced;
+    private bool _pending;
+    private bool _provided;
+    private int _version;
 
     public Controllable(T initial) => _value = initial;
 
@@ -282,23 +325,54 @@ public sealed class Controllable<T>
         _initialized = true;
     }
 
-    /// <summary>Call from OnParametersSet: adopts the parameter when the parent passes a different value than before.</summary>
-    public void Sync(T parameter)
+    /// <summary>
+    /// Call from OnParametersSet: adopts the parameter when the parent passes a different value than before. After a change
+    /// raised through <see cref="SetAsync"/> on a controlled component, a parent render that still passes the old value
+    /// means the parent did not accept it, and the value reverts (as Blazor's own inputs do). Returns true on a revert.
+    /// </summary>
+    public bool Sync(T parameter, bool provided = true)
     {
+        _provided = provided;
         if (!_synced)
         {
             _lastParameter = parameter;
             _synced = true;
-            return;
+            return false;
         }
-        if (EqualityComparer<T>.Default.Equals(parameter, _lastParameter)) return;
-        _lastParameter = parameter;
+        if (!EqualityComparer<T>.Default.Equals(parameter, _lastParameter))
+        {
+            _lastParameter = parameter;
+            _value = parameter;
+            _pending = false;
+            return false;
+        }
+        if (!_pending) return false;
+        _pending = false;
+        if (EqualityComparer<T>.Default.Equals(_value, parameter)) return false;
         _value = parameter;
+        return true;
     }
 
-    public async Task SetAsync(T value, bool controlled, EventCallback<T> changed)
+    /// <summary>
+    /// Sets the value and raises <paramref name="changed"/>. When the parent controls the value (it passes the parameter and
+    /// handles the change), the change must come back as a new parameter: after the parent's render, a value the parent did not
+    /// accept is reverted, as Blazor's own inputs do. Returns true when the change was reverted.
+    /// </summary>
+    public async Task<bool> SetAsync(T value, bool controlled, EventCallback<T> changed)
     {
         _value = value;
+        // A newer change (for example the next pointer move) supersedes this one, including its acceptance check.
+        var version = ++_version;
+        // Only a parent that passes the value (not just a change handler) controls it; Default… + …Changed stays uncontrolled.
+        _pending = controlled && _provided && _synced;
         if (changed.HasDelegate) await changed.InvokeAsync(value);
+        if (!_pending || version != _version) return false;
+        // The parent re-renders after handling the event; yield once so that render (and our OnParametersSet) runs first.
+        await Task.Yield();
+        if (!_pending || version != _version) return false;
+        _pending = false;
+        if (EqualityComparer<T>.Default.Equals(_value, _lastParameter)) return false;
+        _value = _lastParameter;
+        return true;
     }
 }

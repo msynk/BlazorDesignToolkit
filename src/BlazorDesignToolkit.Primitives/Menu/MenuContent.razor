@@ -10,8 +10,9 @@
      aria-orientation="vertical"
      tabindex="-1"
      data-state="@(Context.Owner.IsOpen ? "open" : "closed")"
-     data-bdt-keys="ArrowUp ArrowDown Home End Space Enter"
-     @onkeydown="OnKeyDownAsync">
+     data-bdt-keys="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Space Enter"
+     @onkeydown="OnKeyDownAsync"
+     @onkeydown:stopPropagation="@(Context.Parent is not null || Context.Menubar is not null)">
     @if (Context.Owner.IsOpen)
     {
         @ChildContent
@@ -20,9 +21,19 @@
 
 @code {
     private readonly Typeahead _typeahead = new();
+
+    private Menu.MenuContext Root
+    {
+        get
+        {
+            var context = Context;
+            while (context.Parent is not null) context = context.Parent;
+            return context;
+        }
+    }
     private ElementReference _element;
     private DotNetObjectReference<MenuContent>? _reference;
-    private int _handle;
+    private readonly JsResource _overlay = new();
     private bool _shown;
 
     [CascadingParameter] internal Menu.MenuContext Context { get; set; } = default!;
@@ -32,6 +43,12 @@
     {
         if (Context is null) throw new InvalidOperationException("MenuContent must be placed inside Menu.");
         Track(Context);
+        Context.FocusEdge = async edge =>
+        {
+            if (Context.Items.OrderDirty) Context.Items.ApplyOrder(await Js.InvokeAsync<string[]>("domOrder", _element, "[data-menu-item]"));
+            var target = Context.Items.Navigate(null, edge == Menu.MenuFocus.First ? NavigationIntent.First : NavigationIntent.Last, loop: true);
+            if (target is not null) await FocusItemAsync(target);
+        };
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -43,7 +60,7 @@
         {
             _shown = true;
             _reference ??= DotNetObjectReference.Create(this);
-            _handle = await Js.TrackAsync("showPopover", _element, Context.Trigger, _reference, new { placement = Context.Owner.Placement, focus = false, restoreFocus = true });
+            await _overlay.OpenAsync(() => Js.TrackAsync("showPopover", _element, Context.Trigger, _reference, new { placement = Context.Owner.Placement, focus = false, restoreFocus = true }));
             if (Context.Items.OrderDirty) Context.Items.ApplyOrder(await Js.InvokeAsync<string[]>("domOrder", _element, "[data-menu-item]"));
             if (Context.PendingFocus is { } pending)
             {
@@ -56,7 +73,7 @@
         else if (!open && _shown)
         {
             _shown = false;
-            await Js.ReleaseAsync(_handle);
+            await _overlay.CloseAsync(Js);
         }
     }
 
@@ -79,11 +96,24 @@
         switch (e.Key)
         {
             case "Escape":
+                // Closes this menu only; a submenu returns focus to its trigger in the parent menu.
                 await Context.Owner.CloseAsync();
                 return;
             case "Tab":
                 // Let focus move naturally; just close.
+                await Context.Owner.CloseAllAsync();
+                return;
+            case "ArrowLeft" when Context.Parent is not null:
                 await Context.Owner.CloseAsync();
+                return;
+            case "ArrowLeft" when Context.Menubar is not null:
+                await Context.Menubar.MoveAsync((Menu)Context.Owner, -1);
+                return;
+            case "ArrowRight" when Context.Active is MenuSubTrigger:
+                return; // the submenu trigger opens its submenu
+            case "ArrowRight" when Root.Menubar is not null:
+                // APG: from an item without a submenu, Right moves to the next menu of the menubar (closing submenus).
+                await Root.Menubar.MoveAsync((Menu)Root.Owner, 1);
                 return;
         }
         if (KeyboardNavigation.IsPrintable(e) && e.Key != " ")

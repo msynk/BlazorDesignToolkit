@@ -8,7 +8,9 @@ using BlazorDesignToolkit.Tokens.Json;
 using BlazorDesignToolkit.Tokens.Resolution;
 using BlazorDesignToolkit.Tokens.Validation;
 
+if (args.Length == 2 && args[0] is "--gate" or "--update-baseline") return RegressionGate.Run(args[0], args[1]);
 BenchmarkSwitcher.FromAssembly(typeof(TokenSetBenchmarks).Assembly).Run(args);
+return 0;
 
 /// <summary>Synthetic DTCG documents: a palette, semantic aliases (with two-level chains), dimensions and typography composites.</summary>
 public static class Synthetic

@@ -18,7 +18,7 @@
 @code {
     private ElementReference _element;
     private DotNetObjectReference<PopoverContent>? _reference;
-    private int _handle;
+    private readonly JsResource _overlay = new();
     private bool _shown;
 
     [CascadingParameter] internal Popover.PopoverContext Context { get; set; } = default!;
@@ -40,14 +40,13 @@
         {
             _shown = true;
             _reference ??= DotNetObjectReference.Create(this);
-            _handle = await Js.TrackAsync("showPopover", _element, Context.Trigger, _reference,
-                new { placement = Context.Owner.Placement, focus = FocusOnOpen, restoreFocus = true });
+            await _overlay.OpenAsync(() => Js.TrackAsync("showPopover", _element, Context.Trigger, _reference,
+                new { placement = Context.Owner.Placement, focus = FocusOnOpen, restoreFocus = true }));
         }
         else if (!open && _shown)
         {
             _shown = false;
-            await Js.ReleaseAsync(_handle);
-            _handle = 0;
+            await _overlay.CloseAsync(Js);
         }
     }
 

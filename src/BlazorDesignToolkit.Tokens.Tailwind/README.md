@@ -1,4 +1,5 @@
 # BlazorDesignToolkit.Tokens.Tailwind
 
-Generates a type-checked Tailwind CSS v4 `@theme` block from DTCG tokens, referencing runtime theme variables
-(`@theme inline`) or literal values. See https://github.com/msynk/BlazorDesignToolkit/blob/main/docs/integrations.md
+Generates type-checked Tailwind CSS output from DTCG tokens: a Tailwind 4 `@theme` block (`@theme inline` with runtime
+theme variables, or literal values) or a Tailwind 3 preset module (`theme.extend`, with opacity modifiers on runtime
+colors). See https://github.com/msynk/BlazorDesignToolkit/blob/main/docs/integrations.md

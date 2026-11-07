@@ -3,6 +3,7 @@ using System.Text;
 using BlazorDesignToolkit.Tokens;
 using BlazorDesignToolkit.Tokens.Diagnostics;
 using BlazorDesignToolkit.Tokens.Export;
+using BlazorDesignToolkit.Tokens.Resolution;
 using BlazorDesignToolkit.Tokens.Json;
 
 namespace BlazorDesignToolkit.Theming;
@@ -23,12 +24,24 @@ public sealed record ThemeCssOptions
     public string ScopeRoot { get; init; } = ":root";
     /// <summary>Emit <c>@media</c> variants so that the value <c>system</c> works without JavaScript.</summary>
     public bool IncludeSystemMediaQueries { get; init; } = true;
+    /// <summary>
+    /// Wrap the theme scope in <c>:is()</c> instead of <c>:where()</c>, adding the specificity of <c>:root:not([data-theme])</c>
+    /// (0,2,0) to every rule. Needed when the output must override framework rules on <c>:root</c>, such as Bootstrap's.
+    /// Relative ordering between theme rules is unchanged.
+    /// </summary>
+    public bool ElevateSpecificity { get; init; }
     /// <summary>Emit the CSS <c>color-scheme</c> property for the "mode" axis (light/dark) so native controls follow the theme.</summary>
     public bool EmitColorScheme { get; init; } = true;
     public string? Layer { get; init; }
     public bool IncludeHeader { get; init; } = true;
     /// <summary>Restrict output to these theme ids (default: all).</summary>
     public IReadOnlyList<string>? Themes { get; init; }
+    /// <summary>
+    /// Produces the declarations for one composed theme selection (default: the tokens as CSS custom properties, see
+    /// <see cref="Css"/>). Integrations use it to emit framework variables per theme and mode with the same cascade-diff
+    /// selectors, for example Bootstrap runtime variables whose values must be computed per theme.
+    /// </summary>
+    public Func<ThemeSelection, ResolvedTokenSet, DiagnosticBag, IReadOnlyList<CssDeclaration>>? Declarations { get; init; }
 
     public string AxisAttribute(string axis) => AxisAttributePrefix + axis;
 }
@@ -124,7 +137,9 @@ public static class ThemeStylesheetGenerator
                 if (seenDiagnostics.Add(d.RuleId + "|" + d.TokenPath + "|" + d.Message + "|" + d.Scope)) bag.Add(d);
             }
             var exportBag = new DiagnosticBag();
-            var declarations = CssExporter.GetDeclarations(resolution.Tokens, options.Css, exportBag).ToList();
+            var declarations = options.Declarations is { } custom
+                ? custom(selection, resolution.Tokens, exportBag).ToList()
+                : CssExporter.GetDeclarations(resolution.Tokens, options.Css, exportBag).ToList();
             foreach (var d in exportBag.Items)
             {
                 var scoped = d.WithScope(ThemeComposer.Scope(selection));
@@ -184,9 +199,12 @@ public static class ThemeStylesheetGenerator
     private static string Selector(ThemeCatalog catalog, ThemeDefinition theme, ImmutableSortedDictionary<string, string> assignment, ThemeCssOptions options, HashSet<string> systemAxes)
     {
         var themeSelector = $"[{options.ThemeAttribute}=\"{theme.Id}\"]";
+        var wrapper = options.ElevateSpecificity ? ":is" : ":where";
         var scope = theme.Id == catalog.DefaultThemeId && options.DefaultThemeOnScopeRoot
-            ? $":where({options.ScopeRoot}:not([{options.ThemeAttribute}]), {themeSelector})"
-            : $":where({themeSelector})";
+            ? $"{wrapper}({options.ScopeRoot}:not([{options.ThemeAttribute}]), {themeSelector})"
+            : options.ElevateSpecificity
+                ? $":is({options.ScopeRoot}:not([{options.ThemeAttribute}]):not(*), {themeSelector})" // same (0,2,0) specificity for every theme
+                : $":where({themeSelector})";
         var sb = new StringBuilder(scope);
         // Attribute order follows axis declaration order so selectors are stable.
         foreach (var axis in catalog.Axes)

@@ -2,15 +2,34 @@
 @* WAI-ARIA Tree View (single selection). Only one treeitem is in the tab sequence. Up/Down move between visible
    items; Right expands a closed parent or moves to its first child; Left collapses an open parent or moves to the
    parent; Home/End; Enter/Space select; * expands all siblings; type-to-select. aria-level, aria-setsize and
-   aria-posinset are rendered explicitly. Give the tree an accessible name with aria-label or aria-labelledby. *@
+   aria-posinset are rendered explicitly. Give the tree an accessible name with aria-label or aria-labelledby.
+   Virtualize renders the visible rows as a flat list of treeitems (allowed by ARIA when aria-level, aria-setsize and
+   aria-posinset are present) and only those in view; the tree must be the scroll container. Because rows come and go
+   while scrolling, focus then stays on the tree and the active row is exposed with aria-activedescendant (data-highlighted).
+   Indent rows with the --bdt-tree-level custom property. *@
+@using Microsoft.AspNetCore.Components.Web.Virtualization
 @typeparam TItem where TItem : notnull
 @inherits PrimitiveBase
 
 <ul role="tree" @ref="_element"
-    @attributes='Attributes("role")'
-    data-bdt-keys="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Space"
+    @attributes='Attributes("role", "tabindex", "aria-activedescendant")'
+    tabindex="@(Virtualize ? "0" : null)"
+    aria-activedescendant="@(Virtualize && _hasFocus && TabStop is { } active ? _ids[active] : null)"
+    @onfocus="OnTreeFocus"
+    @onblur="() => _hasFocus = false"
+    data-virtualized="@(Virtualize ? "" : null)"
+    data-bdt-keys="ArrowUp ArrowDown ArrowLeft ArrowRight Home End PageUp PageDown Space"
     @onkeydown="OnKeyDownAsync">
-    @RenderLevel(Items ?? [], 1, default)
+    @if (Virtualize)
+    {
+        <Virtualize TItem="TItem" Items="_visible" ItemSize="ItemSize" OverscanCount="OverscanCount" Context="row">
+            @RenderRow(row)
+        </Virtualize>
+    }
+    else
+    {
+        @RenderLevel(Items ?? [], 1, default)
+    }
 </ul>
 
 @code {
@@ -24,6 +43,8 @@
     private string _baseId = "";
     private string? _pendingFocusId;
     private bool _expandedInitialized;
+    private readonly Dictionary<TItem, (int Level, int SetSize, int PosInSet)> _meta = new();
+    private int _pendingScrollIndex = -1;
 
     [Parameter, EditorRequired] public IEnumerable<TItem>? Items { get; set; }
     [Parameter, EditorRequired] public Func<TItem, IEnumerable<TItem>?> ChildrenSelector { get; set; } = _ => null;
@@ -34,6 +55,13 @@
     [Parameter] public EventCallback<TItem?> ValueChanged { get; set; }
     [Parameter] public IReadOnlyCollection<TItem>? ExpandedItems { get; set; }
     [Parameter] public EventCallback<IReadOnlyCollection<TItem>> ExpandedItemsChanged { get; set; }
+    /// <summary>Render only the rows in view (for large trees). Requires a uniform <see cref="ItemSize"/>.</summary>
+    [Parameter] public bool Virtualize { get; set; }
+    /// <summary>Row height in CSS pixels when virtualized. Default 32.</summary>
+    [Parameter] public float ItemSize { get; set; } = 32;
+    [Parameter] public int OverscanCount { get; set; } = 5;
+    /// <summary>Rows moved by Page Up/Page Down. Default 10.</summary>
+    [Parameter] public int PageSize { get; set; } = 10;
 
     private string Label(TItem item) => ItemLabel?.Invoke(item) ?? item?.ToString() ?? "";
     private bool IsDisabled(TItem item) => ItemDisabled?.Invoke(item) == true;
@@ -56,17 +84,21 @@
     {
         _visible = [];
         _parents.Clear();
-        void Walk(IEnumerable<TItem> level, TItem? parent)
+        _meta.Clear();
+        void Walk(IEnumerable<TItem> level, TItem? parent, int depth)
         {
-            foreach (var item in level)
+            var list = level.ToList();
+            for (var i = 0; i < list.Count; i++)
             {
+                var item = list[i];
                 _parents[item] = parent;
+                _meta[item] = (depth, list.Count, i + 1);
                 if (!_ids.ContainsKey(item)) _ids[item] = $"{_baseId}-item-{_ids.Count}";
                 _visible.Add(item);
-                if (_expanded.Contains(item)) Walk(Children(item), item);
+                if (_expanded.Contains(item)) Walk(Children(item), item, depth + 1);
             }
         }
-        Walk(Items ?? [], default);
+        Walk(Items ?? [], default, 1);
         if (_focused is not null && !_visible.Contains(_focused)) _focused = default;
     }
 
@@ -116,13 +148,57 @@
         }
     };
 
+    /// <summary>One row of the flat (virtualized) rendering.</summary>
+    private RenderFragment RenderRow(TItem item) => builder =>
+    {
+        var (level, setSize, posInSet) = _meta[item];
+        var hasChildren = Children(item).Count > 0;
+        var expanded = hasChildren && _expanded.Contains(item);
+        var selected = Value is not null && EqualityComparer<TItem>.Default.Equals(Value, item);
+        var disabled = IsDisabled(item);
+        builder.OpenElement(0, "li");
+        builder.SetKey(item);
+        builder.AddAttribute(1, "role", "treeitem");
+        builder.AddAttribute(2, "id", _ids[item]);
+        builder.AddAttribute(3, "aria-level", level);
+        builder.AddAttribute(4, "aria-setsize", setSize);
+        builder.AddAttribute(5, "aria-posinset", posInSet);
+        if (hasChildren) builder.AddAttribute(6, "aria-expanded", expanded ? "true" : "false");
+        builder.AddAttribute(7, "aria-selected", selected ? "true" : "false");
+        if (disabled) builder.AddAttribute(8, "aria-disabled", "true");
+        if (EqualityComparer<TItem?>.Default.Equals(TabStop, item)) builder.AddAttribute(9, "data-highlighted", "");
+        builder.AddAttribute(10, "data-state", expanded ? "open" : hasChildren ? "closed" : null);
+        builder.AddAttribute(11, "style", $"--bdt-tree-level: {level}");
+        builder.AddAttribute(12, "onclick", EventCallback.Factory.Create(this, async () =>
+        {
+            await OnItemClickAsync(item);
+            await _element.FocusAsync();
+        }));
+        builder.OpenElement(14, "span");
+        builder.AddAttribute(15, "data-tree-label", "");
+        if (ItemTemplate is not null) builder.AddContent(16, ItemTemplate(new TreeItemContext<TItem>(item, level, Label(item), hasChildren, expanded, selected, disabled)));
+        else builder.AddContent(17, Label(item));
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender) await Js.TrackAsync("preventKeys", _element);
         if (_pendingFocusId is { } id)
         {
             _pendingFocusId = null;
-            await Js.InvokeVoidAsync("focusById", id, false);
+            if (Virtualize && _pendingScrollIndex >= 0)
+            {
+                // The active row may be outside the rendered range: scroll until Virtualize has rendered it (focus stays on the tree).
+                var index = _pendingScrollIndex;
+                _pendingScrollIndex = -1;
+                await Js.InvokeVoidAsync("revealAndFocus", _element, index, ItemSize, id, 1500, false);
+            }
+            else
+            {
+                await Js.InvokeVoidAsync("focusById", id, false);
+            }
         }
     }
 
@@ -145,13 +221,23 @@
     {
         if (expanded ? !_expanded.Add(item) : !_expanded.Remove(item)) return;
         Index();
+
         if (ExpandedItemsChanged.HasDelegate) await ExpandedItemsChanged.InvokeAsync(_expanded.ToArray());
+    }
+
+    private bool _hasFocus;
+
+    private void OnTreeFocus()
+    {
+        _hasFocus = true;
+        if (Virtualize && _focused is null && TabStop is { } first) _focused = first;
     }
 
     private void FocusItem(TItem item)
     {
         _focused = item;
         _pendingFocusId = _ids[item];
+        _pendingScrollIndex = _visible.IndexOf(item);
     }
 
     private async Task OnKeyDownAsync(KeyboardEventArgs e)
@@ -169,6 +255,15 @@
                     var intent = KeyboardNavigation.Intent(e.Key, Orientation.Vertical);
                     var next = KeyboardNavigation.Move(index, _visible.Count, i => IsDisabled(_visible[i]), intent, loop: false);
                     if (next >= 0 && next != index) FocusItem(_visible[next]);
+                    return;
+                }
+            case "PageUp":
+            case "PageDown":
+                {
+                    var target = Math.Clamp(index + (e.Key == "PageDown" ? PageSize : -PageSize), 0, _visible.Count - 1);
+                    var step = e.Key == "PageDown" ? -1 : 1;
+                    while (IsDisabled(_visible[target]) && target != index) target += step;
+                    if (target != index) FocusItem(_visible[target]);
                     return;
                 }
             case "ArrowRight":
