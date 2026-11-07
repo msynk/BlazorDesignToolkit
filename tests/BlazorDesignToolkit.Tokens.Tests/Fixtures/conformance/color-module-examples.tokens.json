@@ -1,0 +1,26 @@
+{
+  "Hot pink": {
+    "$type": "color",
+    "$value": { "colorSpace": "srgb", "components": [1, 0, 1], "alpha": 1, "hex": "#ff00ff" }
+  },
+  "Translucent shadow": {
+    "$type": "color",
+    "$value": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0.5, "hex": "#000000" }
+  },
+  "White none hue": {
+    "$type": "color",
+    "$value": { "colorSpace": "hsl", "components": ["none", 0, 100], "alpha": 1, "hex": "#ffffff" }
+  },
+  "White zero hue": {
+    "$type": "color",
+    "$value": { "colorSpace": "hsl", "components": [0, 0, 100], "alpha": 1, "hex": "#ffffff" }
+  },
+  "Hot pink lab": {
+    "$type": "color",
+    "$value": { "colorSpace": "lab", "components": [60.17, 93.54, -60.5], "alpha": 1, "hex": "#ff00ff" }
+  },
+  "Hot pink hsl": {
+    "$type": "color",
+    "$value": { "colorSpace": "hsl", "components": [330, 100, 50], "alpha": 1, "hex": "#ff00ff" }
+  }
+}

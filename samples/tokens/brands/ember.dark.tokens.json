@@ -1,0 +1,20 @@
+{
+  "color": {
+    "$type": "color",
+    "surface": {
+      "accent": {
+        "$value": "{color.ember.400}"
+      }
+    },
+    "text": {
+      "link": {
+        "$value": "{color.ember.300}"
+      }
+    },
+    "focus": {
+      "ring": {
+        "$value": "{color.ember.300}"
+      }
+    }
+  }
+}

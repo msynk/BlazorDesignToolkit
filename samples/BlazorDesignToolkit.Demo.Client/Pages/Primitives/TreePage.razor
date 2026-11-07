@@ -1,0 +1,59 @@
+@page "/primitives/tree"
+
+<PageTitle>Tree view · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Tree view</h1>
+
+<Example Title="Token groups as a tree">
+    <Description><p>The tree below shows the token groups of the current theme. Selecting a token shows its value.</p></Description>
+    <ChildContent>
+        <div class="tree-layout">
+            <TreeView TItem="Node" Items="Roots" ChildrenSelector="n => n.Children" ItemLabel="n => n.Name" @bind-Value="_selected" aria-label="Token groups" data-testid="tree" />
+            <div role="region" aria-label="Selected token" class="tree-detail">
+                @if (_selected?.Token is { } path && Manager.Resolve().Tokens[path] is { } token)
+                {
+                    <p><code>@token.Path</code> (@token.Type)</p>
+                    <pre>@token.Value?.ToSourceNode().ToJson(indented: true)</pre>
+                }
+                else
+                {
+                    <p>Select a token.</p>
+                }
+            </div>
+        </div>
+        <KeyboardTable Rows="@Keys" />
+    </ChildContent>
+</Example>
+
+@code {
+    private Node? _selected;
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+
+    public sealed record Node(string Name, TokenPath? Token, IReadOnlyList<Node> Children);
+
+    private IReadOnlyList<Node>? _roots;
+
+    private IReadOnlyList<Node> Roots => _roots ??= Build(Manager.Resolve().Tokens.Tokens.Select(t => t.Path).ToList(), TokenPath.Empty);
+
+    private static IReadOnlyList<Node> Build(IReadOnlyList<TokenPath> paths, TokenPath prefix)
+        => paths.Where(p => p.StartsWith(prefix) && p.Length > prefix.Length)
+            .GroupBy(p => p.Segments[prefix.Length])
+            .Select(g =>
+            {
+                var path = prefix.Append(g.Key);
+                var isToken = g.Any(p => p.Length == path.Length);
+                return new Node(g.Key, isToken ? (TokenPath?)path : null, isToken ? [] : Build(g.ToList(), path));
+            }).ToList();
+
+    private static readonly IReadOnlyList<(string, string)> Keys =
+    [
+        ("Up / Down", "Moves between visible items."),
+        ("Right", "Expands a closed group, or moves to its first child."),
+        ("Left", "Collapses an open group, or moves to the parent."),
+        ("Home / End", "Moves to the first or last visible item."),
+        ("Enter / Space", "Selects the item."),
+        ("*", "Expands all sibling groups."),
+        ("Type", "Moves to the next item starting with the typed characters."),
+    ];
+}

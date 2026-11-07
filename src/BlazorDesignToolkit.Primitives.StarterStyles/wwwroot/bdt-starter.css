@@ -1,0 +1,104 @@
+/*
+  BlazorDesignToolkit starter styles for the headless primitives (optional).
+
+  - Everything lives in the cascade layer "bdt-starter", so any unlayered rule of yours wins without !important.
+  - Visual values come from --bdt-* custom properties with neutral fallbacks. Map them to your tokens, e.g.
+      :root { --bdt-accent: var(--ds-color-surface-accent); }
+  - Selectors target roles and data-state attributes rendered by the primitives, never internal class names.
+  - Focus is always visible (WCAG 2.2 SC 2.4.7) and respects forced-colors mode; motion respects prefers-reduced-motion.
+*/
+@layer bdt-starter {
+  :root {
+    --bdt-font: inherit;
+    --bdt-text: CanvasText;
+    --bdt-text-muted: color-mix(in srgb, CanvasText 70%, Canvas);
+    --bdt-surface: Canvas;
+    --bdt-surface-raised: Canvas;
+    --bdt-border: color-mix(in srgb, CanvasText 55%, Canvas);
+    --bdt-border-subtle: color-mix(in srgb, CanvasText 20%, Canvas);
+    --bdt-accent: #2d6dca;
+    --bdt-on-accent: #ffffff;
+    --bdt-hover: color-mix(in srgb, CanvasText 8%, Canvas);
+    --bdt-selected: color-mix(in srgb, var(--bdt-accent) 16%, Canvas);
+    --bdt-danger: #b42318;
+    --bdt-focus: #2d6dca;
+    --bdt-focus-width: 2px;
+    --bdt-focus-offset: 2px;
+    --bdt-radius: 0.375rem;
+    --bdt-radius-surface: 0.75rem;
+    --bdt-control-height: 2.5rem;
+    --bdt-control-padding: 1rem;
+    --bdt-gap: 0.5rem;
+    --bdt-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+    --bdt-scrim: rgb(0 0 0 / 0.5);
+    --bdt-duration: 160ms;
+    --bdt-easing: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  :where(button, [role="tab"], [role="switch"], [role="combobox"], [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="treeitem"], [role="listbox"], [role="tabpanel"], input, select, textarea):focus-visible {
+    outline: var(--bdt-focus-width) solid var(--bdt-focus);
+    outline-offset: var(--bdt-focus-offset);
+  }
+
+  [aria-disabled="true"], :disabled { cursor: not-allowed; opacity: 0.55; }
+
+  /* Toggle button and switch */
+  button[aria-pressed] { min-height: var(--bdt-control-height); padding-inline: var(--bdt-control-padding); border: 1px solid var(--bdt-border); border-radius: var(--bdt-radius); background: var(--bdt-surface); color: var(--bdt-text); }
+  button[aria-pressed="true"] { background: var(--bdt-selected); border-color: var(--bdt-accent); }
+
+  [role="switch"] { inline-size: 2.75rem; block-size: 1.5rem; padding: 2px; border: 1px solid var(--bdt-border); border-radius: 999px; background: var(--bdt-surface); position: relative; }
+  [role="switch"]::after { content: ""; display: block; inline-size: 1.125rem; block-size: 1.125rem; border-radius: 50%; background: var(--bdt-border); transition: transform var(--bdt-duration) var(--bdt-easing); }
+  [role="switch"][aria-checked="true"] { background: var(--bdt-accent); border-color: var(--bdt-accent); }
+  [role="switch"][aria-checked="true"]::after { background: var(--bdt-on-accent); transform: translateX(1.25rem); }
+  [dir="rtl"] [role="switch"][aria-checked="true"]::after { transform: translateX(-1.25rem); }
+
+  /* Tabs */
+  [role="tablist"] { display: flex; gap: var(--bdt-gap); border-block-end: 1px solid var(--bdt-border-subtle); }
+  [role="tablist"][aria-orientation="vertical"] { flex-direction: column; border-block-end: 0; border-inline-end: 1px solid var(--bdt-border-subtle); }
+  [role="tab"] { padding: 0.5rem 0.875rem; border: 0; border-block-end: 2px solid transparent; background: none; color: var(--bdt-text-muted); }
+  [role="tab"][aria-selected="true"] { color: var(--bdt-text); border-block-end-color: var(--bdt-accent); }
+  [role="tabpanel"] { padding-block: 1rem; }
+
+  /* Disclosure and accordion */
+  button[aria-expanded] { cursor: pointer; }
+  [data-accordion-trigger] { inline-size: 100%; display: flex; justify-content: space-between; padding: 0.75rem 0; border: 0; background: none; color: inherit; font: inherit; text-align: start; }
+  [data-accordion-trigger]::after { content: "+"; }
+  [data-accordion-trigger][aria-expanded="true"]::after { content: "−"; }
+
+  /* Dialog */
+  dialog { max-inline-size: min(36rem, calc(100vw - 2rem)); padding: 1.5rem; border: 1px solid var(--bdt-border-subtle); border-radius: var(--bdt-radius-surface); background: var(--bdt-surface-raised); color: var(--bdt-text); box-shadow: var(--bdt-shadow); }
+  dialog::backdrop { background: var(--bdt-scrim); }
+
+  /* Popovers, listboxes and menus */
+  [popover] { margin: 0; padding: 0.25rem; border: 1px solid var(--bdt-border-subtle); border-radius: var(--bdt-radius); background: var(--bdt-surface-raised); color: var(--bdt-text); box-shadow: var(--bdt-shadow); }
+  [role="tooltip"][popover] { padding: 0.25rem 0.5rem; font-size: 0.875em; max-inline-size: 20rem; }
+  [role="listbox"]:not([popover]) { border: 1px solid var(--bdt-border); border-radius: var(--bdt-radius); padding: 0.25rem; max-block-size: 16rem; overflow: auto; }
+  [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"] { display: flex; align-items: center; gap: var(--bdt-gap); padding: 0.375rem 0.625rem; border-radius: calc(var(--bdt-radius) - 2px); cursor: default; }
+  [role="option"]:hover, [role="menuitem"]:hover, [role="menuitemcheckbox"]:hover, [role="menuitemradio"]:hover, [data-highlighted] { background: var(--bdt-hover); }
+  [role="option"][aria-selected="true"] { background: var(--bdt-selected); }
+  [role="option"][aria-selected="true"]::after, [aria-checked="true"][role^="menuitem"]::before { content: "✓"; margin-inline-start: auto; }
+  [role="separator"] { block-size: 1px; margin-block: 0.25rem; background: var(--bdt-border-subtle); }
+  button[role="combobox"], input[role="combobox"] { min-block-size: var(--bdt-control-height); padding-inline: 0.75rem; border: 1px solid var(--bdt-border); border-radius: var(--bdt-radius); background: var(--bdt-surface); color: var(--bdt-text); font: inherit; text-align: start; }
+
+  /* Tree */
+  [role="tree"], [role="tree"] [role="group"] { list-style: none; margin: 0; padding-inline-start: 1rem; }
+  [role="tree"] { padding-inline-start: 0; }
+  [role="treeitem"] > [data-tree-label] { display: block; padding: 0.25rem 0.5rem; border-radius: var(--bdt-radius); }
+  [role="treeitem"][aria-selected="true"] > [data-tree-label] { background: var(--bdt-selected); }
+  [role="treeitem"][aria-expanded] > [data-tree-label]::before { content: "▸ "; }
+  [role="treeitem"][aria-expanded="true"] > [data-tree-label]::before { content: "▾ "; }
+
+  /* Toasts */
+  section > [data-toasts] { position: fixed; inset-block-end: 1rem; inset-inline-end: 1rem; display: grid; gap: var(--bdt-gap); margin: 0; padding: 0; list-style: none; z-index: 1000; }
+  [data-toasts] > li { display: flex; gap: var(--bdt-gap); align-items: center; min-inline-size: 16rem; padding: 0.75rem 1rem; border: 1px solid var(--bdt-border-subtle); border-radius: var(--bdt-radius); background: var(--bdt-surface-raised); box-shadow: var(--bdt-shadow); }
+  [data-toasts] > li[data-kind="error"] { border-color: var(--bdt-danger); }
+  [data-toast-dismiss] { margin-inline-start: auto; border: 0; background: none; color: inherit; font-size: 1.25em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+
+  @media (forced-colors: active) {
+    [role="switch"][aria-checked="true"], [role="option"][aria-selected="true"], [data-highlighted] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  }
+}

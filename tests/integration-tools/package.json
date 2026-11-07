@@ -1,0 +1,11 @@
+{
+  "name": "bdt-integration-tools",
+  "private": true,
+  "description": "Pinned third-party compilers used only by integration tests to prove that generated Tailwind and Bootstrap outputs compile. Not shipped.",
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.4",
+    "tailwindcss": "4.3.4",
+    "sass": "1.107.1",
+    "bootstrap": "5.3.8"
+  }
+}

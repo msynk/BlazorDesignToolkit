@@ -1,0 +1,31 @@
+@namespace BlazorDesignToolkit.Primitives
+@* role="tabpanel", labelled by its tab. tabindex="0" makes panels without focusable content reachable (APG). *@
+@inherits PrimitiveBase
+
+@* The panel element always exists so that the tab's aria-controls resolves; inactive content is unmounted unless KeepMounted. *@
+<div role="tabpanel"
+     @attributes='Attributes("role", "aria-labelledby", "id", "hidden")'
+     id="@Context.PanelId(Value)"
+     aria-labelledby="@Context.TabId(Value)"
+     tabindex="@(Focusable && IsSelected ? "0" : null)"
+     hidden="@(!IsSelected)"
+     data-state="@(IsSelected ? "active" : "inactive")">
+    @if (IsSelected || KeepMounted)
+    {
+        @ChildContent
+    }
+</div>
+
+@code {
+    [CascadingParameter] internal Tabs.TabsContext Context { get; set; } = default!;
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    /// <summary>Keep inactive panels in the DOM (hidden) to preserve their state.</summary>
+    [Parameter] public bool KeepMounted { get; set; }
+    /// <summary>Make the panel itself focusable. Disable when the panel starts with a focusable element.</summary>
+    [Parameter] public bool Focusable { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool IsSelected => Context.Owner.Selected == Value;
+
+    protected override void OnInitialized() => Track(Context);
+}

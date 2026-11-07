@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Demo</RootNamespace>
+    <!-- Sample app: never packed; keeps "dotnet pack" of the solution free of warnings. -->
+    <WarnOnPackingNonPackableProject>false</WarnOnPackingNonPackableProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorDesignToolkit.Demo.Client\BlazorDesignToolkit.Demo.Client.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BlazorDesignToolkit.BrowserTests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,46 @@
+@page "/accessibility"
+
+<PageTitle>Accessibility · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Accessibility status</h1>
+<p>Automated checks catch many problems but cannot establish WCAG conformance. This page lists what is verified
+    automatically, how, and what still needs manual review. The full matrix lives in <code>docs/accessibility.md</code>.</p>
+
+<Example Title="What is tested automatically">
+    <ChildContent>
+        <table class="data-table">
+            <caption>Automated coverage</caption>
+            <thead><tr><th scope="col">Layer</th><th scope="col">Tool</th><th scope="col">What it verifies</th></tr></thead>
+            <tbody>
+                <tr><th scope="row">Tokens</th><td><code>bdt validate</code></td><td>WCAG 2.2 contrast (1.4.3, 1.4.11, optional 1.4.6) for configured pairs, pairings and focus indicators in every theme combination, with alpha compositing; indeterminate results are reported, never guessed.</td></tr>
+                <tr><th scope="row">Component markup</th><td>bUnit + <code>BlazorDesignToolkit.Testing</code></td><td>Roles, states, id relationships, accessible names, required owned elements, focusable content in hidden subtrees, keyboard state transitions.</td></tr>
+                <tr><th scope="row">Browser behavior</th><td>Playwright</td><td>Real keyboard operation, focus movement, focus trapping and restoration, Escape handling, theme switching, system preference emulation, reflow at 320 CSS px, in Server and WebAssembly modes.</td></tr>
+                <tr><th scope="row">Rendered pages</th><td>axe-core (bundled with Deque.AxeCore.Playwright) via Playwright</td><td>Every demo page and opened overlay states, with WCAG 2.x A/AA tags, in light, dark and increased-contrast themes.</td></tr>
+            </tbody>
+        </table>
+    </ChildContent>
+</Example>
+
+<Example Title="Manual review still required">
+    <ChildContent>
+        <ul>
+            <li>Screen reader announcements and verbosity (NVDA, JAWS, VoiceOver, TalkBack) for each primitive.</li>
+            <li>Content: accessible names, error messages and instructions written by consumers.</li>
+            <li>Forced-colors (Windows High Contrast) appearance of custom styles.</li>
+            <li>Zoom to 400% and text spacing overrides with real content.</li>
+            <li>Touch and pointer-only operation on mobile devices.</li>
+            <li>Colors that cannot be evaluated automatically: out-of-gamut colors, translucent layers without a known backdrop, gradients and images behind text.</li>
+        </ul>
+    </ChildContent>
+</Example>
+
+<Example Title="Known limitations">
+    <ChildContent>
+        <ul>
+            <li>Server-side interactivity adds a network round trip to keyboard handling; on slow connections, rapid key presses are processed in order but feedback is delayed.</li>
+            <li>The Popover API (top layer, light dismiss) needs a 2024+ browser; older browsers get a fallback without top-layer stacking.</li>
+            <li>Composite widgets order items by registration and re-synchronize with the DOM when items are added later; reordering items without re-rendering their parent is not detected.</li>
+            <li>Tooltips are descriptions only. Interactive content belongs in a Popover.</li>
+        </ul>
+    </ChildContent>
+</Example>

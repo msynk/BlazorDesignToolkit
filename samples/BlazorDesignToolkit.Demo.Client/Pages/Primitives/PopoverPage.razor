@@ -1,0 +1,36 @@
+@page "/primitives/popover"
+
+<PageTitle>Popover and tooltip · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Popover and tooltip</h1>
+
+<Example Title="Popover">
+    <Description><p>Non-modal, in the top layer via the Popover API. Escape or an outside click closes it; focus returns to the trigger when it was inside.</p></Description>
+    <ChildContent>
+        <Popover>
+            <PopoverTrigger data-testid="popover-trigger">Filters</PopoverTrigger>
+            <PopoverContent class="popover-panel" data-testid="popover">
+                <FormField>
+                    <FormLabel>Status</FormLabel>
+                    <Select TItem="string" Items="@(new[] { "Open", "Closed", "All" })" @bind-Value="_status" />
+                </FormField>
+            </PopoverContent>
+        </Popover>
+        <KeyboardTable Rows="@([("Enter / Space", "Opens the popover and moves focus into it."), ("Escape", "Closes it and returns focus to the trigger."), ("Tab", "Moves through the popover's controls.")])" />
+    </ChildContent>
+</Example>
+
+<Example Title="Tooltip">
+    <Description><p>Shown on hover after a delay and immediately on keyboard focus; Escape hides it without moving focus; the pointer may move onto it.</p></Description>
+    <ChildContent>
+        <Tooltip>
+            <TooltipTrigger aria-label="Delete" data-testid="tooltip-trigger">🗑</TooltipTrigger>
+            <TooltipContent data-testid="tooltip">Delete permanently</TooltipContent>
+        </Tooltip>
+        <KeyboardTable Rows="@([("Tab", "Focusing the trigger shows the tooltip."), ("Escape", "Hides the tooltip; focus stays on the trigger.")])" />
+    </ChildContent>
+</Example>
+
+@code {
+    private string? _status = "Open";
+}

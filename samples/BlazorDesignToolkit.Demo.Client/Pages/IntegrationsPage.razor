@@ -1,0 +1,70 @@
+@page "/integrations"
+@using BlazorDesignToolkit.Tokens.Bootstrap
+@using BlazorDesignToolkit.Tokens.Export
+@using BlazorDesignToolkit.Tokens.Fluent
+@using BlazorDesignToolkit.Tokens.Tailwind
+
+<PageTitle>Integrations · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Framework integrations</h1>
+<p>Integrations are separate packages. Each mapping is type-checked against what the framework expects (a Tailwind
+    <code>radius</code> needs a dimension, Bootstrap's Sass color functions need opaque sRGB colors, Fluent line heights are
+    lengths), and mismatches are reported instead of being converted silently. Outputs below come from the current theme.</p>
+
+<Example Title="Plain CSS custom properties" Code="@Css">
+    <Description><p>Framework-free: every token becomes a custom property. This demo itself is styled this way.</p></Description>
+</Example>
+
+<Example Title="Tailwind CSS v4" Code="@Tailwind">
+    <Description>
+        <p><code>@@theme inline</code> makes utilities such as <code>bg-surface-accent</code> or <code>rounded-md</code> resolve to the
+            runtime token variables, so they follow brand and mode switches. The repository's integration tests compile
+            this output with the real Tailwind CLI (4.3).</p>
+    </Description>
+</Example>
+
+<Example Title="Bootstrap 5.3 (Sass)" Code="@Bootstrap">
+    <Description>
+        <p>Import before Bootstrap's Sass to rebrand compiled components. For runtime-only changes, the
+            <code>bootstrap-css</code> exporter writes <code>--bs-*</code> overrides with their <code>-rgb</code> companions;
+            note that component colors such as <code>.btn-primary</code> are compiled from Sass and do not follow runtime overrides.</p>
+    </Description>
+</Example>
+
+<Example Title="Fluent 2 design tokens" Code="@Fluent">
+    <Description><p>Maps semantic tokens onto Fluent 2 token custom properties (for Fluent UI Web Components 3 and the Fluent UI Blazor library built on them).</p></Description>
+</Example>
+
+@code {
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    private BlazorDesignToolkit.Tokens.Resolution.ResolvedTokenSet Tokens => Manager.Resolve().Tokens;
+
+    private string Css => CssExporter.Export(Tokens, DemoTokens.Css with { Filter = t => t.Path.Segments[0] is "color" && t.Path.Length == 3 && t.Path.Segments[1] is "surface" or "text" }).Css;
+
+    private string Tailwind => TailwindThemeExporter.Export(Tokens, new TailwindExportOptions
+    {
+        Css = DemoTokens.Css,
+        Mappings = [new("color.surface.*", "color", "color"), new("color.text.*", "color", "color"), new("radius.*", "radius"), new("shadow.*", "shadow"), new("typography.*", "text"), new("font.family.*", "font")],
+    }).Content;
+
+    private string Bootstrap => BootstrapExporter.Export(Tokens, new BootstrapExportOptions
+    {
+        Mappings =
+        [
+            new("primary", "color.surface.accent"), new("danger", "color.surface.danger"), new("body-bg", "color.surface.default"),
+            new("body-color", "color.text.default"), new("border-radius", "radius.md"), new("font-family-sans-serif", "font.family.sans"),
+        ],
+    }).Content;
+
+    private string Fluent => FluentExporter.Export(Tokens, new FluentExportOptions
+    {
+        Css = DemoTokens.Css,
+        Mappings =
+        [
+            new("colorNeutralForeground1", "color.text.default"), new("colorNeutralBackground1", "color.surface.default"),
+            new("colorBrandBackground", "color.surface.accent"), new("colorStrokeFocus2", "color.focus.ring"), new("borderRadiusMedium", "radius.md"),
+        ],
+    }).Content;
+}

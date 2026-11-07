@@ -1,0 +1,14 @@
+@* Early initialization: applies a theme persisted in localStorage (or a cookie) before the first paint.
+   Place it in <head> after <ThemeStyles />. Renders nothing when persistence is disabled. *@
+@inject ThemeCatalog Catalog
+@inject ThemingOptions Options
+
+@if (Options.Persistence != ThemePersistence.None)
+{
+    <script src="@Src" data-config="@ThemeRootAttributes.InitConfigJson(Catalog, Options)"></script>
+}
+
+@code {
+    /// <summary>Script URL; override when assets are fingerprinted or served from a CDN.</summary>
+    [Parameter] public string Src { get; set; } = "_content/BlazorDesignToolkit.Theming.Blazor/bdt-theme-init.js";
+}

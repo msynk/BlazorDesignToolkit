@@ -1,0 +1,23 @@
+{
+  "$description": "Component-token contracts for the demo's sample design system components. 'requiredTokens' must exist in every theme; 'tokens' lists optional tokens a component may use.",
+  "components": [
+    {
+      "name": "AuroraButton",
+      "sources": ["**/AuroraButton.razor*"],
+      "requiredTokens": ["component.button.primary.background", "component.button.primary.foreground", "component.button.radius", "component.button.height", "component.focus.ring"],
+      "tokens": ["component.button.padding-inline", "component.focus.offset", "transition.default", "typography.body", "color.interactive.hover", "opacity.disabled"]
+    },
+    {
+      "name": "AuroraField",
+      "sources": ["**/AuroraField.razor*"],
+      "requiredTokens": ["component.input.border", "component.input.background", "color.text.default", "color.text.danger", "component.focus.ring"],
+      "tokens": ["color.text.muted", "component.focus.offset", "shape.radius.control", "size.control.height", "size.control.padding-inline", "typography.body", "space.1", "space.2"]
+    },
+    {
+      "name": "AuroraDialog",
+      "sources": ["**/AuroraDialog.razor*"],
+      "requiredTokens": ["component.dialog.scrim", "component.dialog.shadow", "color.surface.raised", "color.on-surface.raised"],
+      "tokens": ["shape.radius.surface", "space.4", "space.6", "typography.heading", "color.border.subtle"]
+    }
+  ]
+}

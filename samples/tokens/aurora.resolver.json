@@ -1,0 +1,42 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/resolver.json",
+  "version": "2025.10",
+  "name": "Aurora",
+  "description": "The Aurora design system expressed as a DTCG 2025.10 resolver document. Use inputs such as {\"mode\": \"dark\", \"density\": \"compact\"}.",
+  "sets": {
+    "foundation": {
+      "description": "Primitive tokens.",
+      "sources": [{ "$ref": "foundation.tokens.json" }]
+    },
+    "components": {
+      "description": "Typography, shadows and component tokens.",
+      "sources": [{ "$ref": "components.tokens.json" }]
+    }
+  },
+  "modifiers": {
+    "mode": {
+      "description": "Color mode, including increased-contrast variants.",
+      "contexts": {
+        "light": [{ "$ref": "semantic.light.tokens.json" }],
+        "dark": [{ "$ref": "semantic.dark.tokens.json" }],
+        "lightMoreContrast": [{ "$ref": "semantic.light.tokens.json" }, { "$ref": "contrast.more.light.tokens.json" }],
+        "darkMoreContrast": [{ "$ref": "semantic.dark.tokens.json" }, { "$ref": "contrast.more.dark.tokens.json" }]
+      },
+      "default": "light"
+    },
+    "density": {
+      "description": "Control sizing.",
+      "contexts": {
+        "comfortable": [{ "$ref": "density.comfortable.tokens.json" }],
+        "compact": [{ "$ref": "density.comfortable.tokens.json" }, { "$ref": "density.compact.tokens.json" }]
+      },
+      "default": "comfortable"
+    }
+  },
+  "resolutionOrder": [
+    { "$ref": "#/sets/foundation" },
+    { "$ref": "#/modifiers/mode" },
+    { "$ref": "#/modifiers/density" },
+    { "$ref": "#/sets/components" }
+  ]
+}

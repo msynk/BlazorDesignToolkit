@@ -1,0 +1,40 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Visually hidden polite and assertive live regions fed by LiveAnnouncer. Render it once, early in the layout, so the
+   regions exist before the first message (screen readers ignore live regions inserted together with their content).
+   Repeated identical messages are re-announced by clearing the region first. *@
+@implements IDisposable
+@inject LiveAnnouncer Announcer
+
+<div role="status" aria-live="polite" aria-atomic="true" style="@VisuallyHidden.Style" data-live-region="polite">@_polite</div>
+<div role="alert" aria-live="assertive" aria-atomic="true" style="@VisuallyHidden.Style" data-live-region="assertive">@_assertive</div>
+
+@code {
+    private string _polite = "";
+    private string _assertive = "";
+    private CancellationTokenSource? _pending;
+
+    /// <summary>Delay between clearing and setting a message, so assistive technology notices the change.</summary>
+    [Parameter] public int RefreshDelay { get; set; } = 100;
+
+    protected override void OnInitialized() => Announcer.Announced += OnAnnounced;
+
+    private void OnAnnounced(string message, Politeness politeness)
+    {
+        _pending?.Cancel();
+        var cts = _pending = new CancellationTokenSource();
+        _ = InvokeAsync(async () =>
+        {
+            if (politeness == Politeness.Polite) _polite = ""; else _assertive = "";
+            StateHasChanged();
+            try { await Task.Delay(RefreshDelay, cts.Token); } catch (TaskCanceledException) { return; }
+            if (politeness == Politeness.Polite) _polite = message; else _assertive = message;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        Announcer.Announced -= OnAnnounced;
+        _pending?.Cancel();
+    }
+}

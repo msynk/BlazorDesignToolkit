@@ -1,0 +1,26 @@
+@* Aurora confirmation dialog: behavior from the headless Dialog, appearance from Aurora dialog tokens. *@
+@* The wrapper carries the CSS-isolation scope: ::deep rules need an element rendered by this component. *@
+<div class="aurora-dialog-host">
+<Dialog @bind-Open="Open" Alert="Destructive">
+    <DialogTrigger class="aurora-dialog__trigger">@TriggerText</DialogTrigger>
+    <DialogContent class="aurora-dialog">
+        <DialogTitle class="aurora-dialog__title">@Title</DialogTitle>
+        <DialogDescription>@Message</DialogDescription>
+        <div class="aurora-dialog__actions">
+            <DialogClose class="aurora-dialog__cancel" autofocus>Cancel</DialogClose>
+            <DialogClose class="aurora-dialog__confirm" OnClick="OnConfirm">@ConfirmText</DialogClose>
+        </div>
+    </DialogContent>
+</Dialog>
+</div>
+
+@code {
+    private bool Open { get; set; }
+
+    [Parameter] public string TriggerText { get; set; } = "Open";
+    [Parameter] public string Title { get; set; } = "Are you sure?";
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    [Parameter] public bool Destructive { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+}

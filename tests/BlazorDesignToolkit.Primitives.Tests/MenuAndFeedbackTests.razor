@@ -1,0 +1,140 @@
+@inherits PrimitiveTestBase
+
+@code {
+    private readonly List<string> _log = [];
+    private bool _wrap;
+    private string? _align = "left";
+
+    private RenderFragment MenuFixture() =>
+        @<Menu>
+            <MenuTrigger>Actions</MenuTrigger>
+            <MenuContent>
+                <MenuItem TextValue="Copy" OnSelect="@(() => _log.Add("copy"))">Copy</MenuItem>
+                <MenuItem TextValue="Cut" Disabled="true">Cut</MenuItem>
+                <MenuItem TextValue="Paste" OnSelect="@(() => _log.Add("paste"))">Paste</MenuItem>
+                <MenuSeparator />
+                <MenuCheckboxItem TextValue="Wrap" @bind-IsChecked="_wrap">Wrap lines</MenuCheckboxItem>
+                <MenuRadioGroup aria-label="Alignment" @bind-Value="_align">
+                    <MenuRadioItem Value="left" TextValue="Left">Left</MenuRadioItem>
+                    <MenuRadioItem Value="right" TextValue="Right">Right</MenuRadioItem>
+                </MenuRadioGroup>
+            </MenuContent>
+        </Menu>;
+
+    [Fact]
+    public void Menu_button_opens_with_keyboard_and_exposes_roles()
+    {
+        var cut = Render(MenuFixture());
+        var trigger = cut.Find("button[aria-haspopup=menu]");
+        Assert.Equal("false", trigger.Attr("aria-expanded"));
+        Assert.Empty(cut.FindAll("[role=menuitem]"));
+        trigger.KeyDown(Key("ArrowDown"));
+        Assert.Equal("true", cut.Find("button[aria-haspopup=menu]").Attr("aria-expanded"));
+        Assert.Equal(3, cut.FindAll("[role=menuitem]").Count);
+        Assert.Equal("true", cut.FindAll("[role=menuitem]")[1].Attr("aria-disabled"));
+        Assert.Single(cut.FindAll("[role=menuitemcheckbox]"));
+        Assert.Equal(2, cut.FindAll("[role=menuitemradio]").Count);
+        Assert.Equal(cut.Find("button[aria-haspopup=menu]").Id, cut.Find("[role=menu]").Attr("aria-labelledby"));
+        Assert.Equal(1, Calls("showPopover"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Menu_items_activate_close_and_typeahead()
+    {
+        var cut = Render(MenuFixture());
+        cut.Find("button[aria-haspopup=menu]").Click();
+        cut.FindAll("[role=menuitem]")[0].Focus();
+        cut.Find("[role=menu]").KeyDown(Key("ArrowDown"));
+        cut.Find("[role=menu]").KeyDown(Key("p"));
+        cut.FindAll("[role=menuitem]")[2].KeyDown(Key("Enter"));
+        Assert.Equal(["paste"], _log);
+        Assert.Equal("false", cut.Find("button[aria-haspopup=menu]").Attr("aria-expanded"));
+    }
+
+    [Fact]
+    public void Checkbox_and_radio_items_keep_menu_open_and_update_state()
+    {
+        var cut = Render(MenuFixture());
+        cut.Find("button[aria-haspopup=menu]").Click();
+        cut.Find("[role=menuitemcheckbox]").Click();
+        Assert.True(_wrap);
+        Assert.Equal("true", cut.Find("[role=menuitemcheckbox]").Attr("aria-checked"));
+        cut.FindAll("[role=menuitemradio]")[1].Click();
+        Assert.Equal("right", _align);
+        Assert.Equal(["false", "true"], cut.FindAll("[role=menuitemradio]").Select(r => r.Attr("aria-checked")));
+        Assert.Equal("true", cut.Find("button[aria-haspopup=menu]").Attr("aria-expanded"));
+        cut.Find("[role=menu]").KeyDown(Key("Escape"));
+        Assert.Equal("false", cut.Find("button[aria-haspopup=menu]").Attr("aria-expanded"));
+    }
+
+    [Fact]
+    public void Toasts_use_live_roles_dismiss_and_expire()
+    {
+        Services.AddHeadlessPrimitives();
+        var cut = Render(@<ToastRegion />);
+        var toasts = Services.GetRequiredService<ToastService>();
+        cut.InvokeAsync(() => toasts.Show(new ToastOptions { Message = "Saved", Duration = TimeSpan.FromMilliseconds(200) }));
+        cut.InvokeAsync(() => toasts.Show("Upload failed", ToastKind.Error));
+        Assert.Equal("Notifications", cut.Find("section").Attr("aria-label"));
+        Assert.Equal("status", cut.FindAll("li [data-toast]")[0].Attr("role"));
+        Assert.Equal("alert", cut.FindAll("li [data-toast]")[1].Attr("role"));
+        Assert.All(cut.FindAll("li"), li => Assert.Null(li.Attr("role"))); // regression: list items keep the listitem role (axe "list")
+        AssertAccessible(cut.Markup);
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll("li")), TimeSpan.FromSeconds(5));
+        Assert.Contains("Upload failed", cut.Markup);
+        cut.Find("[data-toast-dismiss]").Click();
+        Assert.Empty(cut.FindAll("li"));
+    }
+
+    [Fact]
+    public void Toast_timers_pause_while_hovered()
+    {
+        Services.AddHeadlessPrimitives();
+        var cut = Render(@<ToastRegion />);
+        var toasts = Services.GetRequiredService<ToastService>();
+        cut.Find("section").MouseEnter();
+        cut.InvokeAsync(() => toasts.Show(new ToastOptions { Message = "Hold", Duration = TimeSpan.FromMilliseconds(100) }));
+        Thread.Sleep(400);
+        Assert.Single(cut.FindAll("li"));
+        cut.Find("section").MouseLeave();
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("li")), TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public void LiveRegion_announces_messages()
+    {
+        Services.AddHeadlessPrimitives();
+        var cut = Render(@<LiveRegion RefreshDelay="10" />);
+        var announcer = Services.GetRequiredService<LiveAnnouncer>();
+        cut.InvokeAsync(() => announcer.Announce("3 results found"));
+        cut.WaitForAssertion(() => Assert.Equal("3 results found", cut.Find("[data-live-region=polite]").TextContent));
+        cut.InvokeAsync(() => announcer.Announce("Connection lost", Politeness.Assertive));
+        cut.WaitForAssertion(() => Assert.Equal("Connection lost", cut.Find("[data-live-region=assertive]").TextContent));
+        Assert.Equal("status", cut.Find("[data-live-region=polite]").Attr("role"));
+    }
+
+    [Fact]
+    public async Task CommandMenu_opens_with_hotkey_filters_and_runs()
+    {
+        var ran = new List<string>();
+        var commands = new[]
+        {
+            new CommandItem("new", "New file", () => { ran.Add("new"); return Task.CompletedTask; }) { Group = "File", Shortcut = "Ctrl+N" },
+            new CommandItem("open", "Open file", () => { ran.Add("open"); return Task.CompletedTask; }) { Group = "File" },
+            new CommandItem("theme", "Toggle dark mode", () => { ran.Add("theme"); return Task.CompletedTask; }) { Group = "View", Keywords = ["appearance"] },
+        };
+        var cut = Render(@<CommandMenu Commands="commands" />);
+        Assert.Contains(Module.Invocations, i => i.Identifier == "registerHotkey" && (string)i.Arguments[0]! == "Ctrl+K");
+        await cut.InvokeAsync(() => cut.FindComponent<CommandMenu>().Instance.OnHotkey());
+        Assert.Equal(3, cut.FindAll("[role=option]").Count);
+        Assert.Equal(2, cut.FindAll("[role=group]").Count);
+        cut.Find("input[role=combobox]").Input("appear");
+        Assert.Equal(["Toggle dark mode"], cut.FindAll("[role=option] > span").Select(o => o.TextContent));
+        Assert.Contains("1 command available.", cut.Markup);
+        AssertAccessible(cut.Markup);
+        cut.Find("input[role=combobox]").KeyDown(Key("Enter"));
+        Assert.Equal(["theme"], ran);
+        Assert.Empty(cut.FindAll("[role=option]"));
+    }
+}

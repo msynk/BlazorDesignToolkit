@@ -1,0 +1,79 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Tabs pattern. Tabs contains a TabList (role="tablist") with Tab buttons (role="tab") and TabPanels
+   (role="tabpanel"). Arrow keys move focus between tabs (roving tabindex); Home/End jump; with automatic activation
+   (default) focusing a tab selects it, with manual activation Enter/Space select. Disabled tabs are skipped. *@
+@inherits PrimitiveBase
+
+<CascadingValue Value="Context" IsFixed="true">
+    <div @attributes="AdditionalAttributes" data-orientation="@(Orientation == Orientation.Vertical ? "vertical" : "horizontal")" dir="@(Direction == TextDirection.Rtl ? "rtl" : null)">
+        @ChildContent
+    </div>
+</CascadingValue>
+
+@code {
+    private readonly Controllable<string?> _value = new(null);
+
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string? DefaultValue { get; set; }
+    [Parameter] public Orientation Orientation { get; set; } = Orientation.Horizontal;
+    [Parameter] public TabsActivation Activation { get; set; } = TabsActivation.Automatic;
+    [Parameter] public TextDirection Direction { get; set; } = TextDirection.Ltr;
+    /// <summary>Whether arrow keys wrap from the last tab to the first. Default true.</summary>
+    [Parameter] public bool Loop { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal TabsContext Context { get; } = new();
+
+    protected override void OnInitialized()
+    {
+        _value.Initialize(DefaultValue ?? Value);
+        Context.Owner = this;
+        Context.BaseId = ProvidedId ?? Ids.Next("tabs");
+    }
+
+    protected override void OnParametersSet()
+    {
+        _value.Sync(Value);
+        Context.NotifyStateChanged();
+    }
+
+    internal string? Selected
+    {
+        get
+        {
+            var value = _value.Get(Value, ValueChanged.HasDelegate);
+            // Fall back to the first enabled tab so that exactly one panel is always shown.
+            if (value is null || Context.Tabs.Items.All(t => t.Value != value || t.Disabled))
+                value = Context.Tabs.Items.FirstOrDefault(t => !t.Disabled)?.Value ?? value;
+            return value;
+        }
+    }
+
+    internal async Task SelectAsync(string value)
+    {
+        if (value == Selected) return;
+        await _value.SetAsync(value, ValueChanged.HasDelegate, ValueChanged);
+        Context.NotifyStateChanged();
+    }
+
+    public enum TabsActivation
+    {
+        /// <summary>Moving focus selects the tab (recommended when panels render quickly).</summary>
+        Automatic,
+        /// <summary>Enter or Space selects the focused tab.</summary>
+        Manual,
+    }
+
+    internal sealed class TabsContext : PrimitiveContext
+    {
+        public Tabs Owner { get; set; } = default!;
+        public string BaseId { get; set; } = "";
+        public CompositeRegistry<Tab> Tabs { get; } = new();
+        public string TabId(string value) => $"{BaseId}-tab-{Sanitize(value)}";
+        public string PanelId(string value) => $"{BaseId}-panel-{Sanitize(value)}";
+
+        private static string Sanitize(string value)
+            => string.Concat(value.Select(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' ? c : '_'));
+    }
+}

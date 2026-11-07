@@ -1,0 +1,24 @@
+@* Applies a different theme (and axis values) to a subtree without JavaScript, for previews or embedded brands.
+   All axis attributes are rendered so that the scope does not inherit stale values from ancestors. *@
+@inject ThemeCatalog Catalog
+@inject ThemingOptions Options
+
+<div @attributes="Attributes">@ChildContent</div>
+
+@code {
+    [Parameter, EditorRequired] public string ThemeId { get; set; } = "";
+    /// <summary>Axis values for the scope. Missing axes use their defaults; <c>system</c> is supported.</summary>
+    [Parameter] public IReadOnlyDictionary<string, string>? Axes { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private IReadOnlyDictionary<string, object> Attributes
+    {
+        get
+        {
+            var result = new Dictionary<string, object>(AdditionalAttributes ?? new Dictionary<string, object>(), StringComparer.Ordinal);
+            foreach (var (k, v) in ThemeRootAttributes.For(Catalog, new ThemeSelection(ThemeId, Axes), Options.Css)) result[k] = v;
+            return result;
+        }
+    }
+}

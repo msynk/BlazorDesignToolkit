@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Cli\BlazorDesignToolkit.Cli.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\samples\tokens\**\*" LinkBase="samples\tokens" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\bdt.config.json" Link="samples\bdt.config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\generated\**\*" LinkBase="samples\generated" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

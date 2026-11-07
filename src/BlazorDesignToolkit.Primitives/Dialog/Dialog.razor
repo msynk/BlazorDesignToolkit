@@ -1,0 +1,68 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Dialog (modal) pattern on the native <dialog> element. A modal dialog uses showModal(): the rest of the page
+   becomes inert (focus cannot leave, screen readers cannot browse outside), Escape requests closing, focus moves into
+   the dialog and returns to the previously focused element on close. Dialog renders no element itself; it coordinates
+   DialogTrigger, DialogContent, DialogTitle, DialogDescription and DialogClose. *@
+@implements IDisposable
+
+<CascadingValue Value="Context" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    private readonly Controllable<bool> _open = new(false);
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public bool DefaultOpen { get; set; }
+    /// <summary>Modal (default) makes everything else inert. Non-modal dialogs leave the page interactive.</summary>
+    [Parameter] public bool Modal { get; set; } = true;
+    /// <summary>Use role="alertdialog" for urgent confirmations that require a response.</summary>
+    [Parameter] public bool Alert { get; set; }
+    [Parameter] public bool CloseOnEscape { get; set; } = true;
+    /// <summary>Close when the backdrop (outside the dialog box) is clicked. Off by default for modal dialogs.</summary>
+    [Parameter] public bool CloseOnBackdropClick { get; set; }
+    /// <summary>Prevent page scrolling while a modal dialog is open.</summary>
+    [Parameter] public bool LockScroll { get; set; } = true;
+    /// <summary>CSS selector of the element to focus when opening (default: the first focusable element, or one with autofocus).</summary>
+    [Parameter] public string? InitialFocus { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal DialogContext Context { get; } = new();
+    internal bool IsOpen => _open.Get(Open, OpenChanged.HasDelegate);
+
+    protected override void OnInitialized()
+    {
+        _open.Initialize(DefaultOpen || Open);
+        Context.Owner = this;
+        var id = Ids.Next("dialog");
+        Context.ContentId = id;
+        Context.TitleId = id + "-title";
+        Context.DescriptionId = id + "-description";
+    }
+
+    protected override void OnParametersSet()
+    {
+        _open.Sync(Open);
+        Context.NotifyStateChanged();
+    }
+
+    internal async Task SetOpenAsync(bool open)
+    {
+        if (open == IsOpen) return;
+        await _open.SetAsync(open, OpenChanged.HasDelegate, OpenChanged);
+        Context.NotifyStateChanged();
+    }
+
+    public void Dispose() { }
+
+    internal sealed class DialogContext : PrimitiveContext
+    {
+        public Dialog Owner { get; set; } = default!;
+        public string ContentId { get; set; } = "";
+        public string TitleId { get; set; } = "";
+        public string DescriptionId { get; set; } = "";
+        public bool HasTitle { get; set; }
+        public bool HasDescription { get; set; }
+    }
+}

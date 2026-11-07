@@ -1,0 +1,20 @@
+{
+  "$description": "Compact density overrides.",
+  "size": {
+    "control": {
+      "$type": "dimension",
+      "height": {
+        "$value": "{space.8}"
+      },
+      "padding-inline": {
+        "$value": "{space.3}"
+      }
+    }
+  },
+  "space": {
+    "gap": {
+      "$type": "dimension",
+      "$value": "{space.2}"
+    }
+  }
+}

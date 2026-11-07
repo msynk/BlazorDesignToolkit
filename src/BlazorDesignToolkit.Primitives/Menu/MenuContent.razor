@@ -1,0 +1,105 @@
+@namespace BlazorDesignToolkit.Primitives
+@inherits PrimitiveBase
+@* Enter is prevented: activating an item moves focus back to the trigger during the key event, and the browser would
+   otherwise turn the same Enter into a click on the trigger and reopen the menu. *@
+
+<div role="menu" popover="auto" @ref="_element"
+     @attributes='Attributes("role", "popover", "id", "aria-labelledby", "tabindex")'
+     id="@Context.MenuId"
+     aria-labelledby="@(AdditionalAttributes?.ContainsKey("aria-label") == true ? null : Context.TriggerId)"
+     aria-orientation="vertical"
+     tabindex="-1"
+     data-state="@(Context.Owner.IsOpen ? "open" : "closed")"
+     data-bdt-keys="ArrowUp ArrowDown Home End Space Enter"
+     @onkeydown="OnKeyDownAsync">
+    @if (Context.Owner.IsOpen)
+    {
+        @ChildContent
+    }
+</div>
+
+@code {
+    private readonly Typeahead _typeahead = new();
+    private ElementReference _element;
+    private DotNetObjectReference<MenuContent>? _reference;
+    private int _handle;
+    private bool _shown;
+
+    [CascadingParameter] internal Menu.MenuContext Context { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Context is null) throw new InvalidOperationException("MenuContent must be placed inside Menu.");
+        Track(Context);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Context.Items.Rendered = Context.Owner.IsOpen;
+        if (firstRender) await Js.TrackAsync("preventKeys", _element);
+        var open = Context.Owner.IsOpen;
+        if (open && !_shown)
+        {
+            _shown = true;
+            _reference ??= DotNetObjectReference.Create(this);
+            _handle = await Js.TrackAsync("showPopover", _element, Context.Trigger, _reference, new { placement = Context.Owner.Placement, focus = false, restoreFocus = true });
+            if (Context.Items.OrderDirty) Context.Items.ApplyOrder(await Js.InvokeAsync<string[]>("domOrder", _element, "[data-menu-item]"));
+            if (Context.PendingFocus is { } pending)
+            {
+                Context.PendingFocus = null;
+                var target = Context.Items.Navigate(null, pending == Menu.MenuFocus.First ? NavigationIntent.First : NavigationIntent.Last, loop: true);
+                if (target is not null) await FocusItemAsync(target);
+                else await _element.FocusAsync();
+            }
+        }
+        else if (!open && _shown)
+        {
+            _shown = false;
+            await Js.ReleaseAsync(_handle);
+        }
+    }
+
+    internal async Task FocusItemAsync(MenuItemBase item)
+    {
+        Context.Active = item;
+        await item.FocusAsync();
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        var intent = KeyboardNavigation.Intent(e.Key, Orientation.Vertical);
+        if (intent != NavigationIntent.None)
+        {
+            var current = Context.Active ?? Context.Items.FindById(await Js.InvokeAsync<string?>("activeElementId"));
+            var target = Context.Items.Navigate(current, intent, loop: true);
+            if (target is not null) await FocusItemAsync(target);
+            return;
+        }
+        switch (e.Key)
+        {
+            case "Escape":
+                await Context.Owner.CloseAsync();
+                return;
+            case "Tab":
+                // Let focus move naturally; just close.
+                await Context.Owner.CloseAsync();
+                return;
+        }
+        if (KeyboardNavigation.IsPrintable(e) && e.Key != " ")
+        {
+            var match = Context.Items.Typeahead(_typeahead, e.Key[0], Context.Active);
+            if (match is not null && match != Context.Active) await FocusItemAsync(match);
+        }
+    }
+
+    /// <summary>Called by the browser on light dismiss (Escape, outside click).</summary>
+    [JSInvokable]
+    public Task OnPopoverToggle(bool open) => open ? Task.CompletedTask : InvokeAsync(() => Context.Owner.CloseAsync(dismissed: true));
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _reference?.Dispose();
+    }
+}

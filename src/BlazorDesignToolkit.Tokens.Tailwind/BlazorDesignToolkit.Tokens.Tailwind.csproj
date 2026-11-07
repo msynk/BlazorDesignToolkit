@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Tokens.Tailwind</RootNamespace>
+    <Description>Tailwind CSS v4 integration for BlazorDesignToolkit design tokens: generates a type-checked @theme block that references runtime theme variables or literal values.</Description>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorDesignToolkit.Tokens\BlazorDesignToolkit.Tokens.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Primitives.StarterStyles</RootNamespace>
+    <Description>Optional starter stylesheet for BlazorDesignToolkit headless primitives. Pure CSS in a cascade layer, driven by --bdt-* custom properties that can be mapped to any token set; override or omit it freely.</Description>
+    <PackageTags>$(PackageTags);css</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <EnablePackageValidation>false</EnablePackageValidation>
+    <IncludeSymbols>false</IncludeSymbols>
+  </PropertyGroup>
+
+</Project>

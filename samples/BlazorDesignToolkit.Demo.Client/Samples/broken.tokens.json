@@ -1,0 +1,29 @@
+{
+  "$description": "Intentionally broken tokens used by the demo's validation page. Every problem maps to a diagnostic rule.",
+  "color": {
+    "$type": "color",
+    "white": { "$value": { "colorSpace": "srgb", "components": [1, 1, 1], "hex": "#ffffff" } },
+    "gray": { "$value": { "colorSpace": "srgb", "components": [0.62, 0.62, 0.62] } },
+    "legacy": { "$value": "#ff8800" },
+    "brand": { "$value": "{color.brnad}" },
+    "loop-a": { "$value": "{color.loop-b}" },
+    "loop-b": { "$value": "{color.loop-a}" },
+    "old-accent": { "$value": { "colorSpace": "srgb", "components": [0.1, 0.3, 0.8] }, "$deprecated": "Use color.accent" },
+    "accent": { "$value": "{color.old-accent}" },
+    "text": { "muted": { "$value": "{color.gray}" } },
+    "surface": { "default": { "$value": "{color.white}" } }
+  },
+  "space": {
+    "$type": "dimension",
+    "small": { "$value": { "value": 4, "unit": "px" } },
+    "medium": { "$value": { "value": 2, "unit": "em" } },
+    "1": { "$value": { "value": 4, "unit": "px" } },
+    "2": { "$value": { "value": 12, "unit": "px" } },
+    "3": { "$value": { "value": 8, "unit": "px" } }
+  },
+  "Font Size": { "$type": "dimension", "Body": { "$value": { "value": 16, "unit": "px" } } },
+  "border": {
+    "focus": { "$type": "border", "$value": { "color": "{space.small}", "width": { "value": 2, "unit": "px" }, "style": "solid" } }
+  },
+  "weight": { "$type": "fontWeight", "strong": { "$value": "Bold" } }
+}

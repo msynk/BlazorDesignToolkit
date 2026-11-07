@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>BlazorDesignToolkit.Cli</RootNamespace>
+    <AssemblyName>bdt</AssemblyName>
+    <PackageId>BlazorDesignToolkit.Cli</PackageId>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>bdt</ToolCommandName>
+    <Description>Command-line tool for BlazorDesignToolkit: validate DTCG 2025.10 tokens and themes, export CSS and framework integrations, analyse token coverage, diff token sets and run CI quality gates without starting an application.</Description>
+    <PackageTags>$(PackageTags);cli;dotnet-tool</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorDesignToolkit.Tokens\BlazorDesignToolkit.Tokens.csproj" />
+    <ProjectReference Include="..\BlazorDesignToolkit.Theming\BlazorDesignToolkit.Theming.csproj" />
+    <ProjectReference Include="..\BlazorDesignToolkit.Tokens.Tailwind\BlazorDesignToolkit.Tokens.Tailwind.csproj" />
+    <ProjectReference Include="..\BlazorDesignToolkit.Tokens.Bootstrap\BlazorDesignToolkit.Tokens.Bootstrap.csproj" />
+    <ProjectReference Include="..\BlazorDesignToolkit.Tokens.Fluent\BlazorDesignToolkit.Tokens.Fluent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BlazorDesignToolkit.Cli.Tests" />
+  </ItemGroup>
+
+</Project>

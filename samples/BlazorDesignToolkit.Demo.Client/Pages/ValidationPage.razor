@@ -1,0 +1,81 @@
+@page "/validation"
+@using BlazorDesignToolkit.Tokens.Diagnostics
+@using BlazorDesignToolkit.Tokens.Resolution
+@using BlazorDesignToolkit.Tokens.Validation
+
+<PageTitle>Validation · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Validation and design-system diagnostics</h1>
+<p>Every diagnostic has a stable rule id, a severity that configuration can change or suppress (with a justification),
+    the affected token and source location, expected and actual values, and a suggested fix.</p>
+
+<Tabs DefaultValue="broken">
+    <TabList aria-label="Validation examples">
+        <Tab Value="broken">Intentionally broken tokens</Tab>
+        <Tab Value="aurora">Aurora in every theme</Tab>
+        <Tab Value="rules">Rule catalog</Tab>
+    </TabList>
+    <TabPanel Value="broken">
+        <p>The <code>broken.tokens.json</code> sample contains a cycle, a misspelled reference, a legacy hex string, an
+            unsupported unit, a type mismatch, a deprecated reference, an inconsistent scale, naming violations and a
+            low-contrast pair.</p>
+        <p role="status">@Broken.ErrorCount error(s), @Broken.WarningCount warning(s), @Broken.InfoCount info.</p>
+        <DiagnosticList Diagnostics="Broken.Diagnostics" />
+    </TabPanel>
+    <TabPanel Value="aurora">
+        <p>The Aurora design system is validated for each theme × mode × contrast × density combination
+            (@Units.Count combinations, @Contrast.Count contrast checks).</p>
+        <p role="status">@AuroraFailures contrast check(s) fail; @AuroraIndeterminate cannot be determined.</p>
+        <table class="data-table">
+            <caption>Contrast checks that are closest to failing</caption>
+            <thead><tr><th scope="col">Scope</th><th scope="col">Foreground</th><th scope="col">Background</th><th scope="col">Ratio</th><th scope="col">Required</th></tr></thead>
+            <tbody>
+                @foreach (var r in Contrast.Where(c => c.Ratio is not null).OrderBy(c => c.Ratio - c.Required).Take(12))
+                {
+                    <tr><td>@r.Scope</td><th scope="row"><code>@r.Foreground</code></th><td><code>@r.Background</code></td><td>@r.RatioText</td><td>@r.Required:1</td></tr>
+                }
+            </tbody>
+        </table>
+    </TabPanel>
+    <TabPanel Value="rules">
+        <table class="data-table">
+            <caption>Diagnostic rules</caption>
+            <thead><tr><th scope="col">Rule</th><th scope="col">Title</th><th scope="col">Category</th><th scope="col">Default</th><th scope="col">DTCG requirement</th></tr></thead>
+            <tbody>
+                @foreach (var d in DiagnosticCatalog.All)
+                {
+                    <tr><th scope="row"><code>@d.Id</code></th><td>@d.Title</td><td>@d.Category</td><td>@d.DefaultSeverity</td><td>@(d.IsSpecRequirement ? "Yes" : "")</td></tr>
+                }
+            </tbody>
+        </table>
+    </TabPanel>
+</Tabs>
+
+@code {
+    private DiagnosticResult? _broken;
+    private List<ThemeResolution>? _units;
+    private List<ContrastResult>? _contrast;
+
+    private DiagnosticResult Broken => _broken ??= Validate();
+
+    private static DiagnosticResult Validate()
+    {
+        var tokens = TokenResolver.Resolve(DemoTokens.Samples["broken.tokens.json"], new BlazorDesignToolkit.Tokens.Json.JsonParseOptions { SourceName = "broken.tokens.json" });
+        var options = new ValidationOptions
+        {
+            Naming = [new NamingRule { Case = NameCase.KebabCase }],
+            RequiredTokens = [new RequiredToken("color.focus.ring", "color")],
+            Accessibility = new AccessibilityRules { Pairs = [new ContrastPair("color.text.muted", "color.surface.default")] },
+        };
+        return TokenValidator.Validate(tokens, options).Result;
+    }
+
+    private List<ThemeResolution> Units => _units ??= DemoTokens.Catalog.Themes
+        .SelectMany(t => DemoTokens.Catalog.EnumerateAxisCombinations().Select(a => DemoTokens.Catalog.Resolve(new ThemeSelection(t.Id, a)))).ToList();
+
+    private List<ContrastResult> Contrast => _contrast ??= Units
+        .SelectMany(u => TokenValidator.Validate(u.Tokens, DemoTokens.Validation, scope: ThemeComposer.Scope(u.Selection)).ContrastResults).ToList();
+
+    private int AuroraFailures => Contrast.Count(c => c.Passed == false);
+    private int AuroraIndeterminate => Contrast.Count(c => c.Passed is null);
+}

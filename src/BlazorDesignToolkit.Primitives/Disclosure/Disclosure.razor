@@ -1,0 +1,52 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Disclosure pattern: a button (aria-expanded, aria-controls) that shows and hides a region.
+   When the content does not need to be controlled from .NET, the native <details>/<summary> element is a valid alternative. *@
+@inherits PrimitiveBase
+
+<CascadingValue Value="Context" IsFixed="true">
+    <div @attributes="AdditionalAttributes" data-state="@(IsOpen ? "open" : "closed")">
+        @ChildContent
+    </div>
+</CascadingValue>
+
+@code {
+    private readonly Controllable<bool> _open = new(false);
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public bool DefaultOpen { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal DisclosureContext Context { get; } = new();
+    internal bool IsOpen => _open.Get(Open, OpenChanged.HasDelegate);
+
+    protected override void OnInitialized()
+    {
+        _open.Initialize(DefaultOpen || Open);
+        Context.Owner = this;
+        Context.PanelId = Ids.Next("disclosure-panel");
+        Context.TriggerId = Ids.Next("disclosure-trigger");
+    }
+
+    protected override void OnParametersSet()
+    {
+        _open.Sync(Open);
+        Context.NotifyStateChanged();
+    }
+
+    internal async Task ToggleAsync()
+    {
+        if (Disabled) return;
+        await _open.SetAsync(!IsOpen, OpenChanged.HasDelegate, OpenChanged);
+        Context.NotifyStateChanged();
+        StateHasChanged();
+    }
+
+    internal sealed class DisclosureContext : PrimitiveContext
+    {
+        public Disclosure Owner { get; set; } = default!;
+        public string PanelId { get; set; } = "";
+        public string TriggerId { get; set; } = "";
+    }
+}

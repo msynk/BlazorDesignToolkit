@@ -1,0 +1,185 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Listbox pattern (single or multiple selection). Focus stays on the listbox; the active option is exposed with
+   aria-activedescendant and scrolled into view. Keys: Up/Down (Left/Right when horizontal), Home/End, type-to-select,
+   Space toggles (multiple), Shift+Up/Down extends the selection, Ctrl+A selects all. In single-selection mode the
+   selection follows focus unless SelectionFollowsFocus is false (then Enter or Space selects). Give the listbox an
+   accessible name with aria-label, aria-labelledby or a FormField label. *@
+@typeparam TItem
+@inherits PrimitiveBase
+
+<div role="listbox" @ref="_element"
+     @attributes='Attributes("role", "aria-activedescendant", "aria-multiselectable", "tabindex", "id")'
+     id="@_id"
+     tabindex="@(IsDisabled ? "-1" : "0")"
+     aria-activedescendant="@(_list.HasActive ? OptionId(_list.ActiveIndex) : null)"
+     aria-multiselectable="@(Multiple ? "true" : null)"
+     aria-orientation="@(Orientation == Orientation.Horizontal ? "horizontal" : null)"
+     aria-disabled="@(IsDisabled ? "true" : null)"
+     aria-labelledby="@(AdditionalAttributes?.ContainsKey("aria-label") == true || Field is null ? null : Field.LabelId)"
+     aria-describedby="@Field?.DescribedBy"
+     aria-invalid="@(Field?.Invalid == true ? "true" : null)"
+     aria-required="@(Field?.Required == true ? "true" : null)"
+     data-bdt-keys="@(Orientation == Orientation.Horizontal ? "ArrowLeft ArrowRight Home End Space Ctrl+a Meta+a" : "ArrowUp ArrowDown Home End Space Ctrl+a Meta+a")"
+     @onkeydown="OnKeyDownAsync"
+     @onfocus="OnFocus">
+    @for (var i = 0; i < _list.Items.Count; i++)
+    {
+        var index = i;
+        var item = _list.Items[i];
+        var selected = IsSelected(item);
+        var disabled = _list.IsDisabled(i);
+        var active = index == _list.ActiveIndex;
+        <div role="option" id="@OptionId(index)" @key="item"
+             aria-selected="@(selected ? "true" : "false")"
+             aria-disabled="@(disabled ? "true" : null)"
+             data-highlighted="@(active ? "" : null)"
+             data-state="@(selected ? "checked" : "unchecked")"
+             @onclick="() => OnOptionClickAsync(index)">
+            @if (ItemTemplate is not null)
+            {
+                @ItemTemplate(new OptionContext<TItem>(item, index, _list.Label(item), selected, active, disabled))
+            }
+            else
+            {
+                @_list.Label(item)
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private readonly OptionList<TItem> _list = new();
+    private readonly Controllable<TItem?> _value = new(default);
+    private readonly Controllable<IReadOnlyCollection<TItem>> _values = new([]);
+    private ElementReference _element;
+    private string _id = "";
+    private int _scrolledIndex = -1;
+    private int _anchorIndex = -1;
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter, EditorRequired] public IEnumerable<TItem>? Items { get; set; }
+    [Parameter] public Func<TItem, string>? ItemLabel { get; set; }
+    [Parameter] public Func<TItem, bool>? ItemDisabled { get; set; }
+    [Parameter] public RenderFragment<OptionContext<TItem>>? ItemTemplate { get; set; }
+    [Parameter] public TItem? Value { get; set; }
+    [Parameter] public EventCallback<TItem?> ValueChanged { get; set; }
+    [Parameter] public TItem? DefaultValue { get; set; }
+    [Parameter] public bool Multiple { get; set; }
+    [Parameter] public IReadOnlyCollection<TItem>? Values { get; set; }
+    [Parameter] public EventCallback<IReadOnlyCollection<TItem>> ValuesChanged { get; set; }
+    [Parameter] public IReadOnlyCollection<TItem>? DefaultValues { get; set; }
+    [Parameter] public bool SelectionFollowsFocus { get; set; } = true;
+    [Parameter] public Orientation Orientation { get; set; } = Orientation.Vertical;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Loop { get; set; }
+
+    private bool IsDisabled => Disabled || Field?.Disabled == true;
+    private TItem? CurrentValue => _value.Get(Value, ValueChanged.HasDelegate);
+    private IReadOnlyCollection<TItem> CurrentValues => _values.Get(Values ?? [], ValuesChanged.HasDelegate);
+
+    protected override void OnInitialized()
+    {
+        _id = Field?.ControlId ?? ProvidedId ?? Ids.Next("listbox");
+        _value.Initialize(DefaultValue is not null ? DefaultValue : Value);
+        _values.Initialize(DefaultValues ?? Values ?? []);
+        TrackField(Field);
+        if (Field is not null)
+        {
+            Field.LabelTargetsControl = false;
+            Field.NotifyChanged();
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        _value.Sync(Value);
+        if (Values is not null) _values.Sync(Values);
+        _list.Update(Items, ItemLabel, ItemDisabled);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Js.TrackAsync("preventKeys", _element);
+        if (_list.ActiveIndex >= 0 && _list.ActiveIndex != _scrolledIndex)
+        {
+            _scrolledIndex = _list.ActiveIndex;
+            await Js.InvokeVoidAsync("scrollIntoViewById", OptionId(_list.ActiveIndex));
+        }
+    }
+
+    private string OptionId(int index) => $"{_id}-option-{index}";
+
+    private bool IsSelected(TItem item)
+        => Multiple ? CurrentValues.Contains(item) : EqualityComparer<TItem?>.Default.Equals(CurrentValue, item);
+
+    private async Task OnFocus()
+    {
+        if (_list.HasActive || IsDisabled) return;
+        _list.ActivateOrFirst(Multiple ? CurrentValues.FirstOrDefault() : CurrentValue);
+        // APG: in a single-select listbox where selection follows focus, the first option is selected when nothing is.
+        if (!Multiple && SelectionFollowsFocus && CurrentValue is null && _list.HasActive) await ActivateAsync(_list.ActiveIndex, toggle: false);
+    }
+
+    private async Task OnOptionClickAsync(int index)
+    {
+        if (IsDisabled || _list.IsDisabled(index)) return;
+        _list.ActiveIndex = index;
+        await ActivateAsync(index, toggle: Multiple);
+        await _element.FocusAsync();
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (IsDisabled || _list.Items.Count == 0) return;
+        var intent = KeyboardNavigation.Intent(e.Key, Orientation);
+        if (intent != NavigationIntent.None)
+        {
+            if (!_list.HasActive && intent is NavigationIntent.Next or NavigationIntent.Previous) _list.ActivateOrFirst(Multiple ? CurrentValues.FirstOrDefault() : CurrentValue);
+            else _list.Move(intent, Loop);
+            if (Multiple && e.ShiftKey && _list.HasActive) await SelectRangeAsync(e.Key is "Home" or "End");
+            else if (!Multiple && SelectionFollowsFocus && _list.HasActive) await ActivateAsync(_list.ActiveIndex, toggle: false);
+            return;
+        }
+        if (e.Key == " " || (e.Key == "Enter" && (Multiple || !SelectionFollowsFocus)))
+        {
+            if (_list.HasActive) await ActivateAsync(_list.ActiveIndex, toggle: Multiple);
+            return;
+        }
+        if (Multiple && (e.CtrlKey || e.MetaKey) && e.Key is "a" or "A")
+        {
+            var all = _list.Items.Where((item, i) => !_list.IsDisabled(i)).ToList();
+            await SetValuesAsync(CurrentValues.Count == all.Count ? [] : all);
+            return;
+        }
+        if (OptionList<TItem>.IsTypeaheadKey(e) && _list.Type(e.Key[0]) && !Multiple && SelectionFollowsFocus)
+        {
+            await ActivateAsync(_list.ActiveIndex, toggle: false);
+        }
+    }
+
+    private async Task ActivateAsync(int index, bool toggle)
+    {
+        var item = _list.Items[index];
+        _anchorIndex = index;
+        if (Multiple)
+        {
+            var next = CurrentValues.ToList();
+            if (!next.Remove(item)) next.Add(item);
+            await SetValuesAsync(next);
+        }
+        else
+        {
+            await _value.SetAsync(item, ValueChanged.HasDelegate, ValueChanged);
+        }
+    }
+
+    private async Task SelectRangeAsync(bool toEdge)
+    {
+        var anchor = _anchorIndex < 0 ? _list.ActiveIndex : _anchorIndex;
+        var (from, to) = anchor <= _list.ActiveIndex ? (anchor, _list.ActiveIndex) : (_list.ActiveIndex, anchor);
+        var range = Enumerable.Range(from, to - from + 1).Where(i => !_list.IsDisabled(i)).Select(i => _list.Items[i]);
+        await SetValuesAsync(CurrentValues.Union(range).ToList());
+    }
+
+    private Task SetValuesAsync(IReadOnlyCollection<TItem> values) => _values.SetAsync(values, ValuesChanged.HasDelegate, ValuesChanged);
+}

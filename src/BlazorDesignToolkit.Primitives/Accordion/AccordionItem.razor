@@ -1,0 +1,27 @@
+@namespace BlazorDesignToolkit.Primitives
+@* AccordionItem: groups a trigger and a panel and scopes their ids. *@
+@inherits PrimitiveBase
+
+<CascadingValue Value="this" IsFixed="true">
+    <div @attributes="AdditionalAttributes" data-state="@(Context.Owner.IsOpen(Value) ? "open" : "closed")" data-disabled="@(Disabled ? "" : null)">
+        @ChildContent
+    </div>
+</CascadingValue>
+
+@code {
+    [CascadingParameter] internal Accordion.AccordionContext Context { get; set; } = default!;
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal string TriggerId => $"{Context.BaseId}-{Sanitize(Value)}-trigger";
+    internal string PanelId => $"{Context.BaseId}-{Sanitize(Value)}-panel";
+
+    private static string Sanitize(string value) => string.Concat(value.Select(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' ? c : '_'));
+
+    protected override void OnInitialized()
+    {
+        if (Context is null) throw new InvalidOperationException("AccordionItem must be placed inside Accordion.");
+        Track(Context);
+    }
+}

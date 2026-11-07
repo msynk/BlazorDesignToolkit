@@ -1,0 +1,52 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA switch: <button role="switch" aria-checked>. Space and Enter toggle (native button activation).
+   Needs an accessible name: wrap in FormField with FormLabel, or pass aria-label / aria-labelledby. *@
+@inherits PrimitiveBase
+
+<button type="button" role="switch"
+        @attributes='Attributes("role", "aria-checked", "type")'
+        id="@(Field?.ControlId ?? ProvidedId)"
+        aria-checked="@(Current ? "true" : "false")"
+        aria-labelledby="@(AdditionalAttributes?.ContainsKey("aria-label") == true ? null : Field is null ? null : Field.LabelId)"
+        aria-describedby="@Field?.DescribedBy"
+        aria-invalid="@(Field?.Invalid == true ? "true" : null)"
+        aria-errormessage="@(Field is { Invalid: true, HasError: true } ? Field.ErrorId : null)"
+        aria-required="@(Required || Field?.Required == true ? "true" : null)"
+        disabled="@(Disabled || Field?.Disabled == true)"
+        data-state="@(Current ? "checked" : "unchecked")"
+        @onclick="ToggleAsync">
+    @ChildContent
+</button>
+@if (Name is not null)
+{
+    @* Participates in HTML form submission like a checkbox would. *@
+    <input type="hidden" name="@Name" value="@(Current ? Value : "")" disabled="@(!Current)" />
+}
+
+@code {
+    private readonly Controllable<bool> _checked = new(false);
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter] public bool Checked { get; set; }
+    [Parameter] public EventCallback<bool> CheckedChanged { get; set; }
+    [Parameter] public bool DefaultChecked { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string Value { get; set; } = "on";
+    /// <summary>Visual content (for example the thumb). It is not the accessible name.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool Controlled => CheckedChanged.HasDelegate;
+    private bool Current => _checked.Get(Checked, Controlled);
+
+    protected override void OnInitialized()
+    {
+        _checked.Initialize(DefaultChecked || Checked);
+        TrackField(Field);
+    }
+
+    protected override void OnParametersSet() => _checked.Sync(Checked);
+
+    private Task ToggleAsync() => Disabled || Field?.Disabled == true ? Task.CompletedTask : _checked.SetAsync(!Current, Controlled, CheckedChanged);
+}

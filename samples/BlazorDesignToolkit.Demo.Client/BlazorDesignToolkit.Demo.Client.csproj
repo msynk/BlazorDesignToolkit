@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+    <StaticWebAssetProjectMode>Default</StaticWebAssetProjectMode>
+    <RootNamespace>BlazorDesignToolkit.Demo.Client</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Primitives\BlazorDesignToolkit.Primitives.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Primitives.StarterStyles\BlazorDesignToolkit.Primitives.StarterStyles.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Theming.Blazor\BlazorDesignToolkit.Theming.Blazor.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Tokens.Tailwind\BlazorDesignToolkit.Tokens.Tailwind.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Tokens.Bootstrap\BlazorDesignToolkit.Tokens.Bootstrap.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Tokens.Fluent\BlazorDesignToolkit.Tokens.Fluent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The sample design system ships inside the app so it works identically in Server and WebAssembly modes. -->
+    <EmbeddedResource Include="..\tokens\**\*.json" LogicalName="Tokens/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Samples\*.json" LogicalName="Samples/%(Filename)%(Extension)" />
+    <!-- Sources analysed by the coverage page. -->
+    <EmbeddedResource Include="Components\*.razor;Components\*.razor.css;wwwroot\css\*.css" LogicalName="Sources/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

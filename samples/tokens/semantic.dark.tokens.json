@@ -1,0 +1,116 @@
+{
+  "$description": "Aurora semantic color tokens (dark mode). Every value aliases a foundation token.",
+  "color": {
+    "$type": "color",
+    "text": {
+      "default": {
+        "$value": "{color.neutral.50}"
+      },
+      "muted": {
+        "$value": "{color.neutral.300}"
+      },
+      "inverse": {
+        "$value": "{color.neutral.900}"
+      },
+      "link": {
+        "$value": "{color.blue.300}"
+      },
+      "danger": {
+        "$value": "{color.red.300}"
+      },
+      "success": {
+        "$value": "{color.green.300}"
+      }
+    },
+    "surface": {
+      "default": {
+        "$value": "{color.neutral.950}"
+      },
+      "raised": {
+        "$value": "{color.neutral.900}"
+      },
+      "sunken": {
+        "$value": "{color.black}"
+      },
+      "inverse": {
+        "$value": "{color.neutral.50}"
+      },
+      "accent": {
+        "$value": "{color.blue.400}"
+      },
+      "danger": {
+        "$value": "{color.red.400}"
+      },
+      "success": {
+        "$value": "{color.green.400}"
+      },
+      "warning": {
+        "$value": "{color.amber.400}"
+      }
+    },
+    "on-surface": {
+      "default": {
+        "$value": "{color.text.default}"
+      },
+      "raised": {
+        "$value": "{color.text.default}"
+      },
+      "sunken": {
+        "$value": "{color.text.default}"
+      },
+      "inverse": {
+        "$value": "{color.text.inverse}"
+      },
+      "accent": {
+        "$value": "{color.neutral.950}"
+      },
+      "danger": {
+        "$value": "{color.neutral.950}"
+      },
+      "success": {
+        "$value": "{color.neutral.950}"
+      },
+      "warning": {
+        "$value": "{color.neutral.950}"
+      }
+    },
+    "border": {
+      "subtle": {
+        "$value": "{color.neutral.800}",
+        "$description": "Decorative separators only; not sufficient for component boundaries."
+      },
+      "default": {
+        "$value": "{color.neutral.400}",
+        "$description": "Boundaries of form controls (meets 3:1 against surfaces)."
+      }
+    },
+    "focus": {
+      "ring": {
+        "$value": "{color.blue.300}"
+      }
+    },
+    "interactive": {
+      "hover": {
+        "$value": "{color.neutral.800}"
+      },
+      "selected": {
+        "$value": "{color.blue.900}"
+      }
+    },
+    "overlay": {
+      "scrim": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0,
+            0,
+            0
+          ],
+          "alpha": 0.5,
+          "hex": "#000000"
+        },
+        "$description": "Translucent backdrop behind modal dialogs."
+      }
+    }
+  }
+}

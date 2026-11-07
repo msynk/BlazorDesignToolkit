@@ -1,0 +1,58 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject ThemeManager Manager
+
+<ThemeProvider>
+    @* Blazor intercepts same-page links, so the skip link moves focus explicitly; without interactivity the native fragment navigation applies. *@
+    <a class="skip-link" href="#main" @onclick="SkipToMainAsync" @onclick:preventDefault>Skip to main content</a>
+    <div class="shell">
+        <header class="site-header">
+            <a class="brand" href="">BlazorDesignToolkit <span class="brand-sub">demo</span></a>
+            <ThemeControls />
+            <button type="button" class="command-hint" @onclick="() => _commandsOpen = true" aria-keyshortcuts="Control+K">
+                Commands <kbd aria-hidden="true">Ctrl K</kbd>
+            </button>
+        </header>
+        <NavMenu />
+        <main id="main" tabindex="-1" @ref="_main">
+            @Body
+        </main>
+        <footer class="site-footer">
+            <p>Render mode: <strong>@(RendererInfo.IsInteractive ? RendererInfo.Name : "Static (prerendered)")</strong>.
+                <a href="@ModeLink">@ModeLinkText</a></p>
+        </footer>
+    </div>
+    <LiveRegion />
+    <ToastRegion />
+    <CommandMenu Commands="Commands" @bind-Open="_commandsOpen" />
+</ThemeProvider>
+
+@code {
+    private bool _commandsOpen;
+    private ElementReference _main;
+
+    private async Task SkipToMainAsync() => await _main.FocusAsync();
+
+    private string ModeLink => RendererInfo.Name == "WebAssembly" ? "?mode=server" : "?mode=wasm";
+    private string ModeLinkText => RendererInfo.Name == "WebAssembly" ? "Switch to Interactive Server" : "Switch to Interactive WebAssembly";
+
+    private IEnumerable<CommandItem> Commands => NavMenu.Links.Select(l => new CommandItem("nav-" + l.Href, l.Title, () =>
+    {
+        Navigation.NavigateTo(l.Href);
+        return Task.CompletedTask;
+    }) { Group = l.Group, Keywords = [l.Group] })
+    .Concat(
+    [
+        new CommandItem("mode-dark", "Use dark mode", () => SetAxis("mode", "dark")) { Group = "Theme", Keywords = ["appearance", "color"] },
+        new CommandItem("mode-light", "Use light mode", () => SetAxis("mode", "light")) { Group = "Theme", Keywords = ["appearance", "color"] },
+        new CommandItem("mode-system", "Follow system color mode", () => SetAxis("mode", "system")) { Group = "Theme" },
+        new CommandItem("contrast-more", "Increase contrast", () => SetAxis("contrast", "more")) { Group = "Theme", Keywords = ["high contrast"] },
+        new CommandItem("density-compact", "Compact density", () => SetAxis("density", "compact")) { Group = "Theme" },
+    ]);
+
+    private Task SetAxis(string axis, string value)
+    {
+        Manager.TrySetAxis(axis, value);
+        return Task.CompletedTask;
+    }
+}

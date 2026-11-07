@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pinned integration compilers (Tailwind, Sass, Bootstrap)
+        run: npm ci --prefix tests/integration-tools --no-audit --no-fund
+      - run: dotnet restore BlazorDesignToolkit.slnx
+      - run: dotnet build BlazorDesignToolkit.slnx -c Release --no-restore
+      - name: Unit, component, CLI and integration tests
+        run: |
+          for project in Tokens Theming Primitives Integrations Cli; do
+            dotnet test tests/BlazorDesignToolkit.$project.Tests -c Release --no-build \
+              --logger "trx;LogFileName=$project.trx" --results-directory TestResults
+          done
+      - name: Design token quality gates (validation, contrast, outputs up to date, coverage)
+        run: dotnet run --project src/BlazorDesignToolkit.Cli -c Release --no-build -- check --config samples/bdt.config.json --format github --report reports/bdt-check.json
+      - run: dotnet pack BlazorDesignToolkit.slnx -c Release --no-build -o artifacts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results
+          path: |
+            TestResults
+            reports
+            artifacts/*.nupkg
+
+  browser-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build tests/BlazorDesignToolkit.BrowserTests -c Release
+      - name: Install Playwright browser
+        run: pwsh tests/BlazorDesignToolkit.BrowserTests/bin/Release/net10.0/playwright.ps1 install --with-deps ${{ matrix.browser }}
+      - name: Keyboard, focus, theming and axe-core accessibility tests
+        env:
+          BDT_BROWSER: ${{ matrix.browser }}
+        run: dotnet test tests/BlazorDesignToolkit.BrowserTests -c Release --no-build --logger "trx;LogFileName=browser-${{ matrix.browser }}.trx" --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-results-${{ matrix.browser }}
+          path: TestResults

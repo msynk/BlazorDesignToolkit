@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Tokens.Tailwind\BlazorDesignToolkit.Tokens.Tailwind.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Tokens.Bootstrap\BlazorDesignToolkit.Tokens.Bootstrap.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Tokens.Fluent\BlazorDesignToolkit.Tokens.Fluent.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Theming\BlazorDesignToolkit.Theming.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\samples\tokens\**\*" LinkBase="SampleTokens" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

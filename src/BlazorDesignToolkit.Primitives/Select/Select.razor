@@ -1,0 +1,229 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA select-only combobox: a <button role="combobox"> that opens a listbox popup. Focus stays on the button;
+   the active option is exposed with aria-activedescendant. Closed: Down/Up/Enter/Space open, typing opens on the
+   matching option. Open: Up/Down/Home/End move, Enter/Space select and close, Escape closes, Tab selects and moves on,
+   Alt+Up selects and closes. Prefer a native <select> when its styling and behavior are sufficient. *@
+@typeparam TItem
+@inherits PrimitiveBase
+
+<button type="button" role="combobox" @ref="_button"
+        @attributes='Attributes("role", "aria-expanded", "aria-controls", "aria-haspopup", "aria-activedescendant", "type", "id")'
+        id="@_id"
+        aria-haspopup="listbox"
+        aria-expanded="@(_open ? "true" : "false")"
+        aria-controls="@ListId"
+        aria-activedescendant="@(_open && _list.HasActive ? OptionId(_list.ActiveIndex) : null)"
+        aria-labelledby="@LabelledBy"
+        aria-describedby="@Field?.DescribedBy"
+        aria-invalid="@(Field?.Invalid == true ? "true" : null)"
+        aria-required="@(Required || Field?.Required == true ? "true" : null)"
+        disabled="@IsDisabled"
+        data-state="@(_open ? "open" : "closed")"
+        data-placeholder="@(HasValue ? null : "")"
+        data-bdt-keys="@(_open ? "ArrowUp ArrowDown Home End Enter Space Alt+ArrowUp" : "ArrowUp ArrowDown Enter Space")"
+        @onkeydown="OnKeyDownAsync"
+        @onclick="ToggleAsync">
+    <span id="@ValueId">@(HasValue ? (ValueTemplate is null ? _list.Label(Current!) : null) : Placeholder)@if (HasValue && ValueTemplate is not null) { @ValueTemplate(Current!) }</span>
+</button>
+@if (Name is not null)
+{
+    <input type="hidden" name="@Name" value="@(HasValue ? (ItemValue?.Invoke(Current!) ?? _list.Label(Current!)) : "")" />
+}
+<div role="listbox" popover="auto" @ref="_popup"
+     id="@ListId"
+     tabindex="-1"
+     aria-labelledby="@LabelledBy"
+     data-state="@(_open ? "open" : "closed")"
+     @attributes="PopupAttributes">
+    @if (_open)
+    {
+        @for (var i = 0; i < _list.Items.Count; i++)
+        {
+            var index = i;
+            var item = _list.Items[i];
+            var selected = EqualityComparer<TItem?>.Default.Equals(Current, item);
+            var disabled = _list.IsDisabled(i);
+            var active = index == _list.ActiveIndex;
+            <div role="option" id="@OptionId(index)" @key="item"
+                 aria-selected="@(selected ? "true" : "false")"
+                 aria-disabled="@(disabled ? "true" : null)"
+                 data-highlighted="@(active ? "" : null)"
+                 data-state="@(selected ? "checked" : "unchecked")"
+                 @onmousedown:preventDefault
+                 @onclick="() => SelectAsync(index, close: true)">
+                @if (ItemTemplate is not null)
+                {
+                    @ItemTemplate(new OptionContext<TItem>(item, index, _list.Label(item), selected, active, disabled))
+                }
+                else
+                {
+                    @_list.Label(item)
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private readonly OptionList<TItem> _list = new();
+    private readonly Controllable<TItem?> _value = new(default);
+    private ElementReference _button;
+    private ElementReference _popup;
+    private DotNetObjectReference<Select<TItem>>? _reference;
+    private string _id = "";
+    private bool _open;
+    private bool _shown;
+    private int _popupHandle;
+    private int _scrolledIndex = -1;
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter, EditorRequired] public IEnumerable<TItem>? Items { get; set; }
+    [Parameter] public Func<TItem, string>? ItemLabel { get; set; }
+    /// <summary>Submitted form value (defaults to the label).</summary>
+    [Parameter] public Func<TItem, string>? ItemValue { get; set; }
+    [Parameter] public Func<TItem, bool>? ItemDisabled { get; set; }
+    [Parameter] public RenderFragment<OptionContext<TItem>>? ItemTemplate { get; set; }
+    [Parameter] public RenderFragment<TItem>? ValueTemplate { get; set; }
+    [Parameter] public TItem? Value { get; set; }
+    [Parameter] public EventCallback<TItem?> ValueChanged { get; set; }
+    [Parameter] public TItem? DefaultValue { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string Placement { get; set; } = "bottom-start";
+    /// <summary>Attributes for the popup listbox element (class, style…).</summary>
+    [Parameter] public IReadOnlyDictionary<string, object>? PopupAttributes { get; set; }
+
+    private bool IsDisabled => Disabled || Field?.Disabled == true;
+    private TItem? Current => _value.Get(Value, ValueChanged.HasDelegate);
+    private bool HasValue => Current is not null;
+    private string ListId => _id + "-listbox";
+    private string ValueId => _id + "-value";
+    private string? LabelledBy => Field is null ? null : $"{Field.LabelId} {ValueId}";
+    private string OptionId(int index) => $"{_id}-option-{index}";
+
+    protected override void OnInitialized()
+    {
+        _id = Field?.ControlId ?? ProvidedId ?? Ids.Next("select");
+        _value.Initialize(DefaultValue is not null ? DefaultValue : Value);
+        TrackField(Field);
+    }
+
+    protected override void OnParametersSet()
+    {
+        _value.Sync(Value);
+        _list.Update(Items, ItemLabel, ItemDisabled);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Js.TrackAsync("preventKeys", _button);
+        if (_open && !_shown)
+        {
+            _shown = true;
+            _reference ??= DotNetObjectReference.Create(this);
+            _popupHandle = await Js.TrackAsync("showPopover", _popup, _button, _reference, new { placement = Placement, focus = false, restoreFocus = true });
+        }
+        else if (!_open && _shown)
+        {
+            _shown = false;
+            await Js.ReleaseAsync(_popupHandle);
+        }
+        if (_open && _list.ActiveIndex >= 0 && _list.ActiveIndex != _scrolledIndex)
+        {
+            _scrolledIndex = _list.ActiveIndex;
+            await Js.InvokeVoidAsync("scrollIntoViewById", OptionId(_list.ActiveIndex));
+        }
+    }
+
+    private void Open(bool last = false)
+    {
+        if (IsDisabled || _open) return;
+        _open = true;
+        _scrolledIndex = -1;
+        _list.ActivateOrFirst(Current, last);
+    }
+
+    private void Close() => _open = false;
+
+    private DateTimeOffset _dismissedAt;
+
+    private Task ToggleAsync()
+    {
+        if (_open) Close();
+        // A click on the button first light-dismisses the popup (in browsers without popover invoker support); do not reopen it.
+        else if (DateTimeOffset.UtcNow - _dismissedAt > TimeSpan.FromMilliseconds(300)) Open();
+        return Task.CompletedTask;
+    }
+
+    private async Task SelectAsync(int index, bool close)
+    {
+        if (_list.IsDisabled(index)) return;
+        await _value.SetAsync(_list.Items[index], ValueChanged.HasDelegate, ValueChanged);
+        if (close)
+        {
+            Close();
+            await _button.FocusAsync();
+        }
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (IsDisabled) return;
+        if (!_open)
+        {
+            switch (e.Key)
+            {
+                case "ArrowDown" or "Enter" or " ": Open(); return;
+                case "ArrowUp": Open(last: true); return;
+                case "Home": Open(); _list.Move(NavigationIntent.First, false); return;
+                case "End": Open(); _list.Move(NavigationIntent.Last, false); return;
+            }
+            if (OptionList<TItem>.IsTypeaheadKey(e))
+            {
+                Open();
+                _list.Type(e.Key[0]);
+            }
+            return;
+        }
+        if (e.Key == "ArrowUp" && e.AltKey)
+        {
+            if (_list.HasActive) await SelectAsync(_list.ActiveIndex, close: true);
+            else Close();
+            return;
+        }
+        var intent = KeyboardNavigation.Intent(e.Key, Orientation.Vertical);
+        if (intent != NavigationIntent.None) { _list.Move(intent, loop: false); return; }
+        switch (e.Key)
+        {
+            case "Enter" or " ":
+                if (_list.HasActive) await SelectAsync(_list.ActiveIndex, close: true);
+                return;
+            case "Escape":
+                Close();
+                return;
+            case "Tab":
+                if (_list.HasActive) await SelectAsync(_list.ActiveIndex, close: false);
+                Close();
+                return;
+        }
+        if (OptionList<TItem>.IsTypeaheadKey(e)) _list.Type(e.Key[0]);
+    }
+
+    /// <summary>Called by the browser on light dismiss.</summary>
+    [JSInvokable]
+    public Task OnPopoverToggle(bool open) => open ? Task.CompletedTask : InvokeAsync(() =>
+    {
+        if (!_open) return;
+        _open = false;
+        _dismissedAt = DateTimeOffset.UtcNow;
+        StateHasChanged();
+    });
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _reference?.Dispose();
+    }
+}

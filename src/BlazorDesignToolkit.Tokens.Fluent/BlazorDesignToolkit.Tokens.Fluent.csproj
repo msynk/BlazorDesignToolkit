@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Tokens.Fluent</RootNamespace>
+    <Description>Fluent 2 integration for BlazorDesignToolkit design tokens: maps semantic tokens to Fluent 2 design-token CSS custom properties with type validation.</Description>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorDesignToolkit.Tokens\BlazorDesignToolkit.Tokens.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,56 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Roving tabindex for custom composite widgets such as toolbars (WAI-ARIA "Keyboard Navigation Inside Components").
+   Only one RovingFocusItem is in the tab sequence; arrow keys move focus, Home/End jump. Set Role="toolbar" and an
+   aria-label for the toolbar pattern. *@
+@inherits PrimitiveBase
+
+<CascadingValue Value="Context" IsFixed="true">
+    <div @ref="_element" @attributes='Attributes("aria-orientation")'
+         role="@Role"
+         aria-orientation="@(Role is null ? null : Orientation == Orientation.Vertical ? "vertical" : "horizontal")"
+         data-orientation="@(Orientation == Orientation.Vertical ? "vertical" : "horizontal")"
+         data-bdt-keys="@(Orientation == Orientation.Vertical ? "ArrowUp ArrowDown Home End" : "ArrowLeft ArrowRight Home End")"
+         @onkeydown="OnKeyDownAsync">
+        @ChildContent
+    </div>
+</CascadingValue>
+
+@code {
+    private ElementReference _element;
+
+    [Parameter] public string? Role { get; set; }
+    [Parameter] public Orientation Orientation { get; set; } = Orientation.Horizontal;
+    [Parameter] public TextDirection Direction { get; set; } = TextDirection.Ltr;
+    [Parameter] public bool Loop { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal RovingContext Context { get; } = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Context.Items.Rendered = true;
+        if (firstRender) await Js.TrackAsync("preventKeys", _element);
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        var intent = KeyboardNavigation.Intent(e.Key, Orientation, Direction);
+        if (intent == NavigationIntent.None) return;
+        if (Context.Items.OrderDirty) Context.Items.ApplyOrder(await Js.InvokeAsync<string[]>("domOrder", _element, "[data-roving-item]"));
+        var current = Context.Items.Focused ?? Context.Items.FindById(await Js.InvokeAsync<string?>("activeElementId")) ?? Context.Current;
+        var target = Context.Items.Navigate(current, intent, Loop);
+        if (target is null || target == current) return;
+        Context.Current = target;
+        Context.NotifyStateChanged();
+        await target.FocusAsync();
+    }
+
+    internal sealed class RovingContext : PrimitiveContext
+    {
+        public CompositeRegistry<RovingFocusItem> Items { get; } = new();
+        public RovingFocusItem? Current { get; set; }
+
+        /// <summary>The item in the tab sequence: the last focused one, else the first enabled item.</summary>
+        public RovingFocusItem? TabStop => Current is { IsDisabled: false } ? Current : Items.Items.FirstOrDefault(i => !i.IsDisabled);
+    }
+}

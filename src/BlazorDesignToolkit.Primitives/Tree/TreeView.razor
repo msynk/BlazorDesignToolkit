@@ -1,0 +1,202 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Tree View (single selection). Only one treeitem is in the tab sequence. Up/Down move between visible
+   items; Right expands a closed parent or moves to its first child; Left collapses an open parent or moves to the
+   parent; Home/End; Enter/Space select; * expands all siblings; type-to-select. aria-level, aria-setsize and
+   aria-posinset are rendered explicitly. Give the tree an accessible name with aria-label or aria-labelledby. *@
+@typeparam TItem where TItem : notnull
+@inherits PrimitiveBase
+
+<ul role="tree" @ref="_element"
+    @attributes='Attributes("role")'
+    data-bdt-keys="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Space"
+    @onkeydown="OnKeyDownAsync">
+    @RenderLevel(Items ?? [], 1, default)
+</ul>
+
+@code {
+    private readonly Typeahead _typeahead = new();
+    private readonly Dictionary<TItem, string> _ids = new();
+    private readonly Dictionary<TItem, TItem?> _parents = new();
+    private HashSet<TItem> _expanded = new();
+    private List<TItem> _visible = [];
+    private ElementReference _element;
+    private TItem? _focused;
+    private string _baseId = "";
+    private string? _pendingFocusId;
+    private bool _expandedInitialized;
+
+    [Parameter, EditorRequired] public IEnumerable<TItem>? Items { get; set; }
+    [Parameter, EditorRequired] public Func<TItem, IEnumerable<TItem>?> ChildrenSelector { get; set; } = _ => null;
+    [Parameter] public Func<TItem, string>? ItemLabel { get; set; }
+    [Parameter] public Func<TItem, bool>? ItemDisabled { get; set; }
+    [Parameter] public RenderFragment<TreeItemContext<TItem>>? ItemTemplate { get; set; }
+    [Parameter] public TItem? Value { get; set; }
+    [Parameter] public EventCallback<TItem?> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyCollection<TItem>? ExpandedItems { get; set; }
+    [Parameter] public EventCallback<IReadOnlyCollection<TItem>> ExpandedItemsChanged { get; set; }
+
+    private string Label(TItem item) => ItemLabel?.Invoke(item) ?? item?.ToString() ?? "";
+    private bool IsDisabled(TItem item) => ItemDisabled?.Invoke(item) == true;
+    private IReadOnlyList<TItem> Children(TItem item) => ChildrenSelector(item)?.ToList() ?? [];
+
+    protected override void OnInitialized() => _baseId = ProvidedId ?? Ids.Next("tree");
+
+    protected override void OnParametersSet()
+    {
+        if (ExpandedItemsChanged.HasDelegate || !_expandedInitialized)
+        {
+            _expanded = new HashSet<TItem>(ExpandedItems ?? []);
+            _expandedInitialized = true;
+        }
+        Index();
+    }
+
+    /// <summary>Builds parent links, stable ids and the list of visible items in document order.</summary>
+    private void Index()
+    {
+        _visible = [];
+        _parents.Clear();
+        void Walk(IEnumerable<TItem> level, TItem? parent)
+        {
+            foreach (var item in level)
+            {
+                _parents[item] = parent;
+                if (!_ids.ContainsKey(item)) _ids[item] = $"{_baseId}-item-{_ids.Count}";
+                _visible.Add(item);
+                if (_expanded.Contains(item)) Walk(Children(item), item);
+            }
+        }
+        Walk(Items ?? [], default);
+        if (_focused is not null && !_visible.Contains(_focused)) _focused = default;
+    }
+
+    private TItem? TabStop => _focused ?? (Value is not null && _visible.Contains(Value) ? Value : _visible.FirstOrDefault(i => !IsDisabled(i)));
+
+    private RenderFragment RenderLevel(IEnumerable<TItem> items, int level, TItem? parent) => builder =>
+    {
+        var list = items.ToList();
+        var seq = 0;
+        for (var i = 0; i < list.Count; i++)
+        {
+            var item = list[i];
+            var children = Children(item);
+            var hasChildren = children.Count > 0;
+            var expanded = hasChildren && _expanded.Contains(item);
+            var selected = Value is not null && EqualityComparer<TItem>.Default.Equals(Value, item);
+            var disabled = IsDisabled(item);
+            builder.OpenElement(seq++, "li");
+            builder.SetKey(item);
+            builder.AddAttribute(seq++, "role", "treeitem");
+            builder.AddAttribute(seq++, "id", _ids[item]);
+            builder.AddAttribute(seq++, "aria-level", level);
+            builder.AddAttribute(seq++, "aria-setsize", list.Count);
+            builder.AddAttribute(seq++, "aria-posinset", i + 1);
+            if (hasChildren) builder.AddAttribute(seq++, "aria-expanded", expanded ? "true" : "false");
+            builder.AddAttribute(seq++, "aria-selected", selected ? "true" : "false");
+            if (disabled) builder.AddAttribute(seq++, "aria-disabled", "true");
+            builder.AddAttribute(seq++, "tabindex", EqualityComparer<TItem?>.Default.Equals(TabStop, item) ? "0" : "-1");
+            builder.AddAttribute(seq++, "data-state", expanded ? "open" : hasChildren ? "closed" : null);
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => OnItemClickAsync(item)));
+            builder.AddEventStopPropagationAttribute(seq++, "onclick", true);
+            builder.AddAttribute(seq++, "onfocus", EventCallback.Factory.Create(this, () => _focused = item));
+            builder.AddEventStopPropagationAttribute(seq++, "onfocus", true);
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "data-tree-label", "");
+            if (ItemTemplate is not null) builder.AddContent(seq++, ItemTemplate(new TreeItemContext<TItem>(item, level, Label(item), hasChildren, expanded, selected, disabled)));
+            else builder.AddContent(seq++, Label(item));
+            builder.CloseElement();
+            if (expanded)
+            {
+                builder.OpenElement(seq++, "ul");
+                builder.AddAttribute(seq++, "role", "group");
+                builder.AddContent(seq++, RenderLevel(children, level + 1, item));
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Js.TrackAsync("preventKeys", _element);
+        if (_pendingFocusId is { } id)
+        {
+            _pendingFocusId = null;
+            await Js.InvokeVoidAsync("focusById", id, false);
+        }
+    }
+
+    private async Task OnItemClickAsync(TItem item)
+    {
+        _focused = item;
+        if (IsDisabled(item)) return;
+        if (Children(item).Count > 0) await SetExpandedAsync(item, !_expanded.Contains(item));
+        await SelectAsync(item);
+    }
+
+    private async Task SelectAsync(TItem item)
+    {
+        if (IsDisabled(item)) return;
+        Value = item;
+        await ValueChanged.InvokeAsync(item);
+    }
+
+    private async Task SetExpandedAsync(TItem item, bool expanded)
+    {
+        if (expanded ? !_expanded.Add(item) : !_expanded.Remove(item)) return;
+        Index();
+        if (ExpandedItemsChanged.HasDelegate) await ExpandedItemsChanged.InvokeAsync(_expanded.ToArray());
+    }
+
+    private void FocusItem(TItem item)
+    {
+        _focused = item;
+        _pendingFocusId = _ids[item];
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        var current = _focused ?? TabStop;
+        if (current is null) return;
+        var index = _visible.IndexOf(current);
+        switch (e.Key)
+        {
+            case "ArrowDown":
+            case "ArrowUp":
+            case "Home":
+            case "End":
+                {
+                    var intent = KeyboardNavigation.Intent(e.Key, Orientation.Vertical);
+                    var next = KeyboardNavigation.Move(index, _visible.Count, i => IsDisabled(_visible[i]), intent, loop: false);
+                    if (next >= 0 && next != index) FocusItem(_visible[next]);
+                    return;
+                }
+            case "ArrowRight":
+                if (Children(current).Count == 0) return;
+                if (!_expanded.Contains(current)) await SetExpandedAsync(current, true);
+                else if (Children(current).FirstOrDefault() is { } first) FocusItem(first);
+                return;
+            case "ArrowLeft":
+                if (_expanded.Contains(current)) await SetExpandedAsync(current, false);
+                else if (_parents.GetValueOrDefault(current) is { } parent) FocusItem(parent);
+                return;
+            case "Enter":
+            case " ":
+                await SelectAsync(current);
+                return;
+            case "*":
+                {
+                    var siblings = _parents.GetValueOrDefault(current) is { } p ? Children(p) : (Items ?? []).ToList();
+                    foreach (var s in siblings.Where(s => Children(s).Count > 0)) _expanded.Add(s);
+                    Index();
+                    if (ExpandedItemsChanged.HasDelegate) await ExpandedItemsChanged.InvokeAsync(_expanded.ToArray());
+                    return;
+                }
+        }
+        if (KeyboardNavigation.IsPrintable(e))
+        {
+            var match = _typeahead.Search(e.Key[0], index, _visible.Select(Label).ToList(), i => IsDisabled(_visible[i]));
+            if (match >= 0 && match != index) FocusItem(_visible[match]);
+        }
+    }
+}

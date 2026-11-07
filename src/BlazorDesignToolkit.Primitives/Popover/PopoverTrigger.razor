@@ -1,0 +1,24 @@
+@namespace BlazorDesignToolkit.Primitives
+@inherits PrimitiveBase
+
+<button type="button" @ref="Context.Trigger"
+        @attributes='Attributes("aria-expanded", "aria-controls", "aria-haspopup", "type", "id")'
+        id="@Context.TriggerId"
+        aria-haspopup="dialog"
+        aria-expanded="@(Context.Owner.IsOpen ? "true" : "false")"
+        aria-controls="@Context.ContentId"
+        data-state="@(Context.Owner.IsOpen ? "open" : "closed")"
+        @onclick="Context.Owner.ToggleAsync">
+    @ChildContent
+</button>
+
+@code {
+    [CascadingParameter] internal Popover.PopoverContext Context { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Context is null) throw new InvalidOperationException("PopoverTrigger must be placed inside Popover.");
+        Track(Context);
+    }
+}

@@ -1,0 +1,26 @@
+# Build output
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Test and tool output
+TestResults/
+*.trx
+BenchmarkDotNet.Artifacts/
+coverage*.json
+coverage*.xml
+playwright-report/
+test-results/
+node_modules/
+
+# Generated reports (CLI)
+/reports/
+
+# Integration test scratch output
+tests/integration-tools/.work/

@@ -1,0 +1,24 @@
+{
+  "$description": "Increased-contrast overrides for light mode.",
+  "color": {
+    "$type": "color",
+    "text": {
+      "muted": {
+        "$value": "{color.neutral.800}"
+      }
+    },
+    "border": {
+      "subtle": {
+        "$value": "{color.neutral.700}"
+      },
+      "default": {
+        "$value": "{color.neutral.900}"
+      }
+    },
+    "focus": {
+      "ring": {
+        "$value": "{color.blue.800}"
+      }
+    }
+  }
+}

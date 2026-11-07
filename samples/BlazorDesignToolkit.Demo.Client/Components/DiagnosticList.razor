@@ -1,0 +1,40 @@
+@using BlazorDesignToolkit.Tokens.Diagnostics
+@* Renders diagnostics with rule, location, expected/actual values and the suggested fix. *@
+
+@if (Diagnostics.Count == 0)
+{
+    <p>No problems found.</p>
+}
+else
+{
+    <ul class="diagnostics">
+        @foreach (var d in Diagnostics)
+        {
+            <li class="diagnostic diagnostic--@d.Severity.ToString().ToLowerInvariant()">
+                <p>
+                    <strong>@d.Severity</strong> <code>@d.RuleId</code>
+                    @if (d.TokenPath is not null) { <span> · <code>@d.TokenPath</code></span> }
+                    @if (d.Location is not null) { <span> · line @d.Location.Line, column @d.Location.Column</span> }
+                    @if (d.Scope is not null) { <span> · @d.Scope</span> }
+                </p>
+                <p>@d.Message</p>
+                @if (d.Expected is not null || d.Actual is not null)
+                {
+                    <p class="muted">Expected: <code>@(d.Expected ?? "—")</code> · Actual: <code>@(d.Actual ?? "—")</code></p>
+                }
+                @if (d.ReferenceChain.Count > 0)
+                {
+                    <p class="muted">Chain: @string.Join(" → ", d.ReferenceChain)</p>
+                }
+                @if (d.Remediation is not null)
+                {
+                    <p><em>Fix:</em> @d.Remediation</p>
+                }
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<Diagnostic> Diagnostics { get; set; } = [];
+}

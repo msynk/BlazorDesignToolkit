@@ -1,0 +1,52 @@
+@page "/primitives/forms"
+
+<PageTitle>Forms · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Accessible form fields</h1>
+<p><code>FormField</code> connects a label, a control, help text and an error message: <code>label[for]</code>,
+    <code>aria-describedby</code>, <code>aria-invalid</code> and <code>aria-errormessage</code> are generated and kept in sync.
+    Any custom control can use the field's <code>ControlAttributes</code>.</p>
+
+<Example Title="Validation" Code="@Code">
+    <ChildContent>
+        <form class="stack" @onsubmit="Submit" @onsubmit:preventDefault novalidate>
+            <FormField Invalid="_usernameError is not null" Required="true">
+                <FormLabel>Username</FormLabel>
+                <FieldInput @bind-Value="_username" autocomplete="username" data-testid="username" />
+                <FormDescription>3 to 20 letters or digits.</FormDescription>
+                <FormError>@_usernameError</FormError>
+            </FormField>
+            <FormField Context="field" Invalid="_bioError is not null">
+                <FormLabel>Short bio</FormLabel>
+                <textarea @attributes="field.ControlAttributes" @bind="_bio" rows="3"></textarea>
+                <FormError>@_bioError</FormError>
+            </FormField>
+            <AuroraButton Type="submit">Save profile</AuroraButton>
+        </form>
+        <p role="status">@_status</p>
+    </ChildContent>
+</Example>
+
+@code {
+    private string? _username;
+    private string? _bio;
+    private string? _usernameError;
+    private string? _bioError;
+    private string _status = "";
+
+    private void Submit()
+    {
+        _usernameError = _username is { Length: >= 3 and <= 20 } u && u.All(char.IsLetterOrDigit) ? null : "Use 3 to 20 letters or digits.";
+        _bioError = _bio is { Length: > 160 } ? "Keep the bio under 160 characters." : null;
+        _status = _usernameError is null && _bioError is null ? "Profile saved." : "Please fix the highlighted fields.";
+    }
+
+    private const string Code = """
+        <FormField Invalid="error is not null" Required="true">
+            <FormLabel>Username</FormLabel>
+            <FieldInput @bind-Value="username" autocomplete="username" />
+            <FormDescription>3 to 20 letters or digits.</FormDescription>
+            <FormError>@error</FormError>
+        </FormField>
+        """;
+}

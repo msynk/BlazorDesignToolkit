@@ -1,0 +1,62 @@
+@page "/primitives/dialog"
+
+<PageTitle>Dialog · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Dialog</h1>
+<p>Built on the native <code>&lt;dialog&gt;</code> element: <code>showModal()</code> makes the rest of the page inert, so focus
+    and the screen-reader cursor stay inside, and the dialog is promoted to the top layer without being moved in the DOM.</p>
+
+<Example Title="Modal dialog" Code="@Code">
+    <ChildContent>
+        <Dialog @bind-Open="_open">
+            <DialogTrigger data-testid="open-dialog">Edit profile</DialogTrigger>
+            <DialogContent data-testid="dialog">
+                <DialogTitle>Edit profile</DialogTitle>
+                <DialogDescription>Changes are saved when you select Save.</DialogDescription>
+                <FormField>
+                    <FormLabel>Display name</FormLabel>
+                    <FieldInput @bind-Value="_name" data-testid="dialog-name" />
+                </FormField>
+                <div class="actions">
+                    <DialogClose>Cancel</DialogClose>
+                    <DialogClose OnClick="Save" data-testid="dialog-save">Save</DialogClose>
+                </div>
+            </DialogContent>
+        </Dialog>
+        <p role="status">@_status</p>
+    </ChildContent>
+</Example>
+
+<Example Title="Confirmation (alertdialog)">
+    <ChildContent>
+        <AuroraDialog TriggerText="Discard draft…" Title="Discard the draft?" Message="You cannot undo this." ConfirmText="Discard" Destructive="true" />
+    </ChildContent>
+</Example>
+
+<KeyboardTable Rows="@Keys" />
+
+@code {
+    private bool _open;
+    private string? _name = "Ada";
+    private string _status = "";
+
+    private void Save() => _status = $"Saved name: {_name}";
+
+    private static readonly IReadOnlyList<(string, string)> Keys =
+    [
+        ("Tab / Shift+Tab", "Moves focus among the dialog's controls; the page behind is inert."),
+        ("Escape", "Closes the dialog and returns focus to the element that opened it."),
+    ];
+
+    private const string Code = """
+        <Dialog @bind-Open="open">
+            <DialogTrigger>Edit profile</DialogTrigger>
+            <DialogContent>
+                <DialogTitle>Edit profile</DialogTitle>
+                <DialogDescription>Changes are saved when you select Save.</DialogDescription>
+                …
+                <DialogClose>Cancel</DialogClose>
+            </DialogContent>
+        </Dialog>
+        """;
+}

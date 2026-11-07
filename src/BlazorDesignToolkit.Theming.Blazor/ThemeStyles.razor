@@ -1,0 +1,24 @@
+@* Renders the generated theme stylesheet inline. Place it in <head>. For long-lived production apps, prefer exporting the
+   stylesheet at build time ('bdt export') and referencing it with <link>, which lets browsers cache it. *@
+@inject ThemeStylesheetCache Stylesheet
+
+<style id="@Id" data-bdt-theme-styles>@((MarkupString)SafeCss)</style>
+
+@code {
+    /// <summary>Id of the generated style element.</summary>
+    [Parameter] public string Id { get; set; } = "bdt-theme-styles";
+
+    private string SafeCss
+    {
+        get
+        {
+            var css = Stylesheet.Css;
+            // Defense in depth: the generator escapes token-derived text, so this can only trigger on a generator bug.
+            if (css.Contains("</", StringComparison.Ordinal) || css.Contains("<!--", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The generated theme stylesheet contains markup and was not rendered.");
+            }
+            return css;
+        }
+    }
+}

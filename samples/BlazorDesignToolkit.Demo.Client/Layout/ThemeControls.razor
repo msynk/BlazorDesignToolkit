@@ -1,0 +1,33 @@
+@* Theme switcher built from the headless Select primitive. Theme, mode, contrast and density are independent axes. *@
+<div class="theme-controls" role="group" aria-label="Theme settings">
+    <FormField class="control">
+        <FormLabel>Brand</FormLabel>
+        <Select TItem="ThemeDefinition" Items="Manager.Catalog.Themes" ItemLabel="t => t.DisplayName ?? t.Id"
+                Value="Manager.Catalog.FindTheme(State.ThemeId)" ValueChanged="t => { if (t is not null) Manager.TrySetTheme(t.Id); }"
+                data-testid="theme-select" />
+    </FormField>
+    @foreach (var axis in Manager.Catalog.Axes)
+    {
+        var current = axis;
+        <FormField class="control">
+            <FormLabel>@(axis.DisplayName ?? axis.Name)</FormLabel>
+            <Select TItem="string" Items="Values(current)" ItemLabel="Label"
+                    Value="State.Selection[current.Name]" ValueChanged="v => { if (v is not null) Manager.TrySetAxis(current.Name, v); }"
+                    data-testid="@($"axis-{current.Name}")" />
+        </FormField>
+    }
+</div>
+
+@code {
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    private static IEnumerable<string> Values(ThemeAxisDefinition axis) => axis.SupportsSystem ? axis.Values.Append(ThemeAxes.System) : axis.Values;
+
+    private static string Label(string value) => value switch
+    {
+        "system" => "System",
+        "more" => "More",
+        _ => char.ToUpperInvariant(value[0]) + value[1..],
+    };
+}

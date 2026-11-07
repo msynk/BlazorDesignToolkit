@@ -1,0 +1,30 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Keeps keyboard focus inside its content while Active (Tab and Shift+Tab wrap) and restores focus when deactivated.
+   Use it for custom non-native overlays; native modal <dialog> (Dialog) is already inert-isolated. *@
+@inherits PrimitiveBase
+
+<div @ref="_element" @attributes="AdditionalAttributes" data-focus-trap="@(Active ? "active" : "inactive")">@ChildContent</div>
+
+@code {
+    private ElementReference _element;
+    private int _handle;
+    private bool _applied;
+
+    [Parameter] public bool Active { get; set; } = true;
+    [Parameter] public bool RestoreFocus { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Active && !_applied)
+        {
+            _applied = true;
+            _handle = await Js.TrackAsync("trapFocus", _element, RestoreFocus);
+        }
+        else if (!Active && _applied)
+        {
+            _applied = false;
+            await Js.ReleaseAsync(_handle);
+        }
+    }
+}

@@ -1,0 +1,35 @@
+@page "/primitives/disclosure"
+
+<PageTitle>Disclosure and accordion · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Disclosure and accordion</h1>
+
+<Example Title="Disclosure">
+    <ChildContent>
+        <Disclosure data-testid="disclosure">
+            <DisclosureTrigger>Shipping details</DisclosureTrigger>
+            <DisclosurePanel><p>Orders ship within two business days.</p></DisclosurePanel>
+        </Disclosure>
+        <KeyboardTable Rows="@([("Enter / Space", "Shows or hides the content.")])" />
+    </ChildContent>
+</Example>
+
+<Example Title="Accordion (single, collapsible)">
+    <ChildContent>
+        <Accordion HeadingLevel="3" DefaultValues="@(new[] { "q1" })" data-testid="accordion">
+            <AccordionItem Value="q1">
+                <AccordionTrigger>What are design tokens?</AccordionTrigger>
+                <AccordionPanel><p>Named design decisions such as colors and spacing, stored in a tool-independent format.</p></AccordionPanel>
+            </AccordionItem>
+            <AccordionItem Value="q2">
+                <AccordionTrigger>What is DTCG?</AccordionTrigger>
+                <AccordionPanel><p>The Design Tokens Community Group format; this toolkit implements version 2025.10.</p></AccordionPanel>
+            </AccordionItem>
+            <AccordionItem Value="q3">
+                <AccordionTrigger>Do I need a CSS framework?</AccordionTrigger>
+                <AccordionPanel><p>No. Integrations are optional.</p></AccordionPanel>
+            </AccordionItem>
+        </Accordion>
+        <KeyboardTable Rows="@([("Enter / Space", "Expands or collapses the section."), ("Up / Down", "Moves between section headers."), ("Home / End", "Moves to the first or last header.")])" />
+    </ChildContent>
+</Example>

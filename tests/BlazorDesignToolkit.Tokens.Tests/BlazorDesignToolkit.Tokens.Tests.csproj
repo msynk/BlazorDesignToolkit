@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Tokens\BlazorDesignToolkit.Tokens.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\tokens\**\*" LinkBase="SampleTokens" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

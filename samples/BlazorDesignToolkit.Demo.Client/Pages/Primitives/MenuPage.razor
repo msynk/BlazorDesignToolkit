@@ -1,0 +1,58 @@
+@page "/primitives/menu"
+
+<PageTitle>Menu · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Menu button</h1>
+
+<Example Title="Actions menu" Code="@Code">
+    <ChildContent>
+        <Menu>
+            <MenuTrigger data-testid="menu-trigger">Actions</MenuTrigger>
+            <MenuContent class="menu" data-testid="menu">
+                <MenuItem TextValue="Rename" OnSelect="@(() => _last = "Rename")">Rename</MenuItem>
+                <MenuItem TextValue="Duplicate" OnSelect="@(() => _last = "Duplicate")">Duplicate</MenuItem>
+                <MenuItem TextValue="Move" Disabled="true">Move (no permission)</MenuItem>
+                <MenuSeparator />
+                <MenuCheckboxItem TextValue="Pin" @bind-IsChecked="_pinned">Pinned</MenuCheckboxItem>
+                <MenuRadioGroup aria-label="Sort by" @bind-Value="_sort">
+                    <MenuRadioItem Value="name" TextValue="Name">Sort by name</MenuRadioItem>
+                    <MenuRadioItem Value="date" TextValue="Date">Sort by date</MenuRadioItem>
+                </MenuRadioGroup>
+                <MenuSeparator />
+                <MenuItem TextValue="Delete" OnSelect="@(() => _last = "Delete")">Delete</MenuItem>
+            </MenuContent>
+        </Menu>
+        <p role="status">Last action: @(_last ?? "none") · pinned: @_pinned · sort: @_sort</p>
+    </ChildContent>
+</Example>
+
+<KeyboardTable Rows="@Keys" />
+
+@code {
+    private string? _last;
+    private bool _pinned;
+    private string? _sort = "name";
+
+    private static readonly IReadOnlyList<(string, string)> Keys =
+    [
+        ("Enter / Space / Down", "Opens the menu and focuses the first item."),
+        ("Up (on the button)", "Opens the menu and focuses the last item."),
+        ("Up / Down", "Moves between items, wrapping; disabled items are skipped."),
+        ("Home / End", "Moves to the first or last item."),
+        ("Type", "Moves to the next item starting with the typed characters."),
+        ("Enter / Space", "Activates the item. Checkbox and radio items keep the menu open."),
+        ("Escape", "Closes the menu and returns focus to the button."),
+        ("Tab", "Closes the menu and moves focus onwards."),
+    ];
+
+    private const string Code = """
+        <Menu>
+            <MenuTrigger>Actions</MenuTrigger>
+            <MenuContent>
+                <MenuItem TextValue="Rename" OnSelect="Rename">Rename</MenuItem>
+                <MenuSeparator />
+                <MenuCheckboxItem TextValue="Pin" @bind-IsChecked="pinned">Pinned</MenuCheckboxItem>
+            </MenuContent>
+        </Menu>
+        """;
+}

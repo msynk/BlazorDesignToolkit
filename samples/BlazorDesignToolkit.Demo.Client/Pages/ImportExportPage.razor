@@ -1,0 +1,127 @@
+@page "/import-export"
+@using BlazorDesignToolkit.Tokens.Bootstrap
+@using BlazorDesignToolkit.Tokens.Diagnostics
+@using BlazorDesignToolkit.Tokens.Export
+@using BlazorDesignToolkit.Tokens.Fluent
+@using BlazorDesignToolkit.Tokens.Resolution
+@using BlazorDesignToolkit.Tokens.Tailwind
+@using BlazorDesignToolkit.Tokens.Validation
+
+<PageTitle>Import and export · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Import and export</h1>
+<p>Paste a DTCG 2025.10 token document. It is parsed with source locations, validated, and exported to every supported
+    target. Nothing leaves your browser session; the engine runs in .NET.</p>
+
+<Example Title="Token document">
+    <ChildContent>
+        <FormField class="control" Context="field">
+            <FormLabel>DTCG JSON</FormLabel>
+            <textarea @attributes="field.ControlAttributes" rows="14" spellcheck="false" @bind="_json" @bind:event="oninput"></textarea>
+            <FormDescription>Example tokens are prefilled. Try breaking a reference or a value.</FormDescription>
+        </FormField>
+        <div class="actions">
+            <AuroraButton OnClick="Process">Validate and export</AuroraButton>
+            <AuroraButton Variant="secondary" OnClick="LoadSample">Load the Aurora foundation</AuroraButton>
+        </div>
+    </ChildContent>
+</Example>
+
+@if (_result is not null)
+{
+    <Example Title="Diagnostics">
+        <ChildContent>
+            <p role="status">@_result.ErrorCount error(s), @_result.WarningCount warning(s), @_result.InfoCount info.</p>
+            <DiagnosticList Diagnostics="_result.Diagnostics" />
+        </ChildContent>
+    </Example>
+
+    <Example Title="Outputs">
+        <ChildContent>
+            <Tabs DefaultValue="css">
+                <TabList aria-label="Export formats">
+                    @foreach (var (key, label, _) in _outputs)
+                    {
+                        <Tab Value="@key">@label</Tab>
+                    }
+                </TabList>
+                @foreach (var (key, label, content) in _outputs)
+                {
+                    <TabPanel Value="@key" Focusable="false"><CodeBlock Code="@content" Label="@label" /></TabPanel>
+                }
+            </Tabs>
+        </ChildContent>
+    </Example>
+}
+
+@code {
+    private string _json = """
+        {
+          "color": {
+            "$type": "color",
+            "blue": { "$value": { "colorSpace": "srgb", "components": [0.176, 0.427, 0.792], "hex": "#2d6dca" } },
+            "white": { "$value": { "colorSpace": "srgb", "components": [1, 1, 1], "hex": "#ffffff" } },
+            "accent": { "$value": "{color.blue}", "$description": "Primary actions" },
+            "on-accent": { "$value": "{color.white}" }
+          },
+          "radius": { "md": { "$type": "dimension", "$value": { "value": 0.5, "unit": "rem" } } },
+          "shadow": {
+            "raised": {
+              "$type": "shadow",
+              "$value": { "color": { "colorSpace": "srgb", "components": [0, 0, 0], "alpha": 0.12 }, "offsetX": { "value": 0, "unit": "px" }, "offsetY": { "value": 1, "unit": "px" }, "blur": { "value": 3, "unit": "px" }, "spread": { "value": 0, "unit": "px" } }
+            }
+          },
+          "typography": {
+            "body": { "$type": "typography", "$value": { "fontFamily": ["Inter", "system-ui", "sans-serif"], "fontSize": { "value": 1, "unit": "rem" }, "fontWeight": 400, "letterSpacing": { "value": 0, "unit": "px" }, "lineHeight": 1.5 } }
+          }
+        }
+        """;
+
+    private DiagnosticResult? _result;
+    private List<(string Key, string Label, string Content)> _outputs = [];
+
+    protected override void OnInitialized() => Process();
+
+    private void LoadSample()
+    {
+        _json = DemoTokens.Files["foundation.tokens.json"];
+        Process();
+    }
+
+    private void Process()
+    {
+        var tokens = TokenResolver.Resolve(_json, new BlazorDesignToolkit.Tokens.Json.JsonParseOptions { SourceName = "input.tokens.json", MaxInputBytes = 2 * 1024 * 1024 });
+        var report = TokenValidator.Validate(tokens, new ValidationOptions { ReportDuplicateValues = false });
+        var exportBag = new DiagnosticBag();
+        var css = CssExporter.Export(tokens, new CssExportOptions { Prefix = "ds" });
+        exportBag.AddRange(css.Diagnostics);
+        var preserve = CssExporter.Export(tokens, new CssExportOptions { Prefix = "ds", References = CssReferenceMode.Preserve });
+        var json = DtcgWriter.Write(tokens);
+        var tailwind = TailwindThemeExporter.Export(tokens, new TailwindExportOptions
+        {
+            Css = new CssExportOptions { Prefix = "ds" },
+            Mappings = [new("color.**", "color", "color"), new("radius.*", "radius"), new("shadow.*", "shadow"), new("typography.*", "text")],
+        });
+        exportBag.AddRange(tailwind.Diagnostics);
+        var colorTokens = tokens.Tokens.Where(t => t.Type == TokenTypes.Color && t.IsValid).Select(t => t.Path.ToString()).ToList();
+        var bootstrap = BootstrapExporter.Export(tokens, new BootstrapExportOptions
+        {
+            Mappings = colorTokens.Take(1).Select(p => new TargetMapping("primary", p)).ToList(),
+        });
+        var fluent = FluentExporter.Export(tokens, new FluentExportOptions
+        {
+            Css = new CssExportOptions { Prefix = "ds" },
+            Mappings = colorTokens.Take(1).Select(p => new TargetMapping("colorBrandBackground", p)).ToList(),
+        });
+        _result = DiagnosticPolicy.Default.Apply(report.Diagnostics.Concat(exportBag.Items));
+        _outputs =
+        [
+            ("css", "CSS (resolved)", css.Css),
+            ("css-preserve", "CSS (references)", preserve.Css),
+            ("dtcg", "DTCG JSON", json),
+            ("tailwind", "Tailwind v4", tailwind.Content),
+            ("bootstrap", "Bootstrap Sass", bootstrap.Content),
+            ("fluent", "Fluent 2", fluent.Content),
+        ];
+    }
+}

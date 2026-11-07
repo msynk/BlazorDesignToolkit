@@ -1,0 +1,50 @@
+@page "/design-system"
+@inject ToastService Toasts
+
+<PageTitle>Design system example · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">An existing design system on the toolkit</h1>
+<p>"Aurora" is a small custom design system: its own components (<code>AuroraButton</code>, <code>AuroraField</code>,
+    <code>AuroraDialog</code>) with scoped CSS that references only Aurora component and semantic tokens. Behavior comes from
+    native elements and headless primitives; appearance comes from tokens; brands, modes and density come from theming.
+    The components' token usage is declared in <code>components.manifest.json</code> and checked by coverage analysis.</p>
+
+<Example Title="Buttons">
+    <ChildContent>
+        <div class="actions">
+            <AuroraButton OnClick="@(() => Toasts.Show("Saved", ToastKind.Success))">Save</AuroraButton>
+            <AuroraButton Variant="secondary">Cancel</AuroraButton>
+            <AuroraButton Variant="danger">Delete</AuroraButton>
+            <AuroraButton Disabled="true">Unavailable</AuroraButton>
+        </div>
+    </ChildContent>
+</Example>
+
+<Example Title="Form fields">
+    <ChildContent>
+        <form class="stack" @onsubmit="Submit" @onsubmit:preventDefault novalidate>
+            <AuroraField Label="Project name" @bind-Value="_name" Required="true" Error="@_nameError" Description="Shown on the dashboard." Autocomplete="off" />
+            <AuroraField Label="Contact email" Type="email" @bind-Value="_email" Autocomplete="email" />
+            <AuroraButton Type="submit">Create project</AuroraButton>
+        </form>
+    </ChildContent>
+</Example>
+
+<Example Title="Confirmation dialog">
+    <ChildContent>
+        <AuroraDialog TriggerText="Delete project…" Title="Delete this project?" Message="This permanently removes the project and its history."
+                      ConfirmText="Delete" Destructive="true" OnConfirm="@(() => Toasts.Show("Project deleted", ToastKind.Warning))" />
+    </ChildContent>
+</Example>
+
+@code {
+    private string? _name;
+    private string? _email;
+    private string? _nameError;
+
+    private void Submit()
+    {
+        _nameError = string.IsNullOrWhiteSpace(_name) ? "Enter a project name." : null;
+        if (_nameError is null) Toasts.Show($"Project “{_name}” created", ToastKind.Success);
+    }
+}

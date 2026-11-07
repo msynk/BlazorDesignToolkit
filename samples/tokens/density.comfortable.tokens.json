@@ -1,0 +1,20 @@
+{
+  "$description": "Default density.",
+  "size": {
+    "control": {
+      "$type": "dimension",
+      "height": {
+        "$value": "{space.10}"
+      },
+      "padding-inline": {
+        "$value": "{space.4}"
+      }
+    }
+  },
+  "space": {
+    "gap": {
+      "$type": "dimension",
+      "$value": "{space.3}"
+    }
+  }
+}

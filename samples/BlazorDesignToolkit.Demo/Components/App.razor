@@ -1,0 +1,53 @@
+@using BlazorDesignToolkit.Demo.Client
+@using BlazorDesignToolkit.Theming
+@using BlazorDesignToolkit.Theming.Blazor
+@using Microsoft.AspNetCore.Components.Web
+@inject ThemeCatalog Catalog
+@inject ThemingOptions ThemingOptions
+
+<!DOCTYPE html>
+<html lang="en" @attributes="RootAttributes">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <base href="/" />
+    @* The theme stylesheet is rendered inline on the server, so the first response is already styled for the persisted theme. *@
+    <ThemeStyles />
+    <ThemeInitScript />
+    <link rel="stylesheet" href="@Assets["_content/BlazorDesignToolkit.Primitives.StarterStyles/bdt-starter.css"]" />
+    <link rel="stylesheet" href="@Assets["css/site.css"]" />
+    <link rel="stylesheet" href="@Assets["BlazorDesignToolkit.Demo.styles.css"]" />
+    <ImportMap />
+    <HeadOutlet @rendermode="PageRenderMode" />
+</head>
+<body>
+    <Routes @rendermode="PageRenderMode" />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    private IComponentRenderMode? PageRenderMode { get; set; }
+
+    private IReadOnlyDictionary<string, object> RootAttributes { get; set; } = new Dictionary<string, object>();
+
+    protected override void OnInitialized()
+    {
+        // ?mode=wasm or ?mode=server switches the interactive render mode (remembered in a cookie) so both hosting
+        // models can be demonstrated and tested with the same pages.
+        var requested = HttpContext.Request.Query["mode"].ToString();
+        if (requested is "wasm" or "server")
+        {
+            HttpContext.Response.Cookies.Append("bdt-render-mode", requested, new CookieOptions { Path = "/", SameSite = SameSiteMode.Lax, IsEssential = true });
+        }
+        var mode = requested is "wasm" or "server" ? requested : HttpContext.Request.Cookies["bdt-render-mode"];
+        PageRenderMode = mode == "wasm" ? new InteractiveWebAssemblyRenderMode() : new InteractiveServerRenderMode();
+
+        // Render the persisted theme on the server: correct on the first paint, with or without JavaScript.
+        var preference = ThemeRootAttributes.FromCookie(HttpContext.Request.Cookies[ThemingOptions.StorageKey]);
+        RootAttributes = ThemeRootAttributes.For(Catalog, preference, ThemingOptions.Css);
+    }
+}

@@ -1,0 +1,35 @@
+::deep .aurora-field__label {
+  display: block;
+  margin-block-end: var(--ds-space-1);
+  font-weight: var(--ds-font-weight-medium);
+}
+
+::deep .aurora-field__input {
+  inline-size: 100%;
+  min-block-size: var(--ds-size-control-height);
+  padding-inline: var(--ds-size-control-padding-inline);
+  border: var(--ds-component-input-border);
+  border-radius: var(--ds-shape-radius-control);
+  background: var(--ds-component-input-background);
+  color: var(--ds-color-text-default);
+  font: var(--ds-typography-body);
+}
+
+::deep .aurora-field__input:focus-visible {
+  outline: var(--ds-component-focus-ring);
+  outline-offset: var(--ds-component-focus-offset);
+}
+
+::deep .aurora-field__input[aria-invalid="true"] {
+  border-color: var(--ds-color-text-danger);
+}
+
+::deep .aurora-field__description {
+  margin-block-start: var(--ds-space-1);
+  color: var(--ds-color-text-muted);
+}
+
+::deep .aurora-field__error {
+  margin-block-start: var(--ds-space-1);
+  color: var(--ds-color-text-danger);
+}

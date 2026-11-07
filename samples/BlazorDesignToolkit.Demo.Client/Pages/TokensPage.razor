@@ -1,0 +1,97 @@
+@page "/tokens"
+@using BlazorDesignToolkit.Tokens.Export
+@using BlazorDesignToolkit.Tokens.Resolution
+
+<PageTitle>Token explorer · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Token explorer</h1>
+<p>All tokens of the current theme selection (<strong>@Resolution.Selection</strong>), resolved by the DTCG engine.
+    Aliases show their reference chain; the layer column follows the configured primitive/semantic/component conventions.</p>
+
+<div class="toolbar" role="search">
+    <FormField class="control">
+        <FormLabel>Filter by path</FormLabel>
+        <FieldInput @bind-Value="_filter" placeholder="e.g. color.text" />
+    </FormField>
+    <FormField class="control">
+        <FormLabel>Type</FormLabel>
+        <Select TItem="string" Items="Types" Value="_type" ValueChanged="v => _type = v ?? AllTypes" />
+    </FormField>
+    <FormField class="control">
+        <FormLabel>Layer</FormLabel>
+        <Select TItem="string" Items="Layers" Value="_layer" ValueChanged="v => _layer = v ?? AllLayers" />
+    </FormField>
+</div>
+
+<p role="status">@Visible.Count of @Resolution.Tokens.Count tokens shown.</p>
+
+<div class="table-scroll" tabindex="0" role="region" aria-label="Tokens">
+    <table class="data-table tokens-table">
+        <caption>Resolved tokens</caption>
+        <thead>
+            <tr>
+                <th scope="col">Token</th>
+                <th scope="col">Type</th>
+                <th scope="col">Value</th>
+                <th scope="col">References</th>
+                <th scope="col">Layer</th>
+                <th scope="col">CSS variable</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var token in Visible.Take(_limit))
+            {
+                <tr @key="token.Path">
+                    <th scope="row"><code>@token.Path</code>@if (token.IsDeprecated) {<span class="badge">deprecated</span>}</th>
+                    <td>@token.Type</td>
+                    <td>
+                        @if (token.Value is ColorValue color)
+                        {
+                            <span class="swatch" style="background:@(CssExporter.FormatValue(color))" aria-hidden="true"></span>
+                        }
+                        <code>@(token.Value is null ? "invalid" : CssExporter.FormatValue(token.Value, DemoTokens.Css))</code>
+                    </td>
+                    <td>@(token.AliasOf is null ? "—" : string.Join(" → ", Resolution.Tokens.GetAliasChain(token.Path)))</td>
+                    <td>@Layer(token.Path)</td>
+                    <td><code>@CssExporter.GetVariableName(token.Path, DemoTokens.Css)</code></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+@if (Visible.Count > _limit)
+{
+    <button type="button" class="link-button" @onclick="() => _limit += 100">Show 100 more</button>
+}
+
+@code {
+    private const string AllTypes = "All types";
+    private const string AllLayers = "All layers";
+    private string? _filter = "";
+    private string _type = AllTypes;
+    private string _layer = AllLayers;
+    private int _limit = 100;
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    private ThemeResolution Resolution => Manager.Resolve();
+    private IEnumerable<string> Types => new[] { AllTypes }.Concat(TokenTypes.All.Order());
+    private static IEnumerable<string> Layers => [AllLayers, "primitive", "semantic", "component", "other"];
+
+    private List<ResolvedToken> Visible => Resolution.Tokens.Tokens
+        .Where(t => string.IsNullOrWhiteSpace(_filter) || t.Path.ToString().Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase))
+        .Where(t => _type == AllTypes || t.Type == _type)
+        .Where(t => _layer == AllLayers || Layer(t.Path) == _layer)
+        .ToList();
+
+    private static string Layer(TokenPath path)
+    {
+        var text = path.ToString();
+        var layers = DemoTokens.Validation.Layers!;
+        if (layers.Component.Any(p => BlazorDesignToolkit.Tokens.Diagnostics.TokenPathPattern.IsMatch(p, text))) return "component";
+        if (layers.Semantic.Any(p => BlazorDesignToolkit.Tokens.Diagnostics.TokenPathPattern.IsMatch(p, text))) return "semantic";
+        if (layers.Primitive.Any(p => BlazorDesignToolkit.Tokens.Diagnostics.TokenPathPattern.IsMatch(p, text))) return "primitive";
+        return "other";
+    }
+}

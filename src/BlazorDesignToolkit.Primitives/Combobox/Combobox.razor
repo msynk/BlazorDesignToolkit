@@ -1,0 +1,237 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Combobox with list autocomplete: an editable <input role="combobox"> with a listbox popup. Focus stays in
+   the input; the highlighted option is exposed with aria-activedescendant. Down opens/moves (Alt+Down opens only),
+   Up moves, Enter selects, Escape closes (or clears when closed). Typing filters (built-in or through TextChanged for
+   server-side search) and a polite live region announces how many results are available.
+   The text uses @bind:get/@bind:set: with a plain value + @oninput, a render that is still in flight while the user
+   types (Interactive Server) would overwrite the characters typed in the meantime. *@
+@typeparam TItem
+@inherits PrimitiveBase
+
+<input type="text" role="combobox" @ref="_input"
+       @attributes='Attributes("role", "aria-expanded", "aria-controls", "aria-activedescendant", "aria-autocomplete", "type", "value", "id", "autocomplete")'
+       id="@_id"
+       autocomplete="off"
+       aria-autocomplete="list"
+       aria-expanded="@(_open ? "true" : "false")"
+       aria-controls="@ListId"
+       aria-activedescendant="@(_open && _list.HasActive ? OptionId(_list.ActiveIndex) : null)"
+       aria-describedby="@Field?.DescribedBy"
+       aria-invalid="@(Field?.Invalid == true ? "true" : null)"
+       aria-required="@(Required || Field?.Required == true ? "true" : null)"
+       disabled="@IsDisabled"
+       data-state="@(_open ? "open" : "closed")"
+       data-bdt-keys="@(_open ? "ArrowDown ArrowUp Enter Escape" : "ArrowDown ArrowUp")"
+       @bind:get="_text" @bind:set="OnInputAsync" @bind:event="oninput"
+       @onkeydown="OnKeyDownAsync"
+       @onblur="OnBlurAsync" />
+<div role="listbox" popover="manual" @ref="_popup" id="@ListId" aria-labelledby="@(Field?.LabelId)" @attributes="PopupAttributes"
+     data-state="@(_open ? "open" : "closed")">
+    @if (_open)
+    {
+        @if (_list.Items.Count == 0)
+        {
+            <div role="presentation" data-empty="">@(EmptyContent ?? (RenderFragment)(b => b.AddContent(0, "No results")))</div>
+        }
+        @for (var i = 0; i < _list.Items.Count; i++)
+        {
+            var index = i;
+            var item = _list.Items[i];
+            var selected = EqualityComparer<TItem?>.Default.Equals(Current, item);
+            var disabled = _list.IsDisabled(i);
+            var active = index == _list.ActiveIndex;
+            <div role="option" id="@OptionId(index)" @key="item"
+                 aria-selected="@(selected ? "true" : "false")"
+                 aria-disabled="@(disabled ? "true" : null)"
+                 data-highlighted="@(active ? "" : null)"
+                 @onmousedown:preventDefault
+                 @onclick="() => SelectAsync(index)">
+                @if (ItemTemplate is not null)
+                {
+                    @ItemTemplate(new OptionContext<TItem>(item, index, _label(item), selected, active, disabled))
+                }
+                else
+                {
+                    @_label(item)
+                }
+            </div>
+        }
+    }
+</div>
+<VisuallyHidden aria-live="polite" aria-atomic="true">@_status</VisuallyHidden>
+
+@code {
+    private readonly OptionList<TItem> _list = new();
+    private readonly Controllable<TItem?> _value = new(default);
+    private ElementReference _input;
+    private ElementReference _popup;
+    private string _id = "";
+    private string _text = "";
+    private string _status = "";
+    private bool _open;
+    private bool _shown;
+    private int _popupHandle;
+    private int _scrolledIndex = -1;
+    private Func<TItem, string> _label = static i => i?.ToString() ?? "";
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter, EditorRequired] public IEnumerable<TItem>? Items { get; set; }
+    [Parameter] public Func<TItem, string>? ItemLabel { get; set; }
+    [Parameter] public Func<TItem, bool>? ItemDisabled { get; set; }
+    [Parameter] public RenderFragment<OptionContext<TItem>>? ItemTemplate { get; set; }
+    [Parameter] public RenderFragment? EmptyContent { get; set; }
+    [Parameter] public TItem? Value { get; set; }
+    [Parameter] public EventCallback<TItem?> ValueChanged { get; set; }
+    /// <summary>Raised as the user types. Handle it to filter on the server and pass new Items.</summary>
+    [Parameter] public EventCallback<string> TextChanged { get; set; }
+    /// <summary>Filter applied to Items (default: case-insensitive "contains" on the label). Null disables built-in filtering.</summary>
+    [Parameter] public Func<TItem, string, bool>? Filter { get; set; } = DefaultFilter;
+    /// <summary>Highlight the first match automatically while typing. Default true.</summary>
+    [Parameter] public bool AutoHighlight { get; set; } = true;
+    /// <summary>Keep free text that matches no option. When false the text reverts to the selection on blur.</summary>
+    [Parameter] public bool AllowCustomValue { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string Placement { get; set; } = "bottom-start";
+    [Parameter] public IReadOnlyDictionary<string, object>? PopupAttributes { get; set; }
+    /// <summary>Text announced (politely) when the number of results changes; override to localize.</summary>
+    [Parameter] public Func<int, string>? ResultsAnnouncement { get; set; }
+
+    private static string DefaultAnnouncement(int count) => count == 1 ? "1 result available." : $"{count} results available.";
+
+    private static bool DefaultFilter(TItem item, string text) => true;
+
+    private bool IsDisabled => Disabled || Field?.Disabled == true;
+    private TItem? Current => _value.Get(Value, ValueChanged.HasDelegate);
+    private string ListId => _id + "-listbox";
+    private string OptionId(int index) => $"{_id}-option-{index}";
+
+    protected override void OnInitialized()
+    {
+        _id = Field?.ControlId ?? ProvidedId ?? Ids.Next("combobox");
+        _value.Initialize(Value);
+        TrackField(Field);
+    }
+
+    protected override void OnParametersSet()
+    {
+        _value.Sync(Value);
+        _label = ItemLabel ?? (static i => i?.ToString() ?? "");
+        if (!_open && Current is not null) _text = _label(Current);
+        Refilter();
+    }
+
+    private void Refilter()
+    {
+        IEnumerable<TItem> items = Items ?? [];
+        if (Filter is not null && _text.Length > 0)
+        {
+            items = Filter == DefaultFilter
+                ? items.Where(i => _label(i).Contains(_text, StringComparison.CurrentCultureIgnoreCase))
+                : items.Where(i => Filter(i, _text));
+        }
+        _list.Update(items, _label, ItemDisabled);
+        if (_open)
+        {
+            _status = (ResultsAnnouncement ?? DefaultAnnouncement)(_list.Items.Count);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Js.TrackAsync("preventKeys", _input);
+        if (_open && !_shown)
+        {
+            _shown = true;
+            _popupHandle = await Js.TrackAsync("showPopover", _popup, _input, null, new { placement = Placement, focus = false, restoreFocus = false });
+        }
+        else if (!_open && _shown)
+        {
+            _shown = false;
+            await Js.ReleaseAsync(_popupHandle);
+        }
+        if (_open && _list.ActiveIndex >= 0 && _list.ActiveIndex != _scrolledIndex)
+        {
+            _scrolledIndex = _list.ActiveIndex;
+            await Js.InvokeVoidAsync("scrollIntoViewById", OptionId(_list.ActiveIndex));
+        }
+    }
+
+    private void Open()
+    {
+        if (IsDisabled) return;
+        _open = true;
+        _scrolledIndex = -1;
+        Refilter();
+    }
+
+    private void Close()
+    {
+        _open = false;
+        _status = "";
+    }
+
+    private async Task OnInputAsync(string? text)
+    {
+        _text = text ?? "";
+        if (TextChanged.HasDelegate) await TextChanged.InvokeAsync(_text);
+        Open();
+        _list.ActiveIndex = AutoHighlight ? KeyboardNavigation.Move(-1, _list.Items.Count, _list.IsDisabled, NavigationIntent.First) : -1;
+    }
+
+    private async Task SelectAsync(int index)
+    {
+        if (_list.IsDisabled(index)) return;
+        var item = _list.Items[index];
+        _text = _label(item);
+        Close();
+        await _value.SetAsync(item, ValueChanged.HasDelegate, ValueChanged);
+        if (TextChanged.HasDelegate) await TextChanged.InvokeAsync(_text);
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                if (!_open)
+                {
+                    Open();
+                    if (!e.AltKey) _list.ActivateOrFirst(Current);
+                }
+                else _list.Move(NavigationIntent.Next, loop: true);
+                return;
+            case "ArrowUp":
+                if (!_open)
+                {
+                    Open();
+                    _list.ActivateOrFirst(Current, last: true);
+                }
+                else _list.Move(NavigationIntent.Previous, loop: true);
+                return;
+            case "Enter":
+                if (_open && _list.HasActive) await SelectAsync(_list.ActiveIndex);
+                else Close();
+                return;
+            case "Escape":
+                if (_open) Close();
+                else
+                {
+                    _text = "";
+                    await _value.SetAsync(default, ValueChanged.HasDelegate, ValueChanged);
+                    if (TextChanged.HasDelegate) await TextChanged.InvokeAsync(_text);
+                }
+                return;
+            case "Tab":
+                Close();
+                return;
+        }
+    }
+
+    private Task OnBlurAsync()
+    {
+        Close();
+        if (!AllowCustomValue) _text = Current is null ? "" : _label(Current);
+        return Task.CompletedTask;
+    }
+}

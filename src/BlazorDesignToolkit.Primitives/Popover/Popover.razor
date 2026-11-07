@@ -1,0 +1,63 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Non-modal popover anchored to a trigger, using the native Popover API (top layer, light dismiss with Escape or an
+   outside click). Focus moves into the content on open and returns to the trigger when closed from inside.
+   Coordinates PopoverTrigger and PopoverContent. *@
+
+<CascadingValue Value="Context" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    private readonly Controllable<bool> _open = new(false);
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public bool DefaultOpen { get; set; }
+    /// <summary>side-align, e.g. bottom-start (default), top-center, right-end. Flips when there is not enough space.</summary>
+    [Parameter] public string Placement { get; set; } = "bottom-start";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal PopoverContext Context { get; } = new();
+    internal bool IsOpen => _open.Get(Open, OpenChanged.HasDelegate);
+
+    protected override void OnInitialized()
+    {
+        _open.Initialize(DefaultOpen || Open);
+        Context.Owner = this;
+        Context.ContentId = Ids.Next("popover");
+        Context.TriggerId = Context.ContentId + "-trigger";
+    }
+
+    protected override void OnParametersSet()
+    {
+        _open.Sync(Open);
+        Context.NotifyStateChanged();
+    }
+
+    private DateTimeOffset _dismissedAt;
+
+    internal Task ToggleAsync()
+        => IsOpen ? SetOpenAsync(false)
+            : DateTimeOffset.UtcNow - _dismissedAt > TimeSpan.FromMilliseconds(300) ? SetOpenAsync(true) : Task.CompletedTask;
+
+    internal Task DismissAsync()
+    {
+        _dismissedAt = DateTimeOffset.UtcNow;
+        return SetOpenAsync(false);
+    }
+
+    internal async Task SetOpenAsync(bool open)
+    {
+        if (open == IsOpen) return;
+        await _open.SetAsync(open, OpenChanged.HasDelegate, OpenChanged);
+        Context.NotifyStateChanged();
+    }
+
+    internal sealed class PopoverContext : PrimitiveContext
+    {
+        public Popover Owner { get; set; } = default!;
+        public string ContentId { get; set; } = "";
+        public string TriggerId { get; set; } = "";
+        public ElementReference Trigger { get; set; }
+    }
+}

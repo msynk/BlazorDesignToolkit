@@ -1,0 +1,37 @@
+@page "/primitives/feedback"
+@inject ToastService Toasts
+@inject LiveAnnouncer Announcer
+
+<PageTitle>Toasts and announcements · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Toasts, live regions and the command menu</h1>
+
+<Example Title="Toasts">
+    <Description><p>Each toast is a live region inside a labelled region. Timers pause while the pointer is over the notifications or focus is inside them; errors stay until dismissed.</p></Description>
+    <ChildContent>
+        <div class="actions">
+            <AuroraButton Variant="secondary" OnClick="@(() => Toasts.Show("Settings saved", ToastKind.Success))" data-testid="toast-success">Show success</AuroraButton>
+            <AuroraButton Variant="secondary" OnClick="@(() => Toasts.Show(new ToastOptions { Message = "Item archived", ActionLabel = "Undo", Action = UndoAsync }))">Show with action</AuroraButton>
+            <AuroraButton Variant="danger" OnClick="@(() => Toasts.Show("Upload failed. Check your connection.", ToastKind.Error))" data-testid="toast-error">Show error</AuroraButton>
+        </div>
+    </ChildContent>
+</Example>
+
+<Example Title="Live announcements">
+    <Description><p><code>LiveAnnouncer</code> speaks status changes that have no visible focus change, such as search result counts.</p></Description>
+    <ChildContent>
+        <AuroraButton Variant="secondary" OnClick="@(() => Announcer.Announce($"{Random.Shared.Next(2, 40)} results found"))">Announce results</AuroraButton>
+    </ChildContent>
+</Example>
+
+<Example Title="Command menu">
+    <Description><p>Press <kbd>Ctrl</kbd>+<kbd>K</kbd> (or <kbd>⌘</kbd>+<kbd>K</kbd>) anywhere, or use the Commands button in the header. Type to filter, Enter to run.</p></Description>
+</Example>
+
+@code {
+    private Task UndoAsync()
+    {
+        Announcer.Announce("Archive undone");
+        return Task.CompletedTask;
+    }
+}

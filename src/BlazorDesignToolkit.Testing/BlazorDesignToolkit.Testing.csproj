@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Testing</RootNamespace>
+    <Description>Accessibility test helpers for Blazor components: structural ARIA checks on rendered markup (duplicate ids, broken id references, missing accessible names, invalid roles, states and values, required owned elements, focusable content inside aria-hidden). Use with bUnit or any HTML string; complements axe-core browser scans.</Description>
+    <PackageTags>$(PackageTags);testing;bunit;a11y</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,60 @@
+@page "/primitives/tabs"
+
+<PageTitle>Tabs · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Tabs</h1>
+
+<Example Title="Automatic activation" Code="@Code">
+    <ChildContent>
+        <Tabs DefaultValue="overview" data-testid="tabs-auto">
+            <TabList aria-label="Project">
+                <Tab Value="overview">Overview</Tab>
+                <Tab Value="activity">Activity</Tab>
+                <Tab Value="archived" Disabled="true">Archived</Tab>
+                <Tab Value="settings">Settings</Tab>
+            </TabList>
+            <TabPanel Value="overview"><p>Overview content.</p></TabPanel>
+            <TabPanel Value="activity"><p>Recent activity.</p></TabPanel>
+            <TabPanel Value="archived"><p>Archived items.</p></TabPanel>
+            <TabPanel Value="settings"><p>Settings content.</p></TabPanel>
+        </Tabs>
+    </ChildContent>
+</Example>
+
+<Example Title="Manual activation, vertical">
+    <ChildContent>
+        <Tabs DefaultValue="a" Activation="Tabs.TabsActivation.Manual" Orientation="Orientation.Vertical" class="vertical-tabs" data-testid="tabs-manual">
+            <TabList aria-label="Account">
+                <Tab Value="a">Profile</Tab>
+                <Tab Value="b">Security</Tab>
+                <Tab Value="c">Billing</Tab>
+            </TabList>
+            <TabPanel Value="a"><p>Profile settings.</p></TabPanel>
+            <TabPanel Value="b"><p>Security settings.</p></TabPanel>
+            <TabPanel Value="c"><p>Billing settings.</p></TabPanel>
+        </Tabs>
+    </ChildContent>
+</Example>
+
+<KeyboardTable Rows="@Keys" />
+
+@code {
+    private static readonly IReadOnlyList<(string, string)> Keys =
+    [
+        ("Tab", "Moves focus into the tab list (selected tab), then to the panel."),
+        ("Left / Right (horizontal), Up / Down (vertical)", "Moves to the previous or next tab, wrapping; disabled tabs are skipped. Mirrored in right-to-left layouts."),
+        ("Home / End", "Moves to the first or last tab."),
+        ("Enter / Space", "Selects the focused tab (manual activation)."),
+    ];
+
+    private const string Code = """
+        <Tabs DefaultValue="overview">
+            <TabList aria-label="Project">
+                <Tab Value="overview">Overview</Tab>
+                <Tab Value="activity">Activity</Tab>
+            </TabList>
+            <TabPanel Value="overview">…</TabPanel>
+            <TabPanel Value="activity">…</TabPanel>
+        </Tabs>
+        """;
+}

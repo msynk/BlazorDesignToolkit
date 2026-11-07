@@ -1,0 +1,159 @@
+@inherits PrimitiveTestBase
+
+@code {
+    private static readonly string[] s_fruits = ["Apple", "Banana", "Blueberry", "Cherry", "Date"];
+
+    [Fact]
+    public void Listbox_single_selection_follows_focus_and_skips_disabled()
+    {
+        string? value = null;
+        var cut = Render(@<Listbox TItem="string" Items="s_fruits" ItemDisabled="@(f => f == "Banana")" Value="value" ValueChanged="v => value = v" aria-label="Fruit" />);
+        var listbox = cut.Find("[role=listbox]");
+        listbox.Focus();
+        Assert.Equal(cut.FindAll("[role=option]")[0].Id, cut.Find("[role=listbox]").Attr("aria-activedescendant"));
+        Assert.Equal("Apple", value); // selection follows focus: the first option is selected on focus
+        cut.Find("[role=listbox]").KeyDown(Key("ArrowDown"));
+        Assert.Equal("Blueberry", value);
+        Assert.Equal("true", cut.FindAll("[role=option]")[1].Attr("aria-disabled"));
+        cut.Find("[role=listbox]").KeyDown(Key("End"));
+        Assert.Equal("Date", value);
+        cut.Find("[role=listbox]").KeyDown(Key("c"));
+        Assert.Equal("Cherry", value);
+        Assert.Equal("true", cut.FindAll("[role=option]")[3].Attr("aria-selected"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Listbox_multiple_selection_with_space_shift_and_select_all()
+    {
+        IReadOnlyCollection<string> values = [];
+        var cut = Render(@<Listbox TItem="string" Items="s_fruits" Multiple="true" Values="values" ValuesChanged="v => values = v" aria-label="Fruit" />);
+        Assert.Equal("true", cut.Find("[role=listbox]").Attr("aria-multiselectable"));
+        cut.Find("[role=listbox]").Focus();
+        cut.Find("[role=listbox]").KeyDown(Key(" "));
+        Assert.Equal(["Apple"], values);
+        cut.Find("[role=listbox]").KeyDown(Key("ArrowDown", shift: true));
+        Assert.Equal(["Apple", "Banana"], values.Order());
+        cut.Find("[role=listbox]").KeyDown(Key("a", ctrl: true));
+        Assert.Equal(5, values.Count);
+        cut.FindAll("[role=option]")[4].Click();
+        Assert.Equal(4, values.Count);
+    }
+
+    [Fact]
+    public void Select_keyboard_opens_navigates_selects_and_closes()
+    {
+        string? value = null;
+        var cut = Render(@<FormField><FormLabel>Fruit</FormLabel>
+            <Select TItem="string" Items="s_fruits" Value="value" ValueChanged="v => value = v" Placeholder="Choose" Name="fruit" />
+        </FormField>);
+        var combo = cut.Find("[role=combobox]");
+        Assert.Equal("listbox", combo.Attr("aria-haspopup"));
+        Assert.Equal("false", combo.Attr("aria-expanded"));
+        Assert.Contains("Choose", combo.TextContent);
+        combo.KeyDown(Key("ArrowDown"));
+        combo = cut.Find("[role=combobox]");
+        Assert.Equal("true", combo.Attr("aria-expanded"));
+        Assert.Equal(cut.FindAll("[role=option]")[0].Id, combo.Attr("aria-activedescendant"));
+        Assert.Equal(1, Calls("showPopover"));
+        combo.KeyDown(Key("ArrowDown"));
+        combo.KeyDown(Key("Enter"));
+        Assert.Equal("Banana", value);
+        Assert.Equal("false", cut.Find("[role=combobox]").Attr("aria-expanded"));
+        Assert.Equal("Banana", cut.Find("input[type=hidden]").Attr("value"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Select_escape_closes_without_changing_and_typeahead_opens_on_match()
+    {
+        string? value = "Apple";
+        var cut = Render(@<Select TItem="string" Items="s_fruits" Value="value" ValueChanged="v => value = v" aria-label="Fruit" />);
+        cut.Find("[role=combobox]").KeyDown(Key("d"));
+        Assert.Equal("true", cut.Find("[role=combobox]").Attr("aria-expanded"));
+        Assert.Equal(cut.FindAll("[role=option]")[4].Id, cut.Find("[role=combobox]").Attr("aria-activedescendant"));
+        cut.Find("[role=combobox]").KeyDown(Key("Escape"));
+        Assert.Equal("Apple", value);
+        Assert.Equal("false", cut.Find("[role=combobox]").Attr("aria-expanded"));
+    }
+
+    [Fact]
+    public void Combobox_filters_announces_and_selects()
+    {
+        string? value = null;
+        var cut = Render(@<FormField><FormLabel>Fruit</FormLabel>
+            <Combobox TItem="string" Items="s_fruits" Value="value" ValueChanged="v => value = v" />
+        </FormField>);
+        var input = cut.Find("input[role=combobox]");
+        Assert.Equal("list", input.Attr("aria-autocomplete"));
+        input.Input("b");
+        Assert.Equal("true", cut.Find("input").Attr("aria-expanded"));
+        Assert.Equal(["Banana", "Blueberry"], cut.FindAll("[role=option]").Select(o => o.TextContent.Trim()));
+        Assert.Contains("2 results available.", cut.Markup);
+        Assert.Equal(cut.FindAll("[role=option]")[0].Id, cut.Find("input").Attr("aria-activedescendant"));
+        cut.Find("input").KeyDown(Key("ArrowDown"));
+        cut.Find("input").KeyDown(Key("Enter"));
+        Assert.Equal("Blueberry", value);
+        Assert.Equal("Blueberry", cut.Find("input").Attr("value"));
+        Assert.Equal("false", cut.Find("input").Attr("aria-expanded"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Combobox_escape_closes_then_clears_and_blur_reverts_free_text()
+    {
+        string? value = "Cherry";
+        var cut = Render(@<Combobox TItem="string" Items="s_fruits" Value="value" ValueChanged="v => value = v" aria-label="Fruit" />);
+        Assert.Equal("Cherry", cut.Find("input").Attr("value"));
+        cut.Find("input").Input("zzz");
+        Assert.Contains("No results", cut.Markup);
+        cut.Find("input").Blur();
+        Assert.Equal("Cherry", cut.Find("input").Attr("value"));
+        cut.Find("input").KeyDown(Key("ArrowDown"));
+        cut.Find("input").KeyDown(Key("Escape"));
+        Assert.Equal("false", cut.Find("input").Attr("aria-expanded"));
+        cut.Find("input").KeyDown(Key("Escape"));
+        Assert.Null(value);
+    }
+
+    public sealed record Node(string Name, Node[] Children);
+
+    private static readonly Node[] s_tree =
+    [
+        new("src", [new("app.cs", []), new("lib", [new("util.cs", [])])]),
+        new("docs", [new("readme.md", [])]),
+        new("license", []),
+    ];
+
+    [Fact]
+    public void TreeView_renders_levels_and_supports_keyboard()
+    {
+        Node? selected = null;
+        var cut = Render(@<TreeView TItem="Node" Items="s_tree" ChildrenSelector="n => n.Children" ItemLabel="n => n.Name"
+                                   Value="selected" ValueChanged="v => selected = v" aria-label="Files" />);
+        var items = cut.FindAll("[role=treeitem]");
+        Assert.Equal(3, items.Count);
+        Assert.Equal(["1", "1", "1"], items.Select(i => i.Attr("aria-level")));
+        Assert.Equal(["1", "2", "3"], items.Select(i => i.Attr("aria-posinset")));
+        Assert.Equal("false", items[0].Attr("aria-expanded"));
+        Assert.False(items[2].HasAttribute("aria-expanded"));
+        Assert.Equal("0", items[0].Attr("tabindex"));
+
+        items[0].Focus();
+        cut.Find("[role=tree]").KeyDown(Key("ArrowRight"));
+        Assert.Equal("true", cut.FindAll("[role=treeitem]")[0].Attr("aria-expanded"));
+        Assert.Equal("2", cut.Find("[role=group] > [role=treeitem]").Attr("aria-level"));
+        cut.Find("[role=tree]").KeyDown(Key("ArrowRight"));
+        Assert.Contains(Module.Invocations, i => i.Identifier == "focusById" && (string)i.Arguments[0]! == cut.Find("[role=group] > [role=treeitem]").Id);
+        cut.FindAll("[role=group] > [role=treeitem]")[0].Focus();
+        cut.Find("[role=tree]").KeyDown(Key("Enter"));
+        Assert.Equal("app.cs", selected?.Name);
+        cut.Find("[role=tree]").KeyDown(Key("ArrowLeft"));
+        cut.FindAll("[role=treeitem]")[0].Focus();
+        cut.Find("[role=tree]").KeyDown(Key("ArrowLeft"));
+        Assert.Equal("false", cut.FindAll("[role=treeitem]")[0].Attr("aria-expanded"));
+        cut.Find("[role=tree]").KeyDown(Key("*"));
+        Assert.Equal(2, cut.FindAll("[role=treeitem][aria-expanded=true]").Count);
+        AssertAccessible(cut.Markup);
+    }
+}

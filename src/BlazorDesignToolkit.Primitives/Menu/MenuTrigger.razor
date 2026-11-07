@@ -1,0 +1,48 @@
+@namespace BlazorDesignToolkit.Primitives
+@inherits PrimitiveBase
+
+<button type="button" @ref="Context.Trigger"
+        @attributes='Attributes("aria-haspopup", "aria-expanded", "aria-controls", "type", "id")'
+        id="@Context.TriggerId"
+        aria-haspopup="menu"
+        aria-expanded="@(Context.Owner.IsOpen ? "true" : "false")"
+        aria-controls="@Context.MenuId"
+        data-state="@(Context.Owner.IsOpen ? "open" : "closed")"
+        data-bdt-keys="ArrowDown ArrowUp"
+        @onclick="OnClickAsync"
+        @onkeydown="OnKeyDownAsync">
+    @ChildContent
+</button>
+
+@code {
+    private int _keysHandle;
+
+    [CascadingParameter] internal Menu.MenuContext Context { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Context is null) throw new InvalidOperationException("MenuTrigger must be placed inside Menu.");
+        Track(Context);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _keysHandle = await Js.TrackAsync("preventKeys", Context.Trigger);
+    }
+
+    private Task OnClickAsync(MouseEventArgs e)
+    {
+        if (Context.Owner.IsOpen) return Context.Owner.CloseAsync();
+        // Enter and Space also raise click (detail 0); they open with focus on the first item, as does a pointer click.
+        Context.OpenedByPointer = e.Detail > 0;
+        return Context.Owner.OpenAsync(Menu.MenuFocus.First);
+    }
+
+    private Task OnKeyDownAsync(KeyboardEventArgs e) => e.Key switch
+    {
+        "ArrowDown" => Context.Owner.OpenAsync(Menu.MenuFocus.First),
+        "ArrowUp" => Context.Owner.OpenAsync(Menu.MenuFocus.Last),
+        _ => Task.CompletedTask,
+    };
+}

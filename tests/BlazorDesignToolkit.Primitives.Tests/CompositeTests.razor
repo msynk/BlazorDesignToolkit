@@ -1,0 +1,140 @@
+@inherits PrimitiveTestBase
+
+@code {
+    private RenderFragment TabsFixture(Tabs.TabsActivation activation = Tabs.TabsActivation.Automatic, Orientation orientation = Orientation.Horizontal,
+        TextDirection direction = TextDirection.Ltr) =>
+        @<Tabs Activation="activation" Orientation="orientation" Direction="direction" DefaultValue="one">
+            <TabList aria-label="Settings">
+                <Tab Value="one">One</Tab>
+                <Tab Value="two" Disabled="true">Two</Tab>
+                <Tab Value="three">Three</Tab>
+            </TabList>
+            <TabPanel Value="one">Panel one</TabPanel>
+            <TabPanel Value="two">Panel two</TabPanel>
+            <TabPanel Value="three">Panel three</TabPanel>
+        </Tabs>;
+
+    [Fact]
+    public void Tabs_render_roles_and_relationships()
+    {
+        var cut = Render(TabsFixture());
+        var tabs = cut.FindAll("[role=tab]");
+        Assert.Equal(["true", "false", "false"], tabs.Select(t => t.Attr("aria-selected")));
+        Assert.Equal(["0", "-1", "-1"], tabs.Select(t => t.Attr("tabindex")));
+        var panels = cut.FindAll("[role=tabpanel]");
+        Assert.Equal(3, panels.Count);
+        Assert.False(panels[0].HasAttribute("hidden"));
+        Assert.True(panels[2].HasAttribute("hidden"));
+        Assert.Equal("", panels[2].TextContent.Trim());
+        Assert.Equal(tabs[0].Id, panels[0].Attr("aria-labelledby"));
+        Assert.Equal(panels[0].Id, tabs[0].Attr("aria-controls"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Tabs_arrow_keys_skip_disabled_wrap_and_select_automatically()
+    {
+        var cut = Render(TabsFixture());
+        cut.FindAll("[role=tab]")[0].Focus();
+        cut.Find("[role=tablist]").KeyDown(Key("ArrowRight"));
+        Assert.Equal("true", cut.FindAll("[role=tab]")[2].Attr("aria-selected"));
+        cut.FindAll("[role=tab]")[2].Focus();
+        cut.Find("[role=tablist]").KeyDown(Key("ArrowRight"));
+        Assert.Equal("true", cut.FindAll("[role=tab]")[0].Attr("aria-selected"));
+        cut.FindAll("[role=tab]")[0].Focus();
+        cut.Find("[role=tablist]").KeyDown(Key("End"));
+        Assert.Equal("true", cut.FindAll("[role=tab]")[2].Attr("aria-selected"));
+        Assert.Equal("Panel three", cut.Find("[role=tabpanel]:not([hidden])").TextContent.Trim());
+    }
+
+    [Fact]
+    public void Tabs_manual_activation_requires_enter_or_space()
+    {
+        var cut = Render(TabsFixture(Tabs.TabsActivation.Manual));
+        cut.FindAll("[role=tab]")[0].Focus();
+        cut.Find("[role=tablist]").KeyDown(Key("ArrowRight"));
+        Assert.Equal("true", cut.FindAll("[role=tab]")[0].Attr("aria-selected"));
+        cut.FindAll("[role=tab]")[2].KeyDown(Key("Enter"));
+        Assert.Equal("true", cut.FindAll("[role=tab]")[2].Attr("aria-selected"));
+    }
+
+    [Fact]
+    public void Tabs_vertical_orientation_and_rtl()
+    {
+        var vertical = Render(TabsFixture(orientation: Orientation.Vertical));
+        Assert.Equal("vertical", vertical.Find("[role=tablist]").Attr("aria-orientation"));
+        vertical.FindAll("[role=tab]")[0].Focus();
+        vertical.Find("[role=tablist]").KeyDown(Key("ArrowRight"));
+        Assert.Equal("true", vertical.FindAll("[role=tab]")[0].Attr("aria-selected"));
+        vertical.Find("[role=tablist]").KeyDown(Key("ArrowDown"));
+        Assert.Equal("true", vertical.FindAll("[role=tab]")[2].Attr("aria-selected"));
+
+        var rtl = Render(TabsFixture(direction: TextDirection.Rtl));
+        rtl.FindAll("[role=tab]")[0].Focus();
+        rtl.Find("[role=tablist]").KeyDown(Key("ArrowLeft"));
+        Assert.Equal("true", rtl.FindAll("[role=tab]")[2].Attr("aria-selected"));
+    }
+
+    [Fact]
+    public void Disclosure_toggles_expanded_and_panel()
+    {
+        var cut = Render(@<Disclosure><DisclosureTrigger>Details</DisclosureTrigger><DisclosurePanel>Hidden text</DisclosurePanel></Disclosure>);
+        var button = cut.Find("button");
+        Assert.Equal("false", button.Attr("aria-expanded"));
+        Assert.True(cut.Find("#" + button.Attr("aria-controls")).HasAttribute("hidden"));
+        button.Click();
+        Assert.Equal("true", cut.Find("button").Attr("aria-expanded"));
+        Assert.Equal("Hidden text", cut.Find("#" + button.Attr("aria-controls")).TextContent);
+        AssertAccessible(cut.Markup);
+    }
+
+    private RenderFragment AccordionFixture(Accordion.AccordionType type, bool collapsible = true) =>
+        @<Accordion Type="type" Collapsible="collapsible" HeadingLevel="4" DefaultValues="@(new[] { "a" })">
+            <AccordionItem Value="a"><AccordionTrigger>Alpha</AccordionTrigger><AccordionPanel>A</AccordionPanel></AccordionItem>
+            <AccordionItem Value="b"><AccordionTrigger>Beta</AccordionTrigger><AccordionPanel>B</AccordionPanel></AccordionItem>
+            <AccordionItem Value="c" Disabled="true"><AccordionTrigger>Gamma</AccordionTrigger><AccordionPanel>C</AccordionPanel></AccordionItem>
+        </Accordion>;
+
+    [Fact]
+    public void Accordion_single_mode_opens_one_item_inside_headings()
+    {
+        var cut = Render(AccordionFixture(Accordion.AccordionType.Single));
+        Assert.Equal(3, cut.FindAll("h4 > button").Count);
+        var buttons = cut.FindAll("button");
+        Assert.Equal(["true", "false", "false"], buttons.Select(b => b.Attr("aria-expanded")));
+        buttons[1].Click();
+        Assert.Equal(["false", "true", "false"], cut.FindAll("button").Select(b => b.Attr("aria-expanded")));
+        var region = cut.Find("[role=region]:not([hidden])");
+        Assert.Equal(cut.FindAll("button")[1].Id, region.Attr("aria-labelledby"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Accordion_non_collapsible_locks_open_item_and_multiple_allows_many()
+    {
+        var locked = Render(AccordionFixture(Accordion.AccordionType.Single, collapsible: false));
+        Assert.Equal("true", locked.FindAll("button")[0].Attr("aria-disabled"));
+        locked.FindAll("button")[0].Click();
+        Assert.Equal("true", locked.FindAll("button")[0].Attr("aria-expanded"));
+
+        var multiple = Render(AccordionFixture(Accordion.AccordionType.Multiple));
+        multiple.FindAll("button")[1].Click();
+        Assert.Equal(["true", "true", "false"], multiple.FindAll("button").Select(b => b.Attr("aria-expanded")));
+        Assert.True(multiple.FindAll("button")[2].HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void RovingFocusGroup_keeps_one_tab_stop()
+    {
+        var cut = Render(@<RovingFocusGroup Role="toolbar" aria-label="Formatting">
+            <RovingFocusItem>Bold</RovingFocusItem>
+            <RovingFocusItem Disabled="true">Italic</RovingFocusItem>
+            <RovingFocusItem>Underline</RovingFocusItem>
+        </RovingFocusGroup>);
+        Assert.Equal(["0", "-1", "-1"], cut.FindAll("button").Select(b => b.Attr("tabindex")));
+        cut.FindAll("button")[0].Focus();
+        cut.Find("[role=toolbar]").KeyDown(Key("ArrowRight"));
+        Assert.Equal(["-1", "-1", "0"], cut.FindAll("button").Select(b => b.Attr("tabindex")));
+        AssertAccessible(cut.Markup);
+    }
+}

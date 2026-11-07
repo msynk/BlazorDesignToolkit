@@ -1,0 +1,24 @@
+@* Aurora text field: FormField wires label, description and error; styling uses Aurora tokens only. *@
+@* The wrapper carries the CSS-isolation scope for the ::deep rules. *@
+<div class="aurora-field-host">
+<FormField class="aurora-field" Invalid="@(Error is not null)" Required="Required">
+    <FormLabel class="aurora-field__label">@Label@if (Required) {<span aria-hidden="true"> *</span>}</FormLabel>
+    <FieldInput class="aurora-field__input" Type="@Type" Value="@Value" ValueChanged="ValueChanged" autocomplete="@Autocomplete" />
+    @if (Description is not null)
+    {
+        <FormDescription class="aurora-field__description">@Description</FormDescription>
+    }
+    <FormError class="aurora-field__error">@Error</FormError>
+</FormField>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public string Type { get; set; } = "text";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string? Autocomplete { get; set; }
+}

@@ -1,0 +1,51 @@
+@page "/primitives/listbox"
+
+<PageTitle>Listbox, select and combobox · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Listbox, select and combobox</h1>
+<p>All three keep DOM focus on one element and expose the highlighted option with <code>aria-activedescendant</code>.
+    Prefer a native <code>&lt;select&gt;</code> when it meets your needs.</p>
+
+<Example Title="Listbox (multiple selection)">
+    <ChildContent>
+        <FormField>
+            <FormLabel>Languages</FormLabel>
+            <Listbox TItem="string" Items="Languages" Multiple="true" @bind-Values="_languages" class="listbox" data-testid="listbox" />
+        </FormField>
+        <p role="status">Selected: @string.Join(", ", _languages)</p>
+        <KeyboardTable Rows="@([("Up / Down", "Moves the highlight."), ("Space", "Toggles selection."), ("Shift+Up / Down", "Extends the selection."), ("Ctrl+A", "Selects or clears all."), ("Type", "Moves to the next matching option.")])" />
+    </ChildContent>
+</Example>
+
+<Example Title="Select">
+    <ChildContent>
+        <FormField>
+            <FormLabel>Country</FormLabel>
+            <Select TItem="string" Items="Countries" @bind-Value="_country" Placeholder="Choose a country" Name="country" data-testid="select" />
+        </FormField>
+        <p role="status">Country: @(_country ?? "none")</p>
+        <KeyboardTable Rows="@([("Down / Up / Enter / Space", "Opens the list."), ("Up / Down, Home / End", "Moves the highlight while open."), ("Enter", "Selects and closes."), ("Escape", "Closes without changing the value."), ("Type", "Opens on the matching option.")])" />
+    </ChildContent>
+</Example>
+
+<Example Title="Combobox">
+    <ChildContent>
+        <FormField>
+            <FormLabel>City</FormLabel>
+            <Combobox TItem="string" Items="Cities" @bind-Value="_city" data-testid="combobox" />
+            <FormDescription>Type to filter. The number of results is announced.</FormDescription>
+        </FormField>
+        <p role="status">City: @(_city ?? "none")</p>
+        <KeyboardTable Rows="@([("Type", "Filters the list."), ("Down / Up", "Moves the highlight (opens the list)."), ("Enter", "Selects the highlighted city."), ("Escape", "Closes the list, or clears the field when closed.")])" />
+    </ChildContent>
+</Example>
+
+@code {
+    private IReadOnlyCollection<string> _languages = ["C#"];
+    private string? _country;
+    private string? _city;
+
+    private static readonly string[] Languages = ["C#", "F#", "TypeScript", "Rust", "Go", "Python", "Kotlin"];
+    private static readonly string[] Countries = ["Australia", "Brazil", "Canada", "Denmark", "Egypt", "Finland", "Germany", "India", "Japan", "Kenya", "Norway", "Portugal"];
+    private static readonly string[] Cities = ["Amsterdam", "Athens", "Bangkok", "Berlin", "Bogotá", "Cairo", "Cape Town", "Dublin", "Lisbon", "Lima", "Madrid", "Manila", "Nairobi", "Oslo", "Seoul", "Tehran", "Tokyo", "Toronto", "Vienna"];
+}

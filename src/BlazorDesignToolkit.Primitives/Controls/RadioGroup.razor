@@ -1,0 +1,73 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Radio group built on native radio inputs, which provide roving focus and arrow-key selection in every browser.
+   The group element has role="radiogroup" and is labelled by the FormField label or aria-label/aria-labelledby. *@
+@typeparam TValue
+@inherits PrimitiveBase
+
+<CascadingValue Value="this" IsFixed="true">
+    <div role="radiogroup"
+         @attributes='Attributes("role")'
+         id="@(Field?.ControlId ?? ProvidedId)"
+         aria-labelledby="@(AdditionalAttributes?.ContainsKey("aria-label") == true || Field is null ? null : Field.LabelId)"
+         aria-describedby="@Field?.DescribedBy"
+         aria-invalid="@(Field?.Invalid == true ? "true" : null)"
+         aria-errormessage="@(Field is { Invalid: true, HasError: true } ? Field.ErrorId : null)"
+         aria-required="@(Required || Field?.Required == true ? "true" : null)"
+         aria-disabled="@(IsDisabled ? "true" : null)"
+         aria-orientation="@(Orientation == Orientation.Vertical ? "vertical" : "horizontal")"
+         data-disabled="@(IsDisabled ? "" : null)">
+        @ChildContent
+    </div>
+</CascadingValue>
+
+@code {
+    internal sealed class RadioGroupState : PrimitiveContext;
+
+    private readonly Controllable<TValue?> _value = new(default);
+    private string _name = default!;
+
+    [CascadingParameter] private FormFieldContext? Field { get; set; }
+    [Parameter] public TValue? Value { get; set; }
+    [Parameter] public EventCallback<TValue?> ValueChanged { get; set; }
+    [Parameter] public TValue? DefaultValue { get; set; }
+    /// <summary>Name shared by the radio inputs (generated when omitted).</summary>
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public Orientation Orientation { get; set; } = Orientation.Vertical;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal string GroupName => Name ?? _name;
+    internal bool IsDisabled => Disabled || Field?.Disabled == true;
+    internal bool IsRequired => Required || Field?.Required == true;
+    internal TValue? Current => _value.Get(Value, ValueChanged.HasDelegate);
+
+    protected override void OnInitialized()
+    {
+        _name = Ids.Next("radio");
+        _value.Initialize(DefaultValue is not null ? DefaultValue : Value);
+        TrackField(Field);
+        if (Field is not null)
+        {
+            Field.LabelTargetsControl = false;
+            Field.NotifyChanged();
+        }
+    }
+
+    internal RadioGroupState State { get; } = new();
+
+    protected override void OnParametersSet()
+    {
+        _value.Sync(Value);
+        State.NotifyStateChanged();
+    }
+
+    internal bool IsSelected(TValue? value) => EqualityComparer<TValue?>.Default.Equals(Current, value);
+
+    internal async Task SelectAsync(TValue? value)
+    {
+        if (IsDisabled) return;
+        await _value.SetAsync(value, ValueChanged.HasDelegate, ValueChanged);
+        State.NotifyStateChanged();
+    }
+}

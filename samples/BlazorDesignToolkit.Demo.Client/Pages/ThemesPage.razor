@@ -1,0 +1,71 @@
+@page "/themes"
+
+<PageTitle>Themes and brands · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Themes and brands</h1>
+<p>Theme identity (brand) is independent of color mode, contrast and density. Use the controls in the header — the page
+    switches by changing attributes on <code>&lt;html&gt;</code>; the stylesheet is generated once at startup.
+    Choose <em>System</em> to follow <code>prefers-color-scheme</code> and <code>prefers-contrast</code>, even without JavaScript.</p>
+
+<Example Title="Current selection">
+    <ChildContent>
+        <dl class="facts">
+            <dt>Requested</dt><dd><code>@State.Selection</code></dd>
+            <dt>Effective</dt><dd><code>@State.EffectiveSelection</code></dd>
+            <dt>System preferences</dt><dd>color scheme: @(State.SystemPreferences.ColorScheme ?? "unknown"), contrast: @(State.SystemPreferences.Contrast ?? "unknown"), reduced motion: @State.SystemPreferences.ReducedMotion</dd>
+        </dl>
+        <AuroraButton Variant="secondary" OnClick="ResetAsync">Reset to defaults</AuroraButton>
+    </ChildContent>
+</Example>
+
+<Example Title="Side-by-side previews">
+    <Description><p><code>ThemeScope</code> applies another theme to a subtree, without JavaScript. Each preview renders every axis attribute so it never inherits stale values.</p></Description>
+    <ChildContent>
+        <div class="preview-grid">
+            @foreach (var (theme, mode, contrast) in Previews)
+            {
+                <ThemeScope ThemeId="@theme" Axes="@(new Dictionary<string, string> { ["mode"] = mode, ["contrast"] = contrast })" class="preview" aria-label="@($"{theme} {mode} {contrast} preview")" role="group">
+                    <p class="preview-title">@theme · @mode · @contrast</p>
+                    <p>Body text on the default surface.</p>
+                    <p class="muted">Muted supporting text.</p>
+                    <AuroraButton tabindex="-1">Primary action</AuroraButton>
+                    <a href="themes" tabindex="-1">A link</a>
+                </ThemeScope>
+            }
+        </div>
+    </ChildContent>
+</Example>
+
+<Example Title="Theme metadata">
+    <ChildContent>
+        <table class="data-table">
+            <caption>Registered themes</caption>
+            <thead><tr><th scope="col">Id</th><th scope="col">Name</th><th scope="col">Extends</th><th scope="col">Layers</th><th scope="col">Metadata</th></tr></thead>
+            <tbody>
+                @foreach (var theme in Manager.Catalog.Themes)
+                {
+                    <tr>
+                        <th scope="row"><code>@theme.Id</code></th>
+                        <td>@theme.DisplayName</td>
+                        <td>@(theme.Extends ?? "—")</td>
+                        <td>@string.Join(", ", theme.Layers.Select(l => l.When.IsEmpty ? l.Name : $"{l.Name} when {string.Join(" & ", l.When.Select(w => $"{w.Key}={w.Value}"))}"))</td>
+                        <td>@string.Join(", ", theme.Metadata.Select(m => $"{m.Key}: {m.Value}"))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </ChildContent>
+</Example>
+
+@code {
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    private static readonly (string Theme, string Mode, string Contrast)[] Previews =
+    [
+        ("aurora", "light", "standard"), ("aurora", "dark", "standard"), ("ember", "light", "standard"),
+        ("ember", "dark", "standard"), ("aurora", "light", "more"), ("ember", "dark", "more"),
+    ];
+
+    private Task ResetAsync() => Manager.ResetAsync();
+}

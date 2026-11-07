@@ -1,0 +1,170 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Command palette: a modal Dialog containing a combobox input that filters a grouped listbox of commands.
+   The global shortcut (Ctrl+K / Cmd+K by default) opens it. Up/Down move, Enter runs the highlighted command and
+   closes, Escape closes and returns focus. Results are announced politely. The query uses @bind:get/@bind:set so that
+   a render still in flight while the user types cannot overwrite the characters typed in the meantime. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<Dialog Open="_open" OpenChanged="SetOpenAsync">
+    <DialogContent @attributes="AdditionalAttributes" aria-label="@Label">
+        <input type="text" role="combobox" @ref="_input"
+               id="@InputId"
+               aria-label="@Label"
+               aria-autocomplete="list"
+               aria-expanded="true"
+               aria-controls="@ListId"
+               aria-activedescendant="@(_list.HasActive ? OptionId(_list.ActiveIndex) : null)"
+               autocomplete="off"
+               placeholder="@Placeholder"
+               data-bdt-keys="ArrowDown ArrowUp Enter"
+               @bind:get="_query" @bind:set="OnInput" @bind:event="oninput"
+               @onkeydown="OnKeyDownAsync" />
+        <div role="listbox" id="@ListId" aria-label="@Label">
+            @if (_list.Items.Count == 0)
+            {
+                <div role="presentation" data-empty="">@EmptyText</div>
+            }
+            @foreach (var group in _list.Items.Select((c, i) => (Command: c, Index: i)).GroupBy(x => x.Command.Group ?? ""))
+            {
+                var headerId = $"{ListId}-group-{group.First().Index}";
+                <div role="group" aria-labelledby="@(group.Key.Length > 0 ? headerId : null)">
+                    @if (group.Key.Length > 0)
+                    {
+                        <div role="presentation" id="@headerId" data-command-group="">@group.Key</div>
+                    }
+                    @foreach (var entry in group)
+                    {
+                        var index = entry.Index;
+                        <div role="option" id="@OptionId(index)" @key="entry.Command.Id"
+                             aria-selected="@(index == _list.ActiveIndex ? "true" : "false")"
+                             aria-disabled="@(entry.Command.Disabled ? "true" : null)"
+                             data-highlighted="@(index == _list.ActiveIndex ? "" : null)"
+                             @onmousedown:preventDefault
+                             @onclick="() => RunAsync(index)">
+                            <span>@entry.Command.Label</span>
+                            @if (entry.Command.Shortcut is not null)
+                            {
+                                <kbd aria-hidden="true">@entry.Command.Shortcut</kbd>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <VisuallyHidden aria-live="polite" aria-atomic="true">@_status</VisuallyHidden>
+    </DialogContent>
+</Dialog>
+
+@code {
+    private readonly OptionList<CommandItem> _list = new();
+    private PrimitivesJs? _js;
+    private DotNetObjectReference<CommandMenu>? _reference;
+    private ElementReference _input;
+    private string _query = "";
+    private string _status = "";
+    private bool _open;
+    private string _id = Ids.Next("command");
+
+    [Parameter, EditorRequired] public IEnumerable<CommandItem> Commands { get; set; } = [];
+    [Parameter] public string Label { get; set; } = "Command menu";
+    [Parameter] public string Placeholder { get; set; } = "Type a command or search…";
+    [Parameter] public string EmptyText { get; set; } = "No matching commands";
+    /// <summary>Text announced (politely) when the number of matching commands changes; override to localize.</summary>
+    [Parameter] public Func<int, string>? ResultsAnnouncement { get; set; }
+    /// <summary>Global shortcut; null disables it. "Ctrl" also matches Cmd on macOS.</summary>
+    [Parameter] public string? Hotkey { get; set; } = "Ctrl+K";
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private string InputId => _id + "-input";
+    private string ListId => _id + "-list";
+    private string OptionId(int index) => $"{_id}-option-{index}";
+
+    protected override void OnParametersSet()
+    {
+        if (OpenChanged.HasDelegate && Open != _open)
+        {
+            _open = Open;
+            if (_open) Reset();
+        }
+        Filter();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Hotkey is not null)
+        {
+            _js = new PrimitivesJs(JSRuntime);
+            _reference = DotNetObjectReference.Create(this);
+            await _js.TrackAsync("registerHotkey", Hotkey, _reference, nameof(OnHotkey));
+        }
+        if (firstRender && _js is null) _js = new PrimitivesJs(JSRuntime);
+        if (_open && _list.HasActive && _js is not null) await _js.InvokeVoidAsync("scrollIntoViewById", OptionId(_list.ActiveIndex));
+    }
+
+    [JSInvokable]
+    public Task OnHotkey() => InvokeAsync(() => SetOpenAsync(!_open));
+
+    private void Reset()
+    {
+        _query = "";
+        Filter();
+    }
+
+    private void Filter()
+    {
+        var q = _query.Trim();
+        var matches = Commands.Where(c => q.Length == 0
+            || c.Label.Contains(q, StringComparison.CurrentCultureIgnoreCase)
+            || c.Keywords.Any(k => k.Contains(q, StringComparison.CurrentCultureIgnoreCase))
+            || (c.Group?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false));
+        // Keep grouped order stable: groups appear in first-occurrence order.
+        var ordered = matches.GroupBy(c => c.Group ?? "").SelectMany(g => g).ToList();
+        _list.Update(ordered, static c => c.Label, static c => c.Disabled);
+        _list.ActiveIndex = KeyboardNavigation.Move(-1, _list.Items.Count, _list.IsDisabled, NavigationIntent.First);
+        _status = _open ? (ResultsAnnouncement ?? (static n => n == 1 ? "1 command available." : $"{n} commands available."))(_list.Items.Count) : "";
+    }
+
+    private async Task SetOpenAsync(bool open)
+    {
+        if (open == _open) return;
+        _open = open;
+        if (open) Reset();
+        if (OpenChanged.HasDelegate) await OpenChanged.InvokeAsync(open);
+        StateHasChanged();
+    }
+
+    private void OnInput(string? query)
+    {
+        _query = query ?? "";
+        Filter();
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown": _list.Move(NavigationIntent.Next, loop: true); break;
+            case "ArrowUp": _list.Move(NavigationIntent.Previous, loop: true); break;
+            case "Enter":
+                if (_list.HasActive) await RunAsync(_list.ActiveIndex);
+                break;
+        }
+    }
+
+    private async Task RunAsync(int index)
+    {
+        if (_list.IsDisabled(index)) return;
+        var command = _list.Items[index];
+        await SetOpenAsync(false);
+        await command.Execute();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_js is not null) await _js.DisposeAsync();
+        _reference?.Dispose();
+    }
+}

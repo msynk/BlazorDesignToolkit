@@ -1,0 +1,72 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Menu Button pattern. MenuTrigger (aria-haspopup="menu") opens MenuContent (role="menu") in the top layer.
+   Focus moves to the first item (Up arrow on the trigger: last item). Inside the menu: Up/Down move (wrapping),
+   Home/End, type-to-select, Enter/Space activate, Escape closes and returns focus to the trigger, Tab closes the menu.
+   Items: MenuItem, MenuCheckboxItem, MenuRadioGroup + MenuRadioItem, MenuSeparator. *@
+
+<CascadingValue Value="Context" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    private readonly Controllable<bool> _open = new(false);
+    private DateTimeOffset _dismissedAt;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+    [Parameter] public string Placement { get; set; } = "bottom-start";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal MenuContext Context { get; } = new();
+    internal bool IsOpen => _open.Get(Open, OpenChanged.HasDelegate);
+
+    protected override void OnInitialized()
+    {
+        _open.Initialize(Open);
+        Context.Owner = this;
+        Context.MenuId = Ids.Next("menu");
+        Context.TriggerId = Context.MenuId + "-trigger";
+    }
+
+    protected override void OnParametersSet()
+    {
+        _open.Sync(Open);
+        Context.NotifyStateChanged();
+    }
+
+    internal async Task OpenAsync(MenuFocus focus)
+    {
+        if (IsOpen) return;
+        if (DateTimeOffset.UtcNow - _dismissedAt < TimeSpan.FromMilliseconds(300) && focus == MenuFocus.First && Context.OpenedByPointer) return;
+        Context.PendingFocus = focus;
+        await _open.SetAsync(true, OpenChanged.HasDelegate, OpenChanged);
+        Context.NotifyStateChanged();
+    }
+
+    internal async Task CloseAsync(bool dismissed = false)
+    {
+        if (!IsOpen) return;
+        if (dismissed) _dismissedAt = DateTimeOffset.UtcNow;
+        Context.Active = null;
+        await _open.SetAsync(false, OpenChanged.HasDelegate, OpenChanged);
+        Context.NotifyStateChanged();
+    }
+
+    internal enum MenuFocus
+    {
+        First,
+        Last,
+    }
+
+    internal sealed class MenuContext : PrimitiveContext
+    {
+        public Menu Owner { get; set; } = default!;
+        public string MenuId { get; set; } = "";
+        public string TriggerId { get; set; } = "";
+        public ElementReference Trigger { get; set; }
+        public CompositeRegistry<MenuItemBase> Items { get; } = new();
+        public MenuItemBase? Active { get; set; }
+        public MenuFocus? PendingFocus { get; set; }
+        public bool OpenedByPointer { get; set; }
+    }
+}

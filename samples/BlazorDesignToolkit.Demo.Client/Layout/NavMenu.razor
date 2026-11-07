@@ -1,0 +1,40 @@
+<nav class="site-nav" aria-label="Main">
+    @foreach (var group in Links.GroupBy(l => l.Group))
+    {
+        <h2 class="nav-group" id="nav-@group.Key.ToLowerInvariant()">@group.Key</h2>
+        <ul aria-labelledby="nav-@group.Key.ToLowerInvariant()">
+            @foreach (var link in group)
+            {
+                <li><NavLink href="@link.Href" Match="@(link.Href == "" ? NavLinkMatch.All : NavLinkMatch.Prefix)">@link.Title</NavLink></li>
+            }
+        </ul>
+    }
+</nav>
+
+@code {
+    public sealed record Link(string Group, string Title, string Href);
+
+    public static readonly IReadOnlyList<Link> Links =
+    [
+        new("Overview", "Introduction", ""),
+        new("Tokens", "Token explorer", "tokens"),
+        new("Tokens", "Themes and brands", "themes"),
+        new("Tokens", "Live editor", "editor"),
+        new("Tokens", "Import and export", "import-export"),
+        new("Tokens", "Validation", "validation"),
+        new("Tokens", "Coverage", "coverage"),
+        new("Tokens", "Integrations", "integrations"),
+        new("Primitives", "Buttons and toggles", "primitives/controls"),
+        new("Primitives", "Forms", "primitives/forms"),
+        new("Primitives", "Tabs", "primitives/tabs"),
+        new("Primitives", "Disclosure and accordion", "primitives/disclosure"),
+        new("Primitives", "Dialog", "primitives/dialog"),
+        new("Primitives", "Popover and tooltip", "primitives/popover"),
+        new("Primitives", "Listbox, select, combobox", "primitives/listbox"),
+        new("Primitives", "Menu", "primitives/menu"),
+        new("Primitives", "Tree view", "primitives/tree"),
+        new("Primitives", "Toasts and announcements", "primitives/feedback"),
+        new("Guides", "Design system example", "design-system"),
+        new("Guides", "Accessibility", "accessibility"),
+    ];
+}

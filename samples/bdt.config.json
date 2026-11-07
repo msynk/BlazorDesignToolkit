@@ -1,0 +1,57 @@
+{
+  "$description": "bdt configuration for the Aurora sample design system. Run 'dotnet bdt check' from this folder.",
+  "themes": "tokens/aurora.themes.json",
+  "validation": "tokens/aurora.validation.json",
+  "policy": {
+    "failOn": "error",
+    "suppressions": [
+      { "rule": "BDT4003", "token": "color.**", "justification": "Palette steps may coincide; aliases are used for semantic tokens." }
+    ]
+  },
+  "outputs": [
+    { "format": "theme-css", "path": "generated/aurora.themes.css", "settings": { "prefix": "ds", "layer": "tokens" } },
+    { "format": "css", "path": "generated/aurora.light.css", "settings": { "prefix": "ds", "references": "resolve" } },
+    { "format": "dtcg-json", "path": "generated/aurora.light.tokens.json" },
+    {
+      "format": "tailwind", "path": "generated/aurora.tailwind.css", "settings": { "prefix": "ds" },
+      "config": { "mappings": [
+        { "tokens": "color.surface.*", "namespace": "color", "stripPrefix": "color" },
+        { "tokens": "color.on-surface.*", "namespace": "color", "stripPrefix": "color" },
+        { "tokens": "color.text.*", "namespace": "color", "stripPrefix": "color" },
+        { "tokens": "color.border.*", "namespace": "color", "stripPrefix": "color" },
+        { "tokens": "radius.*", "namespace": "radius" },
+        { "tokens": "shadow.*", "namespace": "shadow" },
+        { "tokens": "typography.*", "namespace": "text" },
+        { "tokens": "font.family.*", "namespace": "font" },
+        { "tokens": "easing.*", "namespace": "ease" }
+      ] }
+    },
+    {
+      "format": "bootstrap-scss", "path": "generated/_aurora.bootstrap.scss",
+      "config": { "mappings": {
+        "primary": "color.surface.accent", "danger": "color.surface.danger", "success": "color.surface.success",
+        "body-bg": "color.surface.default", "body-color": "color.text.default", "border-color": "color.border.default",
+        "link-color": "color.text.link", "border-radius": "radius.md", "font-family-sans-serif": "font.family.sans",
+        "font-family-monospace": "font.family.mono", "line-height-base": "font.line-height.normal", "box-shadow": "shadow.raised"
+      } }
+    },
+    {
+      "format": "fluent", "path": "generated/aurora.fluent.css", "settings": { "prefix": "ds" },
+      "config": { "mappings": {
+        "colorNeutralForeground1": "color.text.default", "colorNeutralForeground2": "color.text.muted",
+        "colorNeutralBackground1": "color.surface.default", "colorNeutralBackground2": "color.surface.sunken",
+        "colorBrandBackground": "color.surface.accent", "colorNeutralForegroundOnBrand": "color.on-surface.accent",
+        "colorNeutralStroke1": "color.border.default", "colorStrokeFocus2": "color.focus.ring",
+        "borderRadiusMedium": "radius.md", "fontFamilyBase": "font.family.sans", "fontWeightSemibold": "font.weight.semibold",
+        "durationNormal": "duration.normal", "curveEasyEase": "easing.standard", "shadow4": "shadow.raised"
+      } }
+    }
+  ],
+  "coverage": {
+    "sources": ["BlazorDesignToolkit.Demo.Client/**/*.razor", "BlazorDesignToolkit.Demo.Client/**/*.css", "BlazorDesignToolkit.Demo/**/*.razor"],
+    "exclude": ["**/bin/**", "**/obj/**"],
+    "manifests": ["tokens/components.manifest.json"],
+    "entryPoints": ["color.white", "color.black"],
+    "prefix": "ds"
+  }
+}

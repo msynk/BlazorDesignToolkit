@@ -1,0 +1,82 @@
+@page "/"
+
+<PageTitle>BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Design tokens, theming and headless UI for Blazor</h1>
+<p class="lead">
+    Define a design system once in the <a href="https://www.designtokens.org/tr/2025.10/">DTCG 2025.10</a> format, validate it
+    (including WCAG contrast), export it to CSS and frameworks, switch themes at runtime, and build accessible interfaces
+    with unstyled primitives. Every page of this demo uses the toolkit itself.
+</p>
+
+<Example Title="Adopt only what you need">
+    <Description>
+        <p>The modules are independent packages. None of them requires a CSS framework or a visual component library.</p>
+    </Description>
+    <ChildContent>
+        <table class="data-table">
+            <caption>Packages</caption>
+            <thead><tr><th scope="col">Package</th><th scope="col">Use it for</th><th scope="col">Depends on</th></tr></thead>
+            <tbody>
+                <tr><th scope="row"><code>BlazorDesignToolkit.Tokens</code></th><td>DTCG parsing, references, validation, contrast, CSS export, coverage, diff</td><td>.NET only</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.Theming</code></th><td>Brands, modes, contrast and density axes, theme stylesheets, theme manager</td><td>Tokens</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.Theming.Blazor</code></th><td>Runtime switching, system preferences, persistence, no-flash startup</td><td>Theming, Blazor</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.Primitives</code></th><td>Accessible headless components</td><td>Blazor only</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.Primitives.StarterStyles</code></th><td>Optional CSS for the primitives</td><td>None</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.Tokens.Tailwind / .Bootstrap / .Fluent</code></th><td>Type-checked framework integrations</td><td>Tokens</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.Testing</code></th><td>Accessibility assertions for component tests</td><td>AngleSharp</td></tr>
+                <tr><th scope="row"><code>bdt</code> (dotnet tool)</th><td>validate, build, export, coverage, diff, check in CI</td><td>—</td></tr>
+            </tbody>
+        </table>
+    </ChildContent>
+</Example>
+
+<Example Title="Quick start: theming" Code="@ThemingSnippet">
+    <Description><p>Register a catalog, render the stylesheet in <code>&lt;head&gt;</code>, and wrap the app in <code>ThemeProvider</code>.</p></Description>
+</Example>
+
+<Example Title="Quick start: headless primitive" Code="@PrimitiveSnippet">
+    <ChildContent>
+        <Tabs DefaultValue="tokens">
+            <TabList aria-label="Quick start tabs">
+                <Tab Value="tokens">Tokens</Tab>
+                <Tab Value="themes">Themes</Tab>
+            </TabList>
+            <TabPanel Value="tokens"><p>Tokens are validated before anything is exported.</p></TabPanel>
+            <TabPanel Value="themes"><p>Themes only change attributes at runtime; the CSS is generated once.</p></TabPanel>
+        </Tabs>
+    </ChildContent>
+</Example>
+
+@code {
+    private const string ThemingSnippet = """
+        // Program.cs
+        var catalog = (await ThemeManifest.LoadAsync("tokens/aurora.themes.json")).Catalog!;
+        builder.Services.AddDesignTokenTheming(o =>
+        {
+            o.Catalog = catalog;
+            o.Css = ThemeCssOptions.Default with { Css = ThemeCssOptions.Default.Css with { Prefix = "ds" } };
+            o.Persistence = ThemePersistence.Cookie;
+        });
+
+        <!-- App.razor -->
+        <head>
+            <ThemeStyles />
+            <ThemeInitScript />
+        </head>
+
+        <!-- MainLayout.razor -->
+        <ThemeProvider>@Body</ThemeProvider>
+        """;
+
+    private const string PrimitiveSnippet = """
+        <Tabs DefaultValue="tokens">
+            <TabList aria-label="Quick start tabs">
+                <Tab Value="tokens">Tokens</Tab>
+                <Tab Value="themes">Themes</Tab>
+            </TabList>
+            <TabPanel Value="tokens">…</TabPanel>
+            <TabPanel Value="themes">…</TabPanel>
+        </Tabs>
+        """;
+}

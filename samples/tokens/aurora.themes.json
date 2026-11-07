@@ -1,0 +1,38 @@
+{
+  "$description": "Theme manifest for the Aurora sample design system: two brands (Aurora, Ember) across color mode, contrast and density.",
+  "defaultTheme": "aurora",
+  "axes": [
+    { "name": "mode", "displayName": "Color mode", "values": ["light", "dark"], "default": "light", "system": { "dark": "(prefers-color-scheme: dark)" } },
+    { "name": "contrast", "displayName": "Contrast", "values": ["standard", "more"], "default": "standard", "system": { "more": "(prefers-contrast: more)" } },
+    { "name": "density", "displayName": "Density", "values": ["comfortable", "compact"], "default": "comfortable" }
+  ],
+  "themes": [
+    {
+      "id": "aurora",
+      "name": "Aurora",
+      "description": "Cool, neutral default brand.",
+      "metadata": { "owner": "Design Systems", "version": "1.0.0" },
+      "layers": [
+        { "source": "foundation.tokens.json" },
+        { "source": "semantic.light.tokens.json" },
+        { "source": "semantic.dark.tokens.json", "when": { "mode": "dark" } },
+        { "source": "contrast.more.light.tokens.json", "when": { "mode": "light", "contrast": "more" } },
+        { "source": "contrast.more.dark.tokens.json", "when": { "mode": "dark", "contrast": "more" } },
+        { "source": "density.comfortable.tokens.json" },
+        { "source": "density.compact.tokens.json", "when": { "density": "compact" } },
+        { "source": "components.tokens.json" }
+      ]
+    },
+    {
+      "id": "ember",
+      "name": "Ember",
+      "description": "Warm brand that extends Aurora and only changes the accent palette.",
+      "extends": "aurora",
+      "layers": [
+        { "source": "brands/ember.tokens.json" },
+        { "source": "brands/ember.light.tokens.json", "when": { "mode": "light" } },
+        { "source": "brands/ember.dark.tokens.json", "when": { "mode": "dark" } }
+      ]
+    }
+  ]
+}

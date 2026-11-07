@@ -1,0 +1,22 @@
+{
+  "base": {
+    "blue": {
+      "$value": { "colorSpace": "srgb", "components": [0.2, 0.4, 0.9], "hex": "#3366e6" },
+      "$type": "color"
+    }
+  },
+  "semantic": {
+    "primary": {
+      "$value": {
+        "colorSpace": "srgb",
+        "components": [
+          { "$ref": "#/base/blue/$value/components/0" },
+          { "$ref": "#/base/blue/$value/components/1" },
+          0.7
+        ],
+        "hex": "#3366b3"
+      },
+      "$type": "color"
+    }
+  }
+}

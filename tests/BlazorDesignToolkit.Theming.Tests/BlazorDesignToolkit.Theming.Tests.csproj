@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Theming\BlazorDesignToolkit.Theming.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Theming.Blazor\BlazorDesignToolkit.Theming.Blazor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="bunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\samples\tokens\**\*" LinkBase="SampleTokens" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

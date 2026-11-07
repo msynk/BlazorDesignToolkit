@@ -1,0 +1,26 @@
+{
+  "$description": "Validation rules for the Aurora design system (used by bdt.config.json and the demo).",
+  "naming": [{ "pattern": "**", "case": "kebab-case" }],
+  "requiredTokens": [
+    { "path": "color.text.default", "type": "color" },
+    { "path": "color.surface.default", "type": "color" },
+    { "path": "color.focus.ring", "type": "color" },
+    { "path": "color.border.default", "type": "color" }
+  ],
+  "layers": {
+    "primitive": ["color.white", "color.black", "color.neutral.**", "color.blue.**", "color.green.**", "color.red.**", "color.amber.**", "color.violet.**", "color.ember.**", "space.*", "radius.*", "font.**", "border.width.*", "duration.*", "easing.*", "opacity.*", "layer.*"],
+    "semantic": ["color.text.*", "color.surface.*", "color.on-surface.*", "color.border.*", "color.focus.*", "color.interactive.*", "shape.**", "stroke.**"],
+    "component": ["component.**"]
+  },
+  "accessibility": {
+    "backdrop": "color.surface.default",
+    "pairings": [{ "background": "color.surface.*", "foreground": "color.on-surface.*", "kind": "text" }],
+    "pairs": [
+      { "foreground": "color.text.muted", "background": "color.surface.default", "kind": "text" },
+      { "foreground": "color.text.link", "background": "color.surface.default", "kind": "text" },
+      { "foreground": "color.text.danger", "background": "color.surface.default", "kind": "text" },
+      { "foreground": "color.border.default", "background": "color.surface.default", "kind": "non-text" }
+    ],
+    "focusIndicators": [{ "indicator": "color.focus.ring", "backgrounds": ["color.surface.default", "color.surface.raised", "color.surface.sunken"] }]
+  }
+}

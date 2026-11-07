@@ -1,0 +1,14 @@
+@* Aurora design system button: a native <button> styled only with Aurora component tokens (see AuroraButton.razor.css).
+   Shows how an existing design system adopts the token engine without any headless dependency for simple controls. *@
+<button type="@Type" class="aurora-button aurora-button--@Variant" disabled="@Disabled" @attributes="AdditionalAttributes" @onclick="OnClick">
+    @ChildContent
+</button>
+
+@code {
+    [Parameter] public string Type { get; set; } = "button";
+    [Parameter] public string Variant { get; set; } = "primary";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+}

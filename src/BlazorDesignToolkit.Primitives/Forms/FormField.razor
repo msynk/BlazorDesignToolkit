@@ -1,0 +1,32 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Groups a label, a control, a description and an error message and wires their ids (aria-describedby,
+   aria-invalid, aria-errormessage, label[for]). Renders a <div> unless Element is set. *@
+@inherits PrimitiveBase
+
+<CascadingValue Value="_context" IsFixed="true">
+    <div @attributes="AdditionalAttributes" data-invalid="@(Invalid ? "" : null)" data-disabled="@(Disabled ? "" : null)">
+        @ChildContent?.Invoke(_context)
+    </div>
+</CascadingValue>
+
+@code {
+    private FormFieldContext _context = default!;
+
+    /// <summary>Base id; derived ids are "{Id}-control", "-label", "-description" and "-error".</summary>
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public bool Invalid { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    /// <summary>Content; the context exposes ids and <c>ControlAttributes</c> for custom controls.</summary>
+    [Parameter] public RenderFragment<FormFieldContext>? ChildContent { get; set; }
+
+    protected override void OnInitialized() => _context = new FormFieldContext(Id ?? Ids.Next("field"));
+
+    protected override void OnParametersSet()
+    {
+        _context.Invalid = Invalid;
+        _context.Required = Required;
+        _context.Disabled = Disabled;
+        _context.NotifyChanged();
+    }
+}

@@ -1,0 +1,114 @@
+@inherits PrimitiveTestBase
+
+@code {
+    [Fact]
+    public void ToggleButton_reflects_pressed_state()
+    {
+        var cut = Render(@<ToggleButton aria-label="Bold">B</ToggleButton>);
+        var button = cut.Find("button");
+        Assert.Equal("false", button.Attr("aria-pressed"));
+        button.Click();
+        Assert.Equal("true", cut.Find("button").Attr("aria-pressed"));
+        Assert.Equal("on", cut.Find("button").Attr("data-state"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void ToggleButton_controlled_and_disabled()
+    {
+        var pressed = false;
+        var cut = Render(@<ToggleButton Pressed="pressed" PressedChanged="v => pressed = v">Mute</ToggleButton>);
+        cut.Find("button").Click();
+        Assert.True(pressed);
+        var disabled = Render(@<ToggleButton Disabled="true">Off</ToggleButton>);
+        Assert.True(disabled.Find("button").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public void Checkbox_is_native_and_wired_to_form_field()
+    {
+        var value = false;
+        var cut = Render(@<FormField Invalid="true" Required="true">
+            <FormLabel>Accept terms</FormLabel>
+            <Checkbox Checked="value" CheckedChanged="v => value = v" />
+            <FormDescription>Required to continue.</FormDescription>
+            <FormError>You must accept the terms.</FormError>
+        </FormField>);
+        var input = cut.Find("input[type=checkbox]");
+        var label = cut.Find("label");
+        Assert.Equal(input.Id, label.Attr("for"));
+        Assert.Equal("true", input.Attr("aria-invalid"));
+        Assert.True(input.HasAttribute("required"));
+        Assert.Equal(cut.Find("[id$=-error]").Id, input.Attr("aria-errormessage"));
+        Assert.Contains(cut.Find("[id$=-description]").Id!, input.Attr("aria-describedby"));
+        input.Change(true);
+        Assert.True(value);
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Checkbox_sets_indeterminate_through_javascript()
+    {
+        Render(@<label><Checkbox Indeterminate="true" /> Select all</label>);
+        Assert.Contains(Module.Invocations, i => i.Identifier == "setIndeterminate" && (bool)i.Arguments[1]! == true);
+    }
+
+    [Fact]
+    public void Error_message_is_only_rendered_when_invalid()
+    {
+        var cut = Render(@<FormField Invalid="false"><FormLabel>Name</FormLabel><FieldInput /><FormError>Required</FormError></FormField>);
+        Assert.Empty(cut.FindAll("[id$=-error]"));
+        Assert.False(cut.Find("input").HasAttribute("aria-invalid"));
+    }
+
+    [Fact]
+    public void Switch_toggles_and_is_named_by_label()
+    {
+        var cut = Render(@<FormField><FormLabel>Wi-Fi</FormLabel><Switch Name="wifi" /></FormField>);
+        var sw = cut.Find("[role=switch]");
+        Assert.Equal("false", sw.Attr("aria-checked"));
+        Assert.Equal(cut.Find("label").Id, sw.Attr("aria-labelledby"));
+        sw.Click();
+        Assert.Equal("true", cut.Find("[role=switch]").Attr("aria-checked"));
+        Assert.Equal("on", cut.Find("input[type=hidden]").Attr("value"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Switch_without_name_fails_the_audit()
+    {
+        var cut = Render(@<Switch />);
+        var ex = Assert.Throws<AccessibilityException>(() => AssertAccessible(cut.Markup));
+        Assert.Contains(ex.Issues, i => i.Rule == "accessible-name");
+    }
+
+    [Fact]
+    public void RadioGroup_uses_native_radios_and_reacts_to_controlled_value()
+    {
+        string? value = "b";
+        var cut = Render(@<FormField>
+            <FormLabel>Size</FormLabel>
+            <RadioGroup TValue="string" Value="value" ValueChanged="v => value = v">
+                <label><Radio Value="@("a")" /> Small</label>
+                <label><Radio Value="@("b")" /> Medium</label>
+                <label><Radio Value="@("c")" Disabled="true" /> Large</label>
+            </RadioGroup>
+        </FormField>);
+        var radios = cut.FindAll("input[type=radio]");
+        Assert.Single(radios.Select(r => r.Attr("name")).Distinct());
+        Assert.True(radios[1].HasAttribute("checked"));
+        Assert.True(radios[2].HasAttribute("disabled"));
+        radios[0].Change("a");
+        Assert.Equal("a", value);
+        Assert.Equal(cut.Find("label").Id, cut.Find("[role=radiogroup]").Attr("aria-labelledby"));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void VisuallyHidden_keeps_content_for_assistive_technology()
+    {
+        var cut = Render(@<VisuallyHidden>Loading</VisuallyHidden>);
+        Assert.Contains("clip:rect(0,0,0,0)", cut.Find("span").Attr("style"));
+        Assert.Equal("Loading", cut.Find("span").TextContent);
+    }
+}

@@ -1,0 +1,29 @@
+@namespace BlazorDesignToolkit.Primitives
+@* role="region" labelled by the trigger. Set UseRegion=false for accordions with many items (APG advises avoiding
+   too many landmarks). *@
+@inherits PrimitiveBase
+
+@{
+    var open = Context.Owner.IsOpen(Item.Value);
+}
+<div @attributes='Attributes("id", "role", "aria-labelledby", "hidden")'
+     id="@Item.PanelId"
+     role="@(UseRegion ? "region" : null)"
+     aria-labelledby="@Item.TriggerId"
+     hidden="@(!open)"
+     data-state="@(open ? "open" : "closed")">
+    @if (open || KeepMounted)
+    {
+        @ChildContent
+    }
+</div>
+
+@code {
+    [CascadingParameter] internal Accordion.AccordionContext Context { get; set; } = default!;
+    [CascadingParameter] internal AccordionItem Item { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool KeepMounted { get; set; }
+    [Parameter] public bool UseRegion { get; set; } = true;
+
+    protected override void OnInitialized() => Track(Context);
+}

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Theming</RootNamespace>
+    <Description>Browser-independent theming: theme catalogs with brands, color modes, contrast and density axes, layered composition, deterministic theme stylesheets and a runtime theme manager.</Description>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorDesignToolkit.Tokens\BlazorDesignToolkit.Tokens.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BlazorDesignToolkit.Theming.Tests" />
+  </ItemGroup>
+
+</Project>

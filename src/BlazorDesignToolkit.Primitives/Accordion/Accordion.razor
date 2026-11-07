@@ -1,0 +1,100 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Accordion pattern: each item has a heading containing a button (aria-expanded, aria-controls) and a
+   region panel labelled by the button. Optional arrow-key navigation between headers (Up/Down/Home/End).
+   Type Single allows one open item (optionally collapsible); Multiple allows any number. *@
+@inherits PrimitiveBase
+
+<CascadingValue Value="Context" IsFixed="true">
+    <div @attributes="AdditionalAttributes" data-bdt-keys="@(ArrowNavigation ? "ArrowUp ArrowDown Home End" : null)" @ref="_element" @onkeydown="OnKeyDownAsync">
+        @ChildContent
+    </div>
+</CascadingValue>
+
+@code {
+    private ElementReference _element;
+    private HashSet<string> _internal = new(StringComparer.Ordinal);
+    private bool _initialized;
+
+    [Parameter] public AccordionType Type { get; set; } = AccordionType.Single;
+    /// <summary>For Single: whether the open item can be closed so that none is open. Default true.</summary>
+    [Parameter] public bool Collapsible { get; set; } = true;
+    /// <summary>Open item values (controlled when <see cref="ValuesChanged"/> is set).</summary>
+    [Parameter] public IReadOnlyCollection<string>? Values { get; set; }
+    [Parameter] public EventCallback<IReadOnlyCollection<string>> ValuesChanged { get; set; }
+    [Parameter] public IReadOnlyCollection<string>? DefaultValues { get; set; }
+    /// <summary>Heading level of the item headers (1-6). Default 3.</summary>
+    [Parameter] public int HeadingLevel { get; set; } = 3;
+    [Parameter] public bool ArrowNavigation { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal AccordionContext Context { get; } = new();
+
+    protected override void OnInitialized()
+    {
+        Context.Owner = this;
+        Context.BaseId = ProvidedId ?? Ids.Next("accordion");
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!_initialized)
+        {
+            _internal = new HashSet<string>(DefaultValues ?? Values ?? [], StringComparer.Ordinal);
+            _initialized = true;
+        }
+        if (HeadingLevel is < 1 or > 6) throw new ArgumentOutOfRangeException(nameof(HeadingLevel), "Heading level must be between 1 and 6.");
+        Context.NotifyStateChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Context.Triggers.Rendered = true;
+        if (firstRender && ArrowNavigation) await Js.TrackAsync("preventKeys", _element);
+    }
+
+    private IReadOnlyCollection<string> Open => ValuesChanged.HasDelegate ? Values ?? [] : _internal;
+
+    internal bool IsOpen(string value) => Open.Contains(value);
+
+    /// <summary>In Single mode a non-collapsible open item cannot be closed; its button is aria-disabled.</summary>
+    internal bool IsLocked(string value) => Type == AccordionType.Single && !Collapsible && IsOpen(value);
+
+    internal async Task ToggleAsync(string value)
+    {
+        if (IsLocked(value)) return;
+        var next = new HashSet<string>(Open, StringComparer.Ordinal);
+        if (!next.Remove(value))
+        {
+            if (Type == AccordionType.Single) next.Clear();
+            next.Add(value);
+        }
+        if (!ValuesChanged.HasDelegate) _internal = next;
+        else await ValuesChanged.InvokeAsync(next.ToArray());
+        Context.NotifyStateChanged();
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (!ArrowNavigation) return;
+        var intent = KeyboardNavigation.Intent(e.Key, Orientation.Vertical);
+        if (intent == NavigationIntent.None) return;
+        if (Context.Triggers.OrderDirty) Context.Triggers.ApplyOrder(await Js.InvokeAsync<string[]>("domOrder", _element, "[data-accordion-trigger]"));
+        var current = Context.Triggers.Focused ?? Context.Triggers.FindById(await Js.InvokeAsync<string?>("activeElementId"));
+        if (current is null) return;
+        var target = Context.Triggers.Navigate(current, intent, loop: true);
+        if (target is not null && target != current) await target.FocusAsync();
+    }
+
+    public enum AccordionType
+    {
+        Single,
+        Multiple,
+    }
+
+    internal sealed class AccordionContext : PrimitiveContext
+    {
+        public Accordion Owner { get; set; } = default!;
+        public string BaseId { get; set; } = "";
+        public CompositeRegistry<AccordionTrigger> Triggers { get; } = new();
+    }
+}

@@ -1,0 +1,129 @@
+{
+  "$description": "Ember brand palette. Ember themes extend Aurora and only change the accent.",
+  "color": {
+    "$type": "color",
+    "ember": {
+      "50": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.996078,
+            0.956863,
+            0.945098
+          ],
+          "hex": "#fef4f1"
+        }
+      },
+      "100": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            1,
+            0.905882,
+            0.870588
+          ],
+          "hex": "#ffe7de"
+        }
+      },
+      "200": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            1,
+            0.819608,
+            0.74902
+          ],
+          "hex": "#ffd1bf"
+        }
+      },
+      "300": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            1,
+            0.678431,
+            0.556863
+          ],
+          "hex": "#ffad8e"
+        }
+      },
+      "400": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.964706,
+            0.494118,
+            0.298039
+          ],
+          "hex": "#f67e4c"
+        }
+      },
+      "500": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.854902,
+            0.368627,
+            0.14902
+          ],
+          "hex": "#da5e26"
+        }
+      },
+      "600": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.729412,
+            0.270588,
+            0.003922
+          ],
+          "hex": "#ba4501"
+        }
+      },
+      "700": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.596078,
+            0.215686,
+            0.003922
+          ],
+          "hex": "#983701"
+        }
+      },
+      "800": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.466667,
+            0.164706,
+            0.007843
+          ],
+          "hex": "#772a02"
+        }
+      },
+      "900": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.34902,
+            0.109804,
+            0
+          ],
+          "hex": "#591c00"
+        }
+      },
+      "950": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.227451,
+            0.062745,
+            0
+          ],
+          "hex": "#3a1000"
+        }
+      }
+    }
+  }
+}

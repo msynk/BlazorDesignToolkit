@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Primitives</RootNamespace>
+    <Description>Accessible, unstyled (headless) Blazor primitives: toggle button, checkbox, switch, radio group, tabs, disclosure, accordion, dialog, popover, tooltip, listbox, select, menu, combobox, command menu, tree view, toasts, live regions, form fields and focus utilities. Semantic HTML, WAI-ARIA Authoring Practices keyboard behavior, no CSS framework required.</Description>
+    <IsTrimmable>true</IsTrimmable>
+    <PackageTags>$(PackageTags);aria;wai-aria;components</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BlazorDesignToolkit.Primitives.Tests" />
+  </ItemGroup>
+
+</Project>

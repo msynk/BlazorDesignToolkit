@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Browser tests run the demo app in-process on Kestrel and drive it with Playwright. -->
+    <NoWarn>$(NoWarn);xUnit1004</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\BlazorDesignToolkit.Demo\BlazorDesignToolkit.Demo.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tests share one browser; running them sequentially keeps WebKit and Firefox stable on CI machines. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="Deque.AxeCore.Playwright" />
+  </ItemGroup>
+
+</Project>

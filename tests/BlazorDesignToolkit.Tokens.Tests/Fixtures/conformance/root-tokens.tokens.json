@@ -1,0 +1,19 @@
+{
+  "color": {
+    "accent": {
+      "$root": {
+        "$type": "color",
+        "$value": { "colorSpace": "srgb", "components": [0.867, 0, 0], "hex": "#dd0000" }
+      },
+      "light": {
+        "$type": "color",
+        "$value": { "colorSpace": "srgb", "components": [1, 0.133, 0.133], "hex": "#ff2222" }
+      },
+      "dark": {
+        "$type": "color",
+        "$value": { "colorSpace": "srgb", "components": [0.667, 0, 0], "hex": "#aa0000" }
+      }
+    },
+    "brand": { "$value": "{color.accent.$root}" }
+  }
+}

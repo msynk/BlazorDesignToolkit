@@ -1,0 +1,13 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Content available to assistive technology but not shown visually. The inline style is behavior, not theming,
+   so it is applied here rather than in an optional stylesheet. Set Focusable to reveal it when focused (skip links). *@
+@inherits PrimitiveBase
+
+<span @attributes="AdditionalAttributes" style="@(Focusable ? null : Style)" data-visually-hidden="">@ChildContent</span>
+
+@code {
+    internal const string Style = "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0";
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool Focusable { get; set; }
+}

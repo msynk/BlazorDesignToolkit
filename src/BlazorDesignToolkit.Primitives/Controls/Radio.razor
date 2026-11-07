@@ -1,0 +1,33 @@
+@namespace BlazorDesignToolkit.Primitives
+@* A native radio input belonging to the enclosing RadioGroup. Label it with a wrapping <label> or label[for]. *@
+@typeparam TValue
+@inherits PrimitiveBase
+
+<input type="radio"
+       @attributes='Attributes("type", "name", "checked")'
+       id="@Id"
+       name="@Group?.GroupName"
+       value="@ValueText"
+       checked="@(Group?.IsSelected(Value) == true)"
+       disabled="@(Disabled || Group?.IsDisabled == true)"
+       required="@(Group?.IsRequired == true)"
+       data-state="@(Group?.IsSelected(Value) == true ? "checked" : "unchecked")"
+       @onchange="OnChangeAsync" />
+
+@code {
+    [CascadingParameter] private RadioGroup<TValue>? Group { get; set; }
+    [Parameter, EditorRequired] public TValue? Value { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Id { get; set; }
+
+    private string? ValueText => Value?.ToString();
+
+    protected override void OnInitialized()
+    {
+        if (Group is null) throw new InvalidOperationException($"{nameof(Radio<TValue>)} must be placed inside a {nameof(RadioGroup<TValue>)} with the same TValue.");
+        Id ??= ProvidedId ?? Ids.Next("radio-item");
+        Track(Group.State);
+    }
+
+    private Task OnChangeAsync(ChangeEventArgs _) => Group!.SelectAsync(Value);
+}

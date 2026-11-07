@@ -1,0 +1,91 @@
+@* Connects the scoped ThemeManager to the browser: applies theme attributes and runtime overrides to the root element,
+   follows operating-system preferences and loads the persisted preference. It cascades the ThemeManager and the current
+   ThemeState. Place it inside an interactive render boundary; during prerendering it only renders its content. *@
+@implements IAsyncDisposable
+@using System.Text.Json
+@using Microsoft.JSInterop
+@inject ThemeManager Manager
+@inject ThemeBrowserInterop Interop
+@inject ThemingOptions Options
+
+<CascadingValue Value="Manager" IsFixed="true">
+    <CascadingValue Value="Manager.State">
+        @ChildContent
+    </CascadingValue>
+</CascadingValue>
+
+@code {
+    private DotNetObjectReference<ThemeProvider>? _reference;
+    private HashSet<string> _inlineProperties = new(StringComparer.Ordinal);
+    private int _watchId;
+    private bool _initialized;
+    private bool _disposed;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Raised after the theme has been applied to the page (useful for tests and analytics-free instrumentation).</summary>
+    [Parameter] public EventCallback<ThemeState> OnApplied { get; set; }
+
+    protected override void OnInitialized() => Manager.Changed += OnManagerChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        using (Manager.BeginBatch())
+        {
+            await Manager.LoadPreferenceAsync();
+            if (Options.FollowSystemPreferences)
+            {
+                Manager.UpdateSystemPreferences(await Interop.GetSystemPreferencesAsync());
+                _reference = DotNetObjectReference.Create(this);
+                _watchId = await Interop.WatchSystemPreferencesAsync(_reference);
+            }
+        }
+        _initialized = true;
+        await ApplyAsync();
+    }
+
+    private void OnManagerChanged(object? sender, ThemeChangedEventArgs e)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (_disposed) return;
+            if (_initialized) await ApplyAsync();
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>Called from JavaScript when a media feature changes.</summary>
+    [JSInvokable]
+    public Task OnSystemPreferencesChanged(JsonElement preferences)
+        => InvokeAsync(() => Manager.UpdateSystemPreferences(ThemeBrowserInterop.ToPreferences(preferences)));
+
+    private async Task ApplyAsync()
+    {
+        var state = Manager.State;
+        var attributes = ThemeRootAttributes.For(Manager.Catalog, state.Selection, Options.Css)
+            .ToDictionary(static a => a.Key, static a => (string?)a.Value.ToString(), StringComparer.Ordinal);
+        var properties = new Dictionary<string, string?>(StringComparer.Ordinal);
+        if (state.OverridesTree is { } overrides)
+        {
+            foreach (var d in ThemeStylesheetGenerator.GetOverrideDeclarations(Manager.Catalog, state.EffectiveSelection, overrides, Options.Css, out _))
+            {
+                properties[d.Name] = d.Value;
+            }
+        }
+        var clear = _inlineProperties.Where(p => !properties.ContainsKey(p)).ToList();
+        if (await Interop.ApplyAsync(Options.RootSelector, attributes, properties, clear))
+        {
+            _inlineProperties = [.. properties.Keys];
+            if (OnApplied.HasDelegate) await OnApplied.InvokeAsync(state);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        Manager.Changed -= OnManagerChanged;
+        if (_watchId != 0) await Interop.UnwatchAsync(_watchId);
+        _reference?.Dispose();
+    }
+}

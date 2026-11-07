@@ -1,0 +1,63 @@
+@namespace BlazorDesignToolkit.Primitives
+@* role="dialog" (non-modal) labelled by the trigger unless aria-label/aria-labelledby is provided. *@
+@inherits PrimitiveBase
+
+<div popover="auto" @ref="_element"
+     @attributes='Attributes("popover", "id", "role")'
+     id="@Context.ContentId"
+     role="dialog"
+     aria-labelledby="@(AdditionalAttributes?.ContainsKey("aria-label") == true || AdditionalAttributes?.ContainsKey("aria-labelledby") == true ? null : Context.TriggerId)"
+     tabindex="-1"
+     data-state="@(Context.Owner.IsOpen ? "open" : "closed")">
+    @if (Context.Owner.IsOpen || KeepMounted)
+    {
+        @ChildContent
+    }
+</div>
+
+@code {
+    private ElementReference _element;
+    private DotNetObjectReference<PopoverContent>? _reference;
+    private int _handle;
+    private bool _shown;
+
+    [CascadingParameter] internal Popover.PopoverContext Context { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool KeepMounted { get; set; }
+    /// <summary>Move focus into the content when it opens (first focusable element, or the content itself). Default true.</summary>
+    [Parameter] public bool FocusOnOpen { get; set; } = true;
+
+    protected override void OnInitialized()
+    {
+        if (Context is null) throw new InvalidOperationException("PopoverContent must be placed inside Popover.");
+        Track(Context);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var open = Context.Owner.IsOpen;
+        if (open && !_shown)
+        {
+            _shown = true;
+            _reference ??= DotNetObjectReference.Create(this);
+            _handle = await Js.TrackAsync("showPopover", _element, Context.Trigger, _reference,
+                new { placement = Context.Owner.Placement, focus = FocusOnOpen, restoreFocus = true });
+        }
+        else if (!open && _shown)
+        {
+            _shown = false;
+            await Js.ReleaseAsync(_handle);
+            _handle = 0;
+        }
+    }
+
+    /// <summary>Called by the browser on light dismiss (Escape, outside click).</summary>
+    [JSInvokable]
+    public Task OnPopoverToggle(bool open) => open ? Task.CompletedTask : InvokeAsync(Context.Owner.DismissAsync);
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _reference?.Dispose();
+    }
+}

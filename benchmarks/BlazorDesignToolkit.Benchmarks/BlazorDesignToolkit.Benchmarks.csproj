@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <Optimize>true</Optimize>
+    <NoWarn>$(NoWarn);CA1822</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Tokens\BlazorDesignToolkit.Tokens.csproj" />
+    <ProjectReference Include="..\..\src\BlazorDesignToolkit.Theming\BlazorDesignToolkit.Theming.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\samples\tokens\**\*" LinkBase="SampleTokens" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

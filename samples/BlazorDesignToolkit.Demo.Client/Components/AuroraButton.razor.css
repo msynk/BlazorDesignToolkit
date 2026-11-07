@@ -1,0 +1,40 @@
+.aurora-button {
+  min-block-size: var(--ds-component-button-height);
+  padding-inline: var(--ds-component-button-padding-inline);
+  border: var(--ds-stroke-width-control) solid transparent;
+  border-radius: var(--ds-component-button-radius);
+  font: var(--ds-typography-body);
+  font-weight: var(--ds-font-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--ds-transition-default), box-shadow var(--ds-transition-default);
+}
+
+.aurora-button--primary {
+  background: var(--ds-component-button-primary-background);
+  color: var(--ds-component-button-primary-foreground);
+}
+
+.aurora-button--secondary {
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-default);
+  border-color: var(--ds-color-border-default);
+}
+
+.aurora-button--danger {
+  background: var(--ds-color-surface-danger);
+  color: var(--ds-color-on-surface-danger);
+}
+
+.aurora-button:hover:not(:disabled) {
+  box-shadow: var(--ds-shadow-raised);
+}
+
+.aurora-button:focus-visible {
+  outline: var(--ds-component-focus-ring);
+  outline-offset: var(--ds-component-focus-offset);
+}
+
+.aurora-button:disabled {
+  opacity: var(--ds-opacity-disabled);
+  cursor: not-allowed;
+}

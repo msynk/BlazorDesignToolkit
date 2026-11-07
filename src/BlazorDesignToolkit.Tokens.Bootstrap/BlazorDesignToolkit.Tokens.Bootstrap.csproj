@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Tokens.Bootstrap</RootNamespace>
+    <Description>Bootstrap 5.3 integration for BlazorDesignToolkit design tokens: generates type-checked Sass variables and runtime CSS custom-property overrides, including -rgb companions.</Description>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BlazorDesignToolkit.Tokens\BlazorDesignToolkit.Tokens.csproj" />
+  </ItemGroup>
+
+</Project>

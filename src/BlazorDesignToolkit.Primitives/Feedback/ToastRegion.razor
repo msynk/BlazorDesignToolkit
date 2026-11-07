@@ -1,0 +1,105 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Notification region. Each toast is a live region (role="status", or role="alert" for errors) inside a labelled
+   <section>. Timers pause while the pointer is over the region or focus is inside it (WCAG 2.2 SC 2.2.1), errors stay
+   until dismissed, and every toast has a dismiss button. Render once in the layout. *@
+@implements IDisposable
+@inject ToastService Toasts
+
+<section @attributes="AdditionalAttributes" aria-label="@Label"
+         @onmouseenter="Pause" @onmouseleave="Resume" @onfocusin="Pause" @onfocusout="Resume">
+    <ol data-toasts="">
+        @foreach (var toast in Toasts.Toasts)
+        {
+            var t = toast;
+            @* The live-region role sits inside the list item so the list keeps valid list semantics. *@
+            <li @key="t.Id" data-kind="@t.Options.Kind.ToString().ToLowerInvariant()">
+                <div role="@(t.Options.Kind == ToastKind.Error ? "alert" : "status")" aria-atomic="true" data-toast="">
+                @if (ToastTemplate is not null)
+                {
+                    @ToastTemplate(new ToastContext(t, () => Toasts.Dismiss(t.Id)))
+                }
+                else
+                {
+                    @if (t.Options.Title is not null)
+                    {
+                        <strong data-toast-title="">@t.Options.Title</strong>
+                    }
+                    <span data-toast-message="">@t.Options.Message</span>
+                    @if (t.Options.ActionLabel is not null && t.Options.Action is not null)
+                    {
+                        <button type="button" data-toast-action="" @onclick="() => RunActionAsync(t)">@t.Options.ActionLabel</button>
+                    }
+                }
+                </div>
+                @if (ToastTemplate is null)
+                {
+                    <button type="button" data-toast-dismiss="" aria-label="@DismissLabel" @onclick="() => Toasts.Dismiss(t.Id)">×</button>
+                }
+            </li>
+        }
+    </ol>
+</section>
+
+@code {
+    private bool _paused;
+
+    [Parameter] public string Label { get; set; } = "Notifications";
+    [Parameter] public string DismissLabel { get; set; } = "Dismiss notification";
+    [Parameter] public RenderFragment<ToastContext>? ToastTemplate { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    public sealed record ToastContext(Toast Toast, Action Dismiss);
+
+    protected override void OnInitialized() => Toasts.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(() =>
+    {
+        if (!_paused) foreach (var t in Toasts.Toasts) Start(t);
+        StateHasChanged();
+    });
+
+    private void Start(Toast toast)
+    {
+        if (toast.Remaining is not { } remaining || toast.Timer is not null) return;
+        var cts = toast.Timer = new CancellationTokenSource();
+        toast.StartedAt = DateTimeOffset.UtcNow;
+        _ = InvokeAsync(async () =>
+        {
+            try { await Task.Delay(remaining, cts.Token); } catch (TaskCanceledException) { return; }
+            Toasts.Dismiss(toast.Id);
+        });
+    }
+
+    private void Pause()
+    {
+        if (_paused) return;
+        _paused = true;
+        foreach (var t in Toasts.Toasts)
+        {
+            if (t.Timer is null || t.StartedAt is null || t.Remaining is null) continue;
+            t.Timer.Cancel();
+            t.Timer = null;
+            t.Remaining = t.Remaining - (DateTimeOffset.UtcNow - t.StartedAt.Value);
+            if (t.Remaining < TimeSpan.FromSeconds(1)) t.Remaining = TimeSpan.FromSeconds(1);
+        }
+    }
+
+    private void Resume()
+    {
+        if (!_paused) return;
+        _paused = false;
+        foreach (var t in Toasts.Toasts) Start(t);
+    }
+
+    private async Task RunActionAsync(Toast toast)
+    {
+        await toast.Options.Action!();
+        Toasts.Dismiss(toast.Id);
+    }
+
+    public void Dispose()
+    {
+        Toasts.Changed -= OnChanged;
+        foreach (var t in Toasts.Toasts) t.Timer?.Cancel();
+    }
+}

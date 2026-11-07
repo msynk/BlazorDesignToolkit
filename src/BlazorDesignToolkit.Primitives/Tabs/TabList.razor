@@ -1,0 +1,41 @@
+@namespace BlazorDesignToolkit.Primitives
+@* role="tablist". Give it an accessible name with aria-label or aria-labelledby. *@
+@inherits PrimitiveBase
+
+<div role="tablist" @ref="_element"
+     @attributes='Attributes("role", "aria-orientation")'
+     aria-orientation="@(Context.Owner.Orientation == Orientation.Vertical ? "vertical" : "horizontal")"
+     data-bdt-keys="@Keys"
+     @onkeydown="OnKeyDownAsync">
+    @ChildContent
+</div>
+
+@code {
+    private ElementReference _element;
+    private int _keysHandle;
+
+    [CascadingParameter] internal Tabs.TabsContext Context { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string Keys => Context.Owner.Orientation == Orientation.Vertical ? "ArrowUp ArrowDown Home End" : "ArrowLeft ArrowRight Home End";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Context.Tabs.Rendered = true;
+        if (firstRender) _keysHandle = await Js.TrackAsync("preventKeys", _element);
+    }
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        var owner = Context.Owner;
+        var intent = KeyboardNavigation.Intent(e.Key, owner.Orientation, owner.Direction);
+        if (intent == NavigationIntent.None) return;
+        if (Context.Tabs.OrderDirty) Context.Tabs.ApplyOrder(await Js.InvokeAsync<string[]>("domOrder", _element, "[role=tab]"));
+        var current = Context.Tabs.Focused ?? Context.Tabs.FindById(await Js.InvokeAsync<string?>("activeElementId"))
+            ?? Context.Tabs.Items.FirstOrDefault(t => t.Value == owner.Selected);
+        var target = Context.Tabs.Navigate(current, intent, owner.Loop);
+        if (target is null || target == current) return;
+        await target.FocusAsync();
+        if (owner.Activation == Tabs.TabsActivation.Automatic) await owner.SelectAsync(target.Value);
+    }
+}

@@ -1,0 +1,79 @@
+@page "/coverage"
+@using BlazorDesignToolkit.Tokens.Analysis
+@using BlazorDesignToolkit.Tokens.Diagnostics
+@using BlazorDesignToolkit.Tokens.Json
+
+<PageTitle>Token coverage · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Token coverage</h1>
+<p>Static analysis of this demo's own component sources (the Aurora components and stylesheets) against the Aurora
+    tokens and the component manifest. The same analysis runs in CI with <code>bdt coverage</code>.</p>
+
+<Example Title="Summary">
+    <ChildContent>
+        <dl class="facts">
+            <dt>Tokens</dt><dd>@Report.TokenCount</dd>
+            <dt>Used (including transitively)</dt><dd>@Report.UsedTokenCount (@Report.CoveragePercent %)</dd>
+            <dt>Used directly in sources</dt><dd>@Report.DirectlyUsedTokenCount</dd>
+            <dt>Files scanned</dt><dd>@Report.ScannedFileCount</dd>
+            <dt>Undefined custom properties</dt><dd>@(Report.UndefinedVariables.Count == 0 ? "none" : string.Join(", ", Report.UndefinedVariables))</dd>
+        </dl>
+    </ChildContent>
+</Example>
+
+<Example Title="Component contracts">
+    <ChildContent>
+        <table class="data-table">
+            <caption>Tokens per component</caption>
+            <thead><tr><th scope="col">Component</th><th scope="col">Tokens used</th><th scope="col">Missing required tokens</th><th scope="col">Undeclared</th></tr></thead>
+            <tbody>
+                @foreach (var c in Report.Components)
+                {
+                    <tr>
+                        <th scope="row">@c.Name</th>
+                        <td>@string.Join(", ", c.UsedTokens)</td>
+                        <td>@(c.MissingRequired.Count == 0 ? "none" : string.Join(", ", c.MissingRequired))</td>
+                        <td>@(c.Undeclared.Count == 0 ? "none" : string.Join(", ", c.Undeclared))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </ChildContent>
+</Example>
+
+<Example Title="Diagnostics">
+    <ChildContent>
+        <DiagnosticList Diagnostics="Report.Diagnostics.Where(d => d.RuleId != DiagnosticCatalog.UnusedToken.Id).ToList()" />
+        <Disclosure>
+            <DisclosureTrigger class="link-button">Show @Report.UnusedTokens.Count unused tokens</DisclosureTrigger>
+            <DisclosurePanel><p>@string.Join(", ", Report.UnusedTokens)</p></DisclosurePanel>
+        </Disclosure>
+    </ChildContent>
+</Example>
+
+<Example Title="Limitations">
+    <ChildContent>
+        <ul>@foreach (var l in Report.Limitations) {<li>@l</li>}</ul>
+    </ChildContent>
+</Example>
+
+@code {
+    private CoverageReport? _report;
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+
+    private CoverageReport Report => _report ??= Analyze();
+
+    private CoverageReport Analyze()
+    {
+        var manifest = SourceJsonParser.Parse(DemoTokens.Files["components.manifest.json"]).Root!;
+        var components = ComponentManifest.ReadMany(manifest, new DiagnosticBag());
+        var sources = DemoTokens.Sources.Select(kv => new SourceText(kv.Key, kv.Value));
+        return TokenCoverageAnalyzer.Analyze(Manager.Resolve().Tokens, sources, new CoverageOptions
+        {
+            Css = DemoTokens.Css,
+            Components = components,
+            EntryPoints = ["color.white", "color.black"],
+        });
+    }
+}

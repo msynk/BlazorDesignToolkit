@@ -1,0 +1,33 @@
+@namespace BlazorDesignToolkit.Primitives
+@* WAI-ARIA Tooltip pattern: role="tooltip" referenced from the trigger with aria-describedby. Shown on hover (after a
+   delay) and on keyboard focus (immediately); dismissed with Escape without moving focus; the pointer may move onto the
+   tooltip (WCAG 2.2 SC 1.4.13). All timing runs in the browser. Tooltips must not contain interactive content; use a
+   Popover for that. The trigger needs its own accessible name: the tooltip is a description. *@
+
+<CascadingValue Value="Context" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    [Parameter] public int ShowDelay { get; set; } = 300;
+    [Parameter] public int HideDelay { get; set; } = 150;
+    /// <summary>side-align, e.g. top-center (default), bottom-start.</summary>
+    [Parameter] public string Placement { get; set; } = "top-center";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    internal TooltipContext Context { get; } = new();
+
+    protected override void OnInitialized()
+    {
+        Context.Owner = this;
+        Context.TooltipId = Ids.Next("tooltip");
+    }
+
+    internal sealed class TooltipContext
+    {
+        public Tooltip Owner { get; set; } = default!;
+        public string TooltipId { get; set; } = "";
+        public ElementReference Trigger { get; set; }
+        public bool TriggerRendered { get; set; }
+    }
+}

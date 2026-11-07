@@ -1,0 +1,56 @@
+@namespace BlazorDesignToolkit.Primitives
+@* Heading (h1-h6 per Accordion.HeadingLevel) containing the toggle button. *@
+@inherits PrimitiveBase
+@implements ICompositeItem
+
+@{
+    var open = Context.Owner.IsOpen(Item.Value);
+    var locked = Context.Owner.IsLocked(Item.Value);
+}
+<DynamicHeading Level="Context.Owner.HeadingLevel" Attributes="HeadingAttributes">
+    <button type="button" @ref="_element"
+            @attributes='Attributes("aria-expanded", "aria-controls", "id", "type")'
+            id="@ElementId"
+            aria-expanded="@(open ? "true" : "false")"
+            aria-controls="@Item.PanelId"
+            aria-disabled="@(locked || Item.Disabled ? "true" : null)"
+            disabled="@Item.Disabled"
+            data-accordion-trigger=""
+            data-state="@(open ? "open" : "closed")"
+            @onclick="ToggleAsync"
+            @onfocus="() => Context.Triggers.OnFocus(this)"
+            @onblur="() => Context.Triggers.OnBlur(this)">
+        @ChildContent
+    </button>
+</DynamicHeading>
+
+@code {
+    private ElementReference _element;
+
+    [CascadingParameter] internal Accordion.AccordionContext Context { get; set; } = default!;
+    [CascadingParameter] internal AccordionItem Item { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>Attributes for the heading element (the button receives AdditionalAttributes).</summary>
+    [Parameter] public IReadOnlyDictionary<string, object>? HeadingAttributes { get; set; }
+
+    public string ElementId => Item.TriggerId;
+    public bool IsDisabled => Item.Disabled;
+    public string? TypeaheadLabel => null;
+
+    protected override void OnInitialized()
+    {
+        if (Item is null) throw new InvalidOperationException("AccordionTrigger must be placed inside AccordionItem.");
+        Context.Triggers.Register(this);
+        Track(Context);
+    }
+
+    internal ValueTask FocusAsync() => _element.FocusAsync();
+
+    private Task ToggleAsync() => Item.Disabled ? Task.CompletedTask : Context.Owner.ToggleAsync(Item.Value);
+
+    public override ValueTask DisposeAsync()
+    {
+        Context.Triggers.Unregister(this);
+        return base.DisposeAsync();
+    }
+}

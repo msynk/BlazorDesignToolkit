@@ -1,0 +1,227 @@
+{
+  "$description": "Component tokens. They alias semantic tokens so that themes and modes flow through.",
+  "typography": {
+    "$type": "typography",
+    "body": {
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "{font.size.md}",
+        "fontWeight": "{font.weight.regular}",
+        "letterSpacing": "{font.letter-spacing.normal}",
+        "lineHeight": "{font.line-height.normal}"
+      }
+    },
+    "heading": {
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontSize": "{font.size.2xl}",
+        "fontWeight": "{font.weight.semibold}",
+        "letterSpacing": "{font.letter-spacing.tight}",
+        "lineHeight": "{font.line-height.tight}"
+      }
+    },
+    "code": {
+      "$value": {
+        "fontFamily": "{font.family.mono}",
+        "fontSize": "{font.size.sm}",
+        "fontWeight": "{font.weight.regular}",
+        "letterSpacing": "{font.letter-spacing.normal}",
+        "lineHeight": "{font.line-height.normal}"
+      }
+    }
+  },
+  "shadow": {
+    "$type": "shadow",
+    "raised": {
+      "$value": {
+        "color": {
+          "colorSpace": "srgb",
+          "components": [
+            0,
+            0,
+            0
+          ],
+          "alpha": 0.12,
+          "hex": "#000000"
+        },
+        "offsetX": {
+          "value": 0,
+          "unit": "px"
+        },
+        "offsetY": {
+          "value": 1,
+          "unit": "px"
+        },
+        "blur": {
+          "value": 3,
+          "unit": "px"
+        },
+        "spread": {
+          "value": 0,
+          "unit": "px"
+        }
+      }
+    },
+    "overlay": {
+      "$value": [
+        {
+          "color": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": 0.1,
+            "hex": "#000000"
+          },
+          "offsetX": {
+            "value": 0,
+            "unit": "px"
+          },
+          "offsetY": {
+            "value": 4,
+            "unit": "px"
+          },
+          "blur": {
+            "value": 6,
+            "unit": "px"
+          },
+          "spread": {
+            "value": -1,
+            "unit": "px"
+          }
+        },
+        {
+          "color": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": 0.18,
+            "hex": "#000000"
+          },
+          "offsetX": {
+            "value": 0,
+            "unit": "px"
+          },
+          "offsetY": {
+            "value": 12,
+            "unit": "px"
+          },
+          "blur": {
+            "value": 28,
+            "unit": "px"
+          },
+          "spread": {
+            "value": -4,
+            "unit": "px"
+          }
+        }
+      ]
+    }
+  },
+  "transition": {
+    "$type": "transition",
+    "default": {
+      "$value": {
+        "duration": "{duration.normal}",
+        "delay": "{duration.instant}",
+        "timingFunction": "{easing.standard}"
+      }
+    }
+  },
+  "shape": {
+    "$type": "dimension",
+    "$description": "Semantic corner radii.",
+    "radius": {
+      "control": {
+        "$value": "{radius.md}"
+      },
+      "surface": {
+        "$value": "{radius.lg}"
+      }
+    }
+  },
+  "stroke": {
+    "$type": "dimension",
+    "$description": "Semantic stroke widths.",
+    "width": {
+      "control": {
+        "$value": "{border.width.thin}"
+      },
+      "focus": {
+        "$value": "{border.width.thick}"
+      }
+    }
+  },
+  "component": {
+    "button": {
+      "primary": {
+        "background": {
+          "$type": "color",
+          "$value": "{color.surface.accent}"
+        },
+        "foreground": {
+          "$type": "color",
+          "$value": "{color.on-surface.accent}"
+        }
+      },
+      "radius": {
+        "$type": "dimension",
+        "$value": "{shape.radius.control}"
+      },
+      "height": {
+        "$type": "dimension",
+        "$value": "{size.control.height}"
+      },
+      "padding-inline": {
+        "$type": "dimension",
+        "$value": "{size.control.padding-inline}"
+      }
+    },
+    "input": {
+      "border": {
+        "$type": "border",
+        "$value": {
+          "color": "{color.border.default}",
+          "width": "{stroke.width.control}",
+          "style": "solid"
+        }
+      },
+      "background": {
+        "$type": "color",
+        "$value": "{color.surface.default}"
+      }
+    },
+    "focus": {
+      "ring": {
+        "$type": "border",
+        "$value": {
+          "color": "{color.focus.ring}",
+          "width": "{stroke.width.focus}",
+          "style": "solid"
+        }
+      },
+      "offset": {
+        "$type": "dimension",
+        "$value": {
+          "value": 2,
+          "unit": "px"
+        }
+      }
+    },
+    "dialog": {
+      "scrim": {
+        "$type": "color",
+        "$value": "{color.overlay.scrim}"
+      },
+      "shadow": {
+        "$type": "shadow",
+        "$value": "{shadow.overlay}"
+      }
+    }
+  }
+}

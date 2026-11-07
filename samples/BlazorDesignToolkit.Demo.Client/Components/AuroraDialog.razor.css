@@ -1,0 +1,58 @@
+.aurora-dialog-host {
+  display: contents;
+}
+
+::deep .aurora-dialog {
+  max-inline-size: min(32rem, calc(100vw - 2rem));
+  padding: var(--ds-space-6);
+  border: var(--ds-stroke-width-control) solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-shape-radius-surface);
+  background: var(--ds-color-surface-raised);
+  color: var(--ds-color-on-surface-raised);
+  box-shadow: var(--ds-component-dialog-shadow);
+}
+
+::deep .aurora-dialog::backdrop {
+  background: var(--ds-component-dialog-scrim);
+}
+
+::deep .aurora-dialog__title {
+  margin-block-start: 0;
+  font: var(--ds-typography-heading);
+}
+
+::deep .aurora-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ds-space-2);
+  margin-block-start: var(--ds-space-4);
+}
+
+::deep .aurora-dialog__trigger,
+::deep .aurora-dialog__cancel,
+::deep .aurora-dialog__confirm {
+  min-block-size: var(--ds-component-button-height);
+  padding-inline: var(--ds-component-button-padding-inline);
+  border-radius: var(--ds-component-button-radius);
+  font: var(--ds-typography-body);
+  cursor: pointer;
+}
+
+::deep .aurora-dialog__cancel,
+::deep .aurora-dialog__trigger {
+  border: var(--ds-stroke-width-control) solid var(--ds-color-border-default);
+  background: var(--ds-color-surface-default);
+  color: var(--ds-color-text-default);
+}
+
+::deep .aurora-dialog__confirm {
+  border: 0;
+  background: var(--ds-color-surface-danger);
+  color: var(--ds-color-on-surface-danger);
+}
+
+::deep .aurora-dialog button:focus-visible,
+::deep .aurora-dialog__trigger:focus-visible {
+  outline: var(--ds-component-focus-ring);
+  outline-offset: var(--ds-component-focus-offset);
+}

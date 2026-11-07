@@ -1,0 +1,32 @@
+@namespace BlazorDesignToolkit.Primitives
+@* A two-state button (WAI-ARIA button pattern with aria-pressed). Native <button> provides focus and Enter/Space activation.
+   Do not change the accessible name when the state changes; the pressed state is announced instead. *@
+@inherits PrimitiveBase
+
+<button type="button" @attributes='Attributes("aria-pressed", "type")'
+        aria-pressed="@(Current ? "true" : "false")"
+        disabled="@Disabled"
+        data-state="@(Current ? "on" : "off")"
+        data-disabled="@(Disabled ? "" : null)"
+        @onclick="ToggleAsync">
+    @ChildContent
+</button>
+
+@code {
+    private readonly Controllable<bool> _pressed = new(false);
+
+    [Parameter] public bool Pressed { get; set; }
+    [Parameter] public EventCallback<bool> PressedChanged { get; set; }
+    [Parameter] public bool DefaultPressed { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool Controlled => PressedChanged.HasDelegate;
+    private bool Current => _pressed.Get(Pressed, Controlled);
+
+    protected override void OnInitialized() => _pressed.Initialize(DefaultPressed || Pressed);
+
+    protected override void OnParametersSet() => _pressed.Sync(Pressed);
+
+    private Task ToggleAsync() => Disabled ? Task.CompletedTask : _pressed.SetAsync(!Current, Controlled, PressedChanged);
+}

@@ -1,0 +1,70 @@
+@namespace BlazorDesignToolkit.Primitives
+@* The native <dialog> element. Content is rendered only while open (unless KeepMounted). The element stays in place
+   in the DOM; showModal() promotes it to the top layer, so Blazor's renderer is never disturbed. *@
+@inherits PrimitiveBase
+
+<dialog @ref="_element"
+        @attributes='Attributes("id", "role", "aria-labelledby", "aria-describedby", "open")'
+        id="@Context.ContentId"
+        role="@(Context.Owner.Alert ? "alertdialog" : null)"
+        aria-labelledby="@(Context.HasTitle && AdditionalAttributes?.ContainsKey("aria-label") != true ? Context.TitleId : null)"
+        aria-describedby="@(Context.HasDescription ? Context.DescriptionId : null)"
+        aria-modal="@(Context.Owner.Modal && Context.Owner.IsOpen ? "true" : null)"
+        data-state="@(Context.Owner.IsOpen ? "open" : "closed")">
+    @if (Context.Owner.IsOpen || KeepMounted)
+    {
+        @ChildContent
+    }
+</dialog>
+
+@code {
+    private ElementReference _element;
+    private DotNetObjectReference<DialogContent>? _reference;
+    private int _handle;
+    private bool _shown;
+
+    [CascadingParameter] internal Dialog.DialogContext Context { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool KeepMounted { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (Context is null) throw new InvalidOperationException("DialogContent must be placed inside Dialog.");
+        Track(Context);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var open = Context.Owner.IsOpen;
+        if (open && !_shown)
+        {
+            _shown = true;
+            _reference ??= DotNetObjectReference.Create(this);
+            var owner = Context.Owner;
+            _handle = await Js.TrackAsync("showDialog", _element, owner.Modal, _reference, new
+            {
+                closeOnEscape = owner.CloseOnEscape,
+                closeOnBackdropClick = owner.CloseOnBackdropClick,
+                lockScroll = owner.LockScroll,
+                initialFocus = owner.InitialFocus,
+                restoreFocus = true,
+            });
+        }
+        else if (!open && _shown)
+        {
+            _shown = false;
+            await Js.ReleaseAsync(_handle);
+            _handle = 0;
+        }
+    }
+
+    /// <summary>Called by the browser when the user presses Escape or clicks the backdrop.</summary>
+    [JSInvokable]
+    public Task OnDialogDismiss(string reason) => InvokeAsync(() => Context.Owner.SetOpenAsync(false));
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        _reference?.Dispose();
+    }
+}

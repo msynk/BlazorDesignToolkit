@@ -1,0 +1,29 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BlazorDesignToolkit.Tokens/BlazorDesignToolkit.Tokens.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Tokens.Tailwind/BlazorDesignToolkit.Tokens.Tailwind.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Tokens.Bootstrap/BlazorDesignToolkit.Tokens.Bootstrap.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Tokens.Fluent/BlazorDesignToolkit.Tokens.Fluent.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Theming/BlazorDesignToolkit.Theming.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Theming.Blazor/BlazorDesignToolkit.Theming.Blazor.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Primitives/BlazorDesignToolkit.Primitives.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Primitives.StarterStyles/BlazorDesignToolkit.Primitives.StarterStyles.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Testing/BlazorDesignToolkit.Testing.csproj" />
+    <Project Path="src/BlazorDesignToolkit.Cli/BlazorDesignToolkit.Cli.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BlazorDesignToolkit.Tokens.Tests/BlazorDesignToolkit.Tokens.Tests.csproj" />
+    <Project Path="tests/BlazorDesignToolkit.Theming.Tests/BlazorDesignToolkit.Theming.Tests.csproj" />
+    <Project Path="tests/BlazorDesignToolkit.Primitives.Tests/BlazorDesignToolkit.Primitives.Tests.csproj" />
+    <Project Path="tests/BlazorDesignToolkit.Integrations.Tests/BlazorDesignToolkit.Integrations.Tests.csproj" />
+    <Project Path="tests/BlazorDesignToolkit.Cli.Tests/BlazorDesignToolkit.Cli.Tests.csproj" />
+    <Project Path="tests/BlazorDesignToolkit.BrowserTests/BlazorDesignToolkit.BrowserTests.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/BlazorDesignToolkit.Demo/BlazorDesignToolkit.Demo.csproj" />
+    <Project Path="samples/BlazorDesignToolkit.Demo.Client/BlazorDesignToolkit.Demo.Client.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/BlazorDesignToolkit.Benchmarks/BlazorDesignToolkit.Benchmarks.csproj" />
+  </Folder>
+</Solution>

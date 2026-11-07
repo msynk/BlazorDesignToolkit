@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorDesignToolkit.Tokens</RootNamespace>
+    <Description>Framework-independent design-token engine: DTCG 2025.10 parsing and serialization, reference resolution, theme layering, validation, accessibility contrast checks, CSS export and token usage analysis.</Description>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BlazorDesignToolkit.Tokens.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,89 @@
+@inherits PrimitiveTestBase
+
+@code {
+    [Fact]
+    public void Dialog_opens_modally_with_name_and_description_and_closes()
+    {
+        var cut = Render(@<Dialog>
+            <DialogTrigger>Delete…</DialogTrigger>
+            <DialogContent>
+                <DialogTitle>Delete project?</DialogTitle>
+                <DialogDescription>This cannot be undone.</DialogDescription>
+                <DialogClose>Cancel</DialogClose>
+            </DialogContent>
+        </Dialog>);
+        var trigger = cut.Find("button[aria-haspopup=dialog]");
+        Assert.Equal("false", trigger.Attr("aria-expanded"));
+        Assert.Empty(cut.FindAll("h2"));
+        trigger.Click();
+        var dialog = cut.Find("dialog");
+        Assert.Equal(cut.Find("h2").Id, dialog.Attr("aria-labelledby"));
+        Assert.Equal(cut.Find("p").Id, dialog.Attr("aria-describedby"));
+        Assert.Equal(dialog.Id, cut.Find("button[aria-haspopup=dialog]").Attr("aria-controls"));
+        var show = Module.Invocations.Single(i => i.Identifier == "showDialog");
+        Assert.True((bool)show.Arguments[1]!);
+        AssertAccessible(cut.Markup);
+
+        cut.FindAll("button").Single(b => b.TextContent == "Cancel").Click();
+        Assert.Empty(cut.FindAll("h2"));
+        Assert.Contains(Module.Invocations, i => i.Identifier == "release" && (int)i.Arguments[0]! == 2);
+    }
+
+    [Fact]
+    public async Task Dialog_closes_when_browser_reports_escape()
+    {
+        var open = true;
+        var cut = Render(@<Dialog Open="open" OpenChanged="v => open = v" Alert="true">
+            <DialogContent><DialogTitle>Session expiring</DialogTitle><DialogClose>OK</DialogClose></DialogContent>
+        </Dialog>);
+        Assert.Equal("alertdialog", cut.Find("dialog").Attr("role"));
+        await cut.FindComponent<DialogContent>().Instance.OnDialogDismiss("escape");
+        Assert.False(open);
+    }
+
+    [Fact]
+    public async Task Popover_opens_next_to_trigger_and_light_dismiss_closes()
+    {
+        var cut = Render(@<Popover>
+            <PopoverTrigger>Filters</PopoverTrigger>
+            <PopoverContent><label>Status <select><option>Open</option></select></label></PopoverContent>
+        </Popover>);
+        var trigger = cut.Find("button");
+        Assert.Equal("dialog", trigger.Attr("aria-haspopup"));
+        trigger.Click();
+        var content = cut.Find("[role=dialog]");
+        Assert.Equal(trigger.Id, content.Attr("aria-labelledby"));
+        Assert.Equal("auto", content.Attr("popover"));
+        Assert.Equal(1, Calls("showPopover"));
+        AssertAccessible(cut.Markup);
+        await cut.FindComponent<PopoverContent>().Instance.OnPopoverToggle(false);
+        Assert.Equal("false", cut.Find("button").Attr("aria-expanded"));
+        // A click right after light dismiss (the click that caused it) does not reopen the popover.
+        cut.Find("button").Click();
+        Assert.Equal("false", cut.Find("button").Attr("aria-expanded"));
+    }
+
+    [Fact]
+    public void Tooltip_describes_trigger_and_is_attached_in_the_browser()
+    {
+        var cut = Render(@<Tooltip ShowDelay="500">
+            <TooltipTrigger aria-label="Settings">⚙</TooltipTrigger>
+            <TooltipContent>Open settings</TooltipContent>
+        </Tooltip>);
+        var tip = cut.Find("[role=tooltip]");
+        Assert.Equal(tip.Id, cut.Find("button").Attr("aria-describedby"));
+        Assert.Equal("manual", tip.Attr("popover"));
+        var attach = Module.Invocations.Single(i => i.Identifier == "attachTooltip");
+        Assert.Contains("500", System.Text.Json.JsonSerializer.Serialize(attach.Arguments[2]));
+        AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void FocusTrap_activates_and_releases()
+    {
+        var cut = Render<FocusTrap>(p => p.Add(x => x.Active, true).AddChildContent("<button>One</button>"));
+        Assert.Equal(1, Calls("trapFocus"));
+        cut.Render(p => p.Add(x => x.Active, false));
+        Assert.Contains(Module.Invocations, i => i.Identifier == "release" && (int)i.Arguments[0]! == 5);
+    }
+}
