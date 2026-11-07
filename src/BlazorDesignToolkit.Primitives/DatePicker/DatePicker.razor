@@ -59,7 +59,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @{ var days = CalendarMath.MonthGrid(_month, FirstDayOfWeek); }
+                    @{
+                        var days = CalendarMath.MonthGrid(_month, FirstDayOfWeek);
+                        var today = TodayValue;
+                    }
                     @for (var week = 0; week < 6; week++)
                     {
                         <tr>
@@ -76,12 +79,12 @@
                                 <td id="@CellId(date)"
                                     tabindex="@(date == _focused ? "0" : "-1")"
                                     aria-selected="@(selected ? "true" : null)"
-                                    aria-current="@(date == Today ? "date" : null)"
+                                    aria-current="@(date == today ? "date" : null)"
                                     aria-disabled="@(disabled ? "true" : null)"
                                     aria-label="@date.ToString("D", EffectiveCulture)"
                                     data-date="@date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)"
                                     data-selected="@(selected ? "" : null)"
-                                    data-today="@(date == Today ? "" : null)"
+                                    data-today="@(date == today ? "" : null)"
                                     data-disabled="@(disabled ? "" : null)"
                                     @onclick="() => ChooseAsync(date)">@date.Day.ToString(EffectiveCulture)</td>
                             }
@@ -110,9 +113,13 @@
     private bool _invalidText;
     private bool _open;
     private bool _shown;
+    private bool _syncing;
+    private int _closeCount;
     private bool _focusPending;
     private DateOnly _month;
     private DateOnly _focused;
+    private CultureInfo? _cultureSource;
+    private CultureInfo _culture = CultureInfo.InvariantCulture;
 
     [CascadingParameter] private FormFieldContext? Field { get; set; }
     [Parameter] public DateOnly? Value { get; set; }
@@ -122,7 +129,10 @@
     [Parameter] public DateOnly? Max { get; set; }
     /// <summary>Dates that cannot be chosen (for example weekends or booked days).</summary>
     [Parameter] public Func<DateOnly, bool>? IsDateDisabled { get; set; }
-    /// <summary>Culture for names, first day of week and parsing. Default: the current culture.</summary>
+    /// <summary>
+    /// Culture for names, first day of week and parsing. Default: the current culture. Dates are always Gregorian: a culture
+    /// whose default calendar differs (ar-SA, th-TH…) is used with its Gregorian calendar.
+    /// </summary>
     [Parameter] public CultureInfo? Culture { get; set; }
     /// <summary>"Today" for highlighting (aria-current="date"); default: the local date. Set it for deterministic rendering.</summary>
     [Parameter] public DateOnly? Today { get; set; }
@@ -138,7 +148,20 @@
 
     private bool IsDisabled => Disabled || Field?.Disabled == true;
     private DateOnly? Current => _value.Get(Value, ValueChanged.HasDelegate);
-    private CultureInfo EffectiveCulture => Culture ?? CultureInfo.CurrentCulture;
+    // The grid is Gregorian, so names, formatting and parsing use the culture's Gregorian calendar (see CalendarMath).
+    private CultureInfo EffectiveCulture
+    {
+        get
+        {
+            var source = Culture ?? CultureInfo.CurrentCulture;
+            if (!ReferenceEquals(source, _cultureSource))
+            {
+                _cultureSource = source;
+                _culture = CalendarMath.WithGregorianCalendar(source);
+            }
+            return _culture;
+        }
+    }
     private DayOfWeek FirstDayOfWeek => EffectiveCulture.DateTimeFormat.FirstDayOfWeek;
     private DateOnly TodayValue => Today ?? DateOnly.FromDateTime(DateTime.Now);
     private string DialogId => _id + "-dialog";
@@ -164,30 +187,74 @@
     private bool IsUnavailable(DateOnly date)
         => (Min is { } min && date < min) || (Max is { } max && date > max) || (IsDateDisabled?.Invoke(date) ?? false);
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override Task OnAfterRenderAsync(bool firstRender) => SyncDialogAsync();
+
+    /// <summary>
+    /// Brings the browser (popover, focus trap, grid keys, focus) in line with <see cref="_open"/>. OnAfterRenderAsync calls
+    /// can overlap (a close while the open is still awaiting showPopover), so one call at a time does the work and loops until
+    /// the state is stable; overlapping calls return at once and their changes are picked up by the running loop.
+    /// </summary>
+    private async Task SyncDialogAsync()
     {
-        if (_open && !_shown)
+        if (_syncing) return;
+        _syncing = true;
+        try
         {
-            _shown = true;
-            _reference ??= DotNetObjectReference.Create(this);
-            await _overlay.OpenAsync(() => Js.TrackAsync("showPopover", _dialog, _button, _reference, new { placement = "bottom-start", focus = false, restoreFocus = true }));
-            _trap = new JsResource();
-            await _trap.OpenAsync(() => Js.TrackAsync("trapFocus", _dialog));
-            _gridKeys = new JsResource();
-            await _gridKeys.OpenAsync(() => Js.TrackAsync("preventKeys", _grid));
+            while (!IsDisposed)
+            {
+                if (_open && !_shown)
+                {
+                    _shown = true;
+                    var closes = _closeCount;
+                    _reference ??= DotNetObjectReference.Create(this);
+                    await _overlay.OpenAsync(() => Js.TrackAsync("showPopover", _dialog, _button, _reference, new { placement = "bottom-start", focus = false, restoreFocus = true }));
+                    if (closes == _closeCount)
+                    {
+                        _trap = new JsResource();
+                        await _trap.OpenAsync(() => Js.TrackAsync("trapFocus", _dialog));
+                    }
+                    if (closes == _closeCount)
+                    {
+                        _gridKeys = new JsResource();
+                        await _gridKeys.OpenAsync(() => Js.TrackAsync("preventKeys", _grid));
+                    }
+                    // Closed (and possibly reopened) while opening: release everything; the loop reopens if needed.
+                    if (closes != _closeCount) await HideDialogAsync();
+                }
+                else if (!_open && _shown)
+                {
+                    await HideDialogAsync();
+                }
+                else if (_open && _focusPending)
+                {
+                    _focusPending = false;
+                    await Js.InvokeVoidAsync("focusById", CellId(_focused), true);
+                }
+                else break;
+            }
         }
-        else if (!_open && _shown)
+        finally
         {
-            _shown = false;
-            if (_gridKeys is not null) await _gridKeys.CloseAsync(Js);
-            if (_trap is not null) await _trap.CloseAsync(Js);
-            await _overlay.CloseAsync(Js);
+            _syncing = false;
         }
-        if (_open && _focusPending)
-        {
-            _focusPending = false;
-            await Js.InvokeVoidAsync("focusById", CellId(_focused), true);
-        }
+    }
+
+    private async Task HideDialogAsync()
+    {
+        _shown = false;
+        var keys = _gridKeys;
+        var trap = _trap;
+        _gridKeys = _trap = null;
+        if (keys is not null) await keys.CloseAsync(Js);
+        if (trap is not null) await trap.CloseAsync(Js);
+        await _overlay.CloseAsync(Js);
+    }
+
+    private void SetClosed()
+    {
+        if (!_open) return;
+        _open = false;
+        _closeCount++;
     }
 
     private Task ToggleAsync() => _open ? CloseAsync() : OpenAsync();
@@ -205,7 +272,7 @@
 
     private Task CloseAsync()
     {
-        _open = false;
+        SetClosed();
         return Task.CompletedTask;
     }
 
@@ -223,7 +290,7 @@
         if (IsUnavailable(date)) return;
         _editing = false;
         _invalidText = false;
-        _open = false;
+        SetClosed();
         if (Current != date) await _value.SetAsync(date, ValueChanged.HasDelegate, ValueChanged);
         _text = Current is { } d ? d.ToString(EffectiveCulture.DateTimeFormat.ShortDatePattern, EffectiveCulture) : "";
     }
@@ -283,7 +350,7 @@
     public Task OnPopoverToggle(bool open) => open ? Task.CompletedTask : InvokeAsync(() =>
     {
         if (!_open) return;
-        _open = false;
+        SetClosed();
         StateHasChanged();
     });
 

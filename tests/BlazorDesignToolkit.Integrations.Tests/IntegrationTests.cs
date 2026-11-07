@@ -129,6 +129,19 @@ public class TailwindTests
     }
 
     [Fact]
+    public void Name_collisions_between_mappings_are_reported()
+    {
+        var output = TailwindThemeExporter.Export(Fixture.Light, new TailwindExportOptions
+        {
+            Mappings = [new("color.surface.*", "color", "color.surface"), new("color.text.*", "color", "color.text")],
+            Css = Fixture.Css,
+        });
+        Assert.Contains(output.Diagnostics, d => d.RuleId == DiagnosticCatalog.NameCollision.Id && d.TokenPath == "color.text.default");
+        Assert.Single(output.Content.Split('\n'), l => l.TrimStart().StartsWith("--color-default:", StringComparison.Ordinal));
+        Assert.Contains("--color-default: var(--ds-color-surface-default);", output.Content); // the first mapping keeps the name
+    }
+
+    [Fact]
     public void Reference_mode_requires_a_prefix_to_avoid_self_references()
     {
         var output = TailwindThemeExporter.Export(Fixture.Light, new TailwindExportOptions { Mappings = Fixture.TailwindMappings });
@@ -192,6 +205,51 @@ public class BootstrapTests
         Assert.Contains("--bs-body-font-family: var(--ds-font-family-sans)", output.Content.Replace("--bs-font-sans-serif", "--bs-body-font-family"));
         // Sass-only variables are reported for runtime output instead of emitting a variable Bootstrap never reads.
         Assert.Contains(output.Diagnostics, d => d.RuleId == DiagnosticCatalog.UnsupportedConversion.Id && d.Message.Contains("font-weight-bold"));
+    }
+
+    [Fact]
+    public void Runtime_css_keeps_bootstraps_dark_color_mode_working()
+    {
+        var options = new BootstrapExportOptions { Mappings = Fixture.BootstrapMappings, Output = BootstrapOutput.Css, Css = Fixture.Css };
+        var css = BootstrapExporter.Export(Fixture.Light, options).Content;
+        // The light emphasis/subtle values sit on :root, which would override [data-bs-theme=dark]; the dark variants follow.
+        var dark = css.IndexOf("[data-bs-theme=dark] {", StringComparison.Ordinal);
+        Assert.True(dark > css.IndexOf(":root, [data-bs-theme=light] {", StringComparison.Ordinal));
+        var darkBlock = css[dark..css.IndexOf('}', dark)];
+        Assert.Contains("--bs-primary-text-emphasis: color-mix(in srgb, var(--bs-primary) 60%, #ffffff);", darkBlock); // tint 40%
+        Assert.Contains("--bs-primary-bg-subtle: color-mix(in srgb, var(--bs-primary) 20%, #000000);", darkBlock);    // shade 80%
+        Assert.DoesNotContain("--bs-primary:", darkBlock);
+        Assert.DoesNotContain("[data-bs-theme=dark]", BootstrapExporter.Export(Fixture.Light, options with { DarkSelector = "" }).Content);
+
+        var darkOnly = BootstrapExporter.Export(Fixture.Light, options with { Dark = true, Selector = "[data-bs-theme=dark]" }).Content;
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(darkOnly, @"\[data-bs-theme=dark\] \{"));
+        Assert.Contains("--bs-primary-text-emphasis: color-mix(in srgb, var(--bs-primary) 60%, #ffffff);", darkOnly);
+    }
+
+    [Fact]
+    public void Translucent_theme_colors_get_no_component_bridge()
+    {
+        var output = BootstrapExporter.Export(Fixture.Light, new BootstrapExportOptions
+        {
+            Mappings = [new("primary", "color.surface.accent"), new("danger", "color.overlay.scrim")],
+            Output = BootstrapOutput.Css,
+            Css = Fixture.Css,
+        });
+        Assert.Contains("--bs-danger: var(--ds-color-overlay-scrim);", output.Content);
+        Assert.DoesNotContain("--bdt-bs-btn-danger-", output.Content);
+        Assert.DoesNotContain(".btn-danger", output.Content);   // its rules would read undefined variables
+        Assert.Contains(".btn-primary {", output.Content);
+        Assert.Contains(output.Diagnostics, d => d.RuleId == DiagnosticCatalog.UnsupportedConversion.Id && d.TokenPath == "color.overlay.scrim");
+    }
+
+    [Fact]
+    public void Range_thumb_focus_rules_are_split_per_vendor()
+    {
+        var css = BootstrapRuntime.BridgeCss(["primary"]);
+        // A selector list mixing -webkit- and -moz- pseudo-elements is dropped by every browser.
+        Assert.DoesNotContain("-webkit-slider-thumb, ", css);
+        Assert.Contains(".form-range:focus::-webkit-slider-thumb {", css);
+        Assert.Contains(".form-range:focus::-moz-range-thumb {", css);
     }
 
     [Fact]

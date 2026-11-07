@@ -13,8 +13,10 @@ Optional CSS: `BlazorDesignToolkit.Primitives.StarterStyles` (`_content/BlazorDe
   `data-disabled`, `data-highlighted`, `data-orientation`, `data-side` (placed popups), plus ARIA attributes. No class names
   are imposed.
 - **Binding.** `@bind-Value`, `@bind-Open`, `@bind-Checked`… work as with Blazor inputs. A component is **controlled** when
-  the parent passes the value *and* handles the change: a change the parent does not accept (it re-renders with the old
-  value) is reverted, including the native state of checkboxes and radios. With only `Default…` and/or `…Changed` the
+  the parent passes the value *and* handles the change: a change the parent does not accept (it still passes the old value
+  once its handler has completed) is reverted, including the native state of checkboxes and radios. Renders while an
+  asynchronous handler is still running do not count, so the value does not jump back while the parent saves. The parent
+  must re-render to accept a change (as with React's controlled inputs). With only `Default…` and/or `…Changed` the
   component is **uncontrolled**: it keeps its own value and reports changes. Text inputs (`Combobox`, `CommandMenu`,
   `NumberField`, `DatePicker`) and `Checkbox` bind their DOM value with `@bind:get`/`@bind:set`, so text typed while a
   server render is in flight is never overwritten.
@@ -232,7 +234,8 @@ Keyboard tables below follow the WAI-ARIA Authoring Practices Guide (APG). WCAG 
   (`Start`/`End` with their `…Changed` and `Default…`, `MinDistance`, `StartLabel`/`EndLabel`).
 - **Markup:** a focusable `role=slider` thumb with `aria-valuenow/min/max`, `aria-valuetext` (from `ValueText`, for values that
   need units or words), `aria-orientation`; labelled by the FormField label. The range slider is a `role=group` with two
-  sliders whose min/max are constrained by each other (APG multi-thumb slider). Styling: `--bdt-slider-value` (or
+  sliders whose min/max are constrained by each other (APG multi-thumb slider); a `MinDistance` that is not a whole number
+  of steps keeps each thumb on the nearest step inside its range. Styling: `--bdt-slider-value` (or
   `--bdt-slider-start`/`--bdt-slider-end`) as percentages, `data-dragging`.
 - **Keyboard:** →/↑ increase, ←/↓ decrease (horizontal arrows reversed in RTL), Page Up/Down by `LargeStep`, Home/End min/max.
 - **Pointer:** press or drag anywhere on the slider; the browser reports the position once per animation frame and the
@@ -261,6 +264,8 @@ Keyboard tables below follow the WAI-ARIA Authoring Practices Guide (APG). WCAG 
   Alt+↓ in the input opens the calendar.
 - **Text entry:** parsed with the culture's short date pattern (then any culture format) on Enter or blur; invalid or
   unavailable dates keep the text and set `aria-invalid`.
+- **Calendar:** dates are Gregorian. A culture whose default calendar is another one (`ar-SA`, `th-TH`, `fa-IR`…) is used
+  with its Gregorian calendar, so the heading, the grid and the text field agree.
 
 ## Toasts and announcements
 

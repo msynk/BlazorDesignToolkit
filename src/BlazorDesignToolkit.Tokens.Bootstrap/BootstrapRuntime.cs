@@ -114,13 +114,41 @@ public static class BootstrapRuntime
             if (value is null) continue;
             list.Add(new CssDeclaration($"--bs-{variable.Runtime}", value, token.Path));
             if (token.Value is not ColorValue color) continue;
-            var srgb = Opaque(color, token, bag, $"--bs-{variable.Runtime}-rgb and derived colors");
+            var themeColor = Array.IndexOf(ThemeColors, variable.Runtime) >= 0;
+            if (!variable.RgbCompanion && !themeColor) continue;
+            var what = themeColor
+                ? $"--bs-{variable.Runtime}-rgb, its derived colors and the component bridge rules"
+                : $"--bs-{variable.Runtime}-rgb";
+            var srgb = Opaque(color, token, bag, what);
             if (srgb is not { } c) continue;
             if (variable.RgbCompanion) list.Add(new CssDeclaration($"--bs-{variable.Runtime}-rgb", BootstrapColors.Rgb(c), token.Path));
-            if (Array.IndexOf(ThemeColors, variable.Runtime) >= 0) AddThemeColor(list, variable.Runtime, c, dark, options, token.Path);
+            if (themeColor) AddThemeColor(list, variable.Runtime, c, dark, options, token.Path);
         }
         return list;
     }
+
+    /// <summary>
+    /// Theme colors whose derived variables are in <paramref name="declarations"/>: the colors the component bridge can
+    /// serve. A translucent theme color gets <c>--bs-&lt;name&gt;</c> but no derived variables, so it must not be bridged.
+    /// </summary>
+    internal static HashSet<string> DerivedColors(IEnumerable<CssDeclaration> declarations)
+    {
+        var names = declarations.Select(static d => d.Name).ToHashSet(StringComparer.Ordinal);
+        return ThemeColors.Where(c => names.Contains($"--bdt-bs-btn-{c}-color")).ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>Theme colors that have <c>--bs-&lt;name&gt;</c> in <paramref name="declarations"/>.</summary>
+    internal static IEnumerable<string> MappedColors(IEnumerable<CssDeclaration> declarations)
+    {
+        var names = declarations.Select(static d => d.Name).ToHashSet(StringComparer.Ordinal);
+        return ThemeColors.Where(c => names.Contains($"--bs-{c}"));
+    }
+
+    /// <summary>True for the derived variables whose value depends on the color mode (emphasis text, subtle background and border).</summary>
+    internal static bool IsModeDependent(string property)
+        => property.StartsWith("--bs-", StringComparison.Ordinal)
+           && (property.EndsWith("-text-emphasis", StringComparison.Ordinal) || property.EndsWith("-bg-subtle", StringComparison.Ordinal)
+               || property.EndsWith("-border-subtle", StringComparison.Ordinal));
 
     private static SrgbColor? Opaque(ColorValue color, ResolvedToken token, DiagnosticBag bag, string what)
     {
@@ -234,7 +262,9 @@ public static class BootstrapRuntime
             sb.Append(".form-check-input:checked, .form-check-input[type=checkbox]:indeterminate { background-color: var(--bs-primary); border-color: var(--bs-primary); }\n");
             sb.Append(".form-control:focus, .form-select:focus, .form-check-input:focus {\n");
             sb.Append("  border-color: color-mix(in srgb, var(--bs-primary) 50%, #ffffff);\n  box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);\n}\n");
-            sb.Append(".form-range:focus::-webkit-slider-thumb, .form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 1px var(--bs-body-bg), 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25); }\n");
+            // One rule per vendor pseudo-element: a browser drops a whole selector list that contains one it does not know.
+            sb.Append(".form-range:focus::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--bs-body-bg), 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25); }\n");
+            sb.Append(".form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 1px var(--bs-body-bg), 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25); }\n");
             sb.Append(".form-range::-webkit-slider-thumb { background-color: var(--bs-primary); }\n");
             sb.Append(".form-range::-moz-range-thumb { background-color: var(--bs-primary); }\n");
             sb.Append(".form-range::-webkit-slider-thumb:active { background-color: color-mix(in srgb, var(--bs-primary) 30%, #ffffff); }\n");
@@ -251,20 +281,29 @@ public static class BootstrapRuntime
     /// </summary>
     public static TokenExportOutput ExportThemes(ThemeCatalog catalog, BootstrapExportOptions options, ThemeCssOptions? theme = null)
     {
+        // Bridge only colors that have derived variables in every theme and mode where they are mapped: a color that is
+        // translucent somewhere has no derived variables there, and its bridge rules would read undefined variables.
+        var derived = new HashSet<string>(StringComparer.Ordinal);
+        var incomplete = new HashSet<string>(StringComparer.Ordinal);
         var themeOptions = (theme ?? ThemeCssOptions.Default) with
         {
             ElevateSpecificity = true,
             EmitColorScheme = false,
             IncludeHeader = false,
-            Declarations = (selection, tokens, bag) => GetDeclarations(tokens, options, selection[options.DarkAxis] == options.DarkValue, bag),
+            Declarations = (selection, tokens, bag) =>
+            {
+                var list = GetDeclarations(tokens, options, selection[options.DarkAxis] == options.DarkValue, bag);
+                var withDerived = DerivedColors(list);
+                derived.UnionWith(withDerived);
+                incomplete.UnionWith(MappedColors(list).Where(c => !withDerived.Contains(c)));
+                return list;
+            },
         };
         var result = ThemeStylesheetGenerator.Generate(catalog, themeOptions);
-        var colors = options.Mappings.Select(m => BootstrapExporter.NormalizeName(m.Target)).Where(n => BootstrapVariables.All.TryGetValue(n, out var v) && v.Runtime is not null)
-            .Select(n => BootstrapVariables.All[n].Runtime!);
         var sb = new StringBuilder();
         sb.Append("/* Generated by BlazorDesignToolkit for Bootstrap 5.3: runtime variables for every theme and mode. Do not edit by hand. */\n");
         sb.Append(result.Css);
-        if (options.IncludeComponentBridge) sb.Append(BridgeCss(colors));
+        if (options.IncludeComponentBridge) sb.Append(BridgeCss(derived.Except(incomplete)));
         return new TokenExportOutput(sb.ToString(), result.Diagnostics);
     }
 }

@@ -43,6 +43,23 @@ public static class CalendarMath
         return date;
     }
 
+    /// <summary>
+    /// <paramref name="culture"/> with a Gregorian calendar, so that month names, formatting and parsing agree with the
+    /// Gregorian month grid. Cultures whose default calendar is not Gregorian (for example ar-SA, th-TH, fa-IR) get a copy that
+    /// uses their Gregorian variant (localized names when available); other cultures are returned unchanged.
+    /// </summary>
+    public static CultureInfo WithGregorianCalendar(CultureInfo culture)
+    {
+        if (culture.DateTimeFormat.Calendar is GregorianCalendar) return culture;
+        var gregorian = culture.OptionalCalendars.OfType<GregorianCalendar>()
+            .OrderBy(static c => c.CalendarType == GregorianCalendarTypes.Localized ? 0 : 1)
+            .FirstOrDefault();
+        if (gregorian is null) return CultureInfo.InvariantCulture;
+        var clone = (CultureInfo)culture.Clone();
+        clone.DateTimeFormat.Calendar = gregorian;
+        return CultureInfo.ReadOnly(clone);
+    }
+
     /// <summary>Parses user text with the culture (short date pattern first, then any culture format). Null if not a date.</summary>
     public static DateOnly? Parse(string text, CultureInfo culture)
     {

@@ -12,9 +12,45 @@ public static class SliderMath
         var steps = Math.Round((clamped - min) / step, MidpointRounding.AwayFromZero);
         var snapped = min + steps * step;
         if (snapped > max) snapped -= step;
-        // Round to the step's precision so 0.1 + 0.2 shows as 0.3.
-        return Math.Round(snapped, Decimals(step) + Decimals(min));
+        return RoundToStep(snapped, min, step);
     }
+
+    /// <summary>
+    /// Like <see cref="Snap"/>, and also keeps the result within [<paramref name="lower"/>, <paramref name="upper"/>] (for
+    /// example a thumb limited by the other thumb): a snapped value outside moves to the nearest step inside, or to the bound
+    /// itself when no step lies inside. Null when the bounds leave no room inside [min, max].
+    /// </summary>
+    public static double? SnapWithin(double value, double min, double max, double step, double lower, double upper)
+    {
+        lower = Math.Max(lower, min);
+        upper = Math.Min(upper, max);
+        if (double.IsNaN(lower) || double.IsNaN(upper) || upper < lower) return null;
+        var snapped = Snap(value, min, max, step);
+        if (snapped > upper)
+        {
+            snapped = step > 0 ? StepToward(upper, min, step, down: true) : upper;
+            if (snapped < lower || snapped > upper) snapped = upper;
+        }
+        else if (snapped < lower)
+        {
+            snapped = step > 0 ? StepToward(lower, min, step, down: false) : lower;
+            if (snapped < lower || snapped > upper) snapped = lower;
+        }
+        return snapped;
+    }
+
+    /// <summary>The step value (from <paramref name="min"/>) nearest to <paramref name="bound"/> on the inner side: at or below it, or at or above it.</summary>
+    private static double StepToward(double bound, double min, double step, bool down)
+    {
+        // Tolerate floating-point noise so that a bound that is a step value is not moved a whole step.
+        var steps = (bound - min) / step;
+        steps = down ? Math.Floor(steps + 1e-9) : Math.Ceiling(steps - 1e-9);
+        return RoundToStep(min + steps * step, min, step);
+    }
+
+    /// <summary>Rounds to the step's precision so that 0.1 + 0.2 shows as 0.3 (Math.Round accepts at most 15 digits).</summary>
+    private static double RoundToStep(double value, double min, double step)
+        => Math.Round(value, Math.Min(15, Decimals(step) + Decimals(min)));
 
     /// <summary>Value for a pointer position: <paramref name="fraction"/> 0–1 along the track.</summary>
     public static double FromFraction(double fraction, double min, double max, double step)

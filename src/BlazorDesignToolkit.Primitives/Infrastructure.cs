@@ -272,12 +272,6 @@ public abstract class PrimitiveContext
 }
 
 /// <summary>
-/// State for a bindable parameter (<c>Value</c> / <c>ValueChanged</c> / <c>DefaultValue</c>), following Blazor input
-/// conventions: the component keeps its own current value, user changes update it and raise <c>ValueChanged</c>, and a
-/// new value passed by the parent (for example through <c>@bind-Value</c>) replaces it. Works whether or not the parent
-/// re-renders after the change.
-/// </summary>
-/// <summary>
 /// A JavaScript resource opened in OnAfterRenderAsync (an overlay, a focus trap). The open call is kept as a task so that a
 /// close requested before it has returned its handle (OnAfterRenderAsync calls can overlap) still releases the resource.
 /// </summary>
@@ -301,6 +295,19 @@ public sealed class JsResource
     }
 }
 
+/// <summary>
+/// State for a bindable parameter (<c>Value</c> / <c>ValueChanged</c> / <c>DefaultValue</c>), following Blazor input
+/// conventions: the component keeps its own current value, user changes update it and raise <c>ValueChanged</c>, and a
+/// new value passed by the parent (for example through <c>@bind-Value</c>) replaces it.
+/// <para>
+/// A parent that passes the value and handles the change controls it (as with React's controlled inputs): it accepts a
+/// change by passing the new value once its change handler has completed, otherwise the value reverts to the one it passes.
+/// Renders while the handler is still running (Blazor renders an asynchronous handler's component before its first await)
+/// do not decide, so the value does not jump back while the parent is still saving. A controlled parent must therefore
+/// re-render after the change: when it accepts without re-rendering (<c>ShouldRender</c> returns false, or the handler
+/// belongs to a component that does not render this one), the value reverts until the parent's next render passes it.
+/// </para>
+/// </summary>
 public sealed class Controllable<T>
 {
     private T _value;
@@ -308,6 +315,7 @@ public sealed class Controllable<T>
     private bool _initialized;
     private bool _synced;
     private bool _pending;
+    private bool _handlerRunning;
     private bool _provided;
     private int _version;
 
@@ -327,8 +335,8 @@ public sealed class Controllable<T>
 
     /// <summary>
     /// Call from OnParametersSet: adopts the parameter when the parent passes a different value than before. After a change
-    /// raised through <see cref="SetAsync"/> on a controlled component, a parent render that still passes the old value
-    /// means the parent did not accept it, and the value reverts (as Blazor's own inputs do). Returns true on a revert.
+    /// raised through <see cref="SetAsync"/> on a controlled component, a parent render that still passes the old value once
+    /// the change handler has completed means the parent did not accept it, and the value reverts. Returns true on a revert.
     /// </summary>
     public bool Sync(T parameter, bool provided = true)
     {
@@ -346,17 +354,16 @@ public sealed class Controllable<T>
             _pending = false;
             return false;
         }
-        if (!_pending) return false;
-        _pending = false;
-        if (EqualityComparer<T>.Default.Equals(_value, parameter)) return false;
-        _value = parameter;
-        return true;
+        // A render while the change handler is still running (for example before its first await) does not decide: the
+        // value would jump back while the parent is still saving. SetAsync decides once the handler has completed.
+        if (!_pending || _handlerRunning) return false;
+        return Revert();
     }
 
     /// <summary>
     /// Sets the value and raises <paramref name="changed"/>. When the parent controls the value (it passes the parameter and
-    /// handles the change), the change must come back as a new parameter: after the parent's render, a value the parent did not
-    /// accept is reverted, as Blazor's own inputs do. Returns true when the change was reverted.
+    /// handles the change), the parent's answer is the value it renders with during or right after the handler (see the class
+    /// remarks): a change it did not accept is reverted. Returns true when the change was reverted.
     /// </summary>
     public async Task<bool> SetAsync(T value, bool controlled, EventCallback<T> changed)
     {
@@ -365,11 +372,28 @@ public sealed class Controllable<T>
         var version = ++_version;
         // Only a parent that passes the value (not just a change handler) controls it; Default… + …Changed stays uncontrolled.
         _pending = controlled && _provided && _synced;
-        if (changed.HasDelegate) await changed.InvokeAsync(value);
+        _handlerRunning = _pending;
+        try
+        {
+            // Completes after the handler, including its asynchronous part and the parent's render that follows it.
+            if (changed.HasDelegate) await changed.InvokeAsync(value);
+        }
+        finally
+        {
+            if (version == _version) _handlerRunning = false;
+        }
         if (!_pending || version != _version) return false;
-        // The parent re-renders after handling the event; yield once so that render (and our OnParametersSet) runs first.
+        // Inside an event batch the parent renders after the handler returns; yield once so that render (and our
+        // OnParametersSet, which adopts a new value or reverts) runs first.
         await Task.Yield();
         if (!_pending || version != _version) return false;
+        // The parameter did not change. Blazor does not even pass parameters to a child whose parameters are all unchanged
+        // (a bool and the same handler), so this cannot be told apart from a parent that did not re-render: revert.
+        return Revert();
+    }
+
+    private bool Revert()
+    {
         _pending = false;
         if (EqualityComparer<T>.Default.Equals(_value, _lastParameter)) return false;
         _value = _lastParameter;

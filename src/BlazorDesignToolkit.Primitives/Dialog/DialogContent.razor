@@ -57,9 +57,22 @@
         }
     }
 
-    /// <summary>Called by the browser when the user presses Escape or clicks the backdrop.</summary>
+    /// <summary>
+    /// Called by the browser when the user presses Escape, clicks the backdrop, or the browser closed the dialog itself
+    /// ("close"). Returns whether the dialog is still open (a controlled parent can reject the change), so that the browser
+    /// shows a natively closed dialog again.
+    /// </summary>
     [JSInvokable]
-    public Task OnDialogDismiss(string reason) => InvokeAsync(() => Context.Owner.SetOpenAsync(false));
+    public async Task<bool> OnDialogDismiss(string reason)
+    {
+        var stillOpen = false;
+        await InvokeAsync(async () =>
+        {
+            await Context.Owner.SetOpenAsync(false);
+            stillOpen = Context.Owner.IsOpen;
+        });
+        return stillOpen;
+    }
 
     public override async ValueTask DisposeAsync()
     {

@@ -131,6 +131,15 @@ public partial class BootstrapRuntimeTests
     }
 
     [Fact]
+    public void Themed_stylesheet_bridges_only_colors_with_derived_variables()
+    {
+        var mappings = new List<TargetMapping> { new("primary", "color.surface.accent"), new("danger", "color.overlay.scrim") };
+        var css = BootstrapRuntime.ExportThemes(Catalog(), new BootstrapExportOptions { Mappings = mappings, Css = Fixture.Css }).Content;
+        Assert.Contains(".btn-primary {", css);
+        Assert.DoesNotContain(".btn-danger", css); // translucent: no derived variables in any theme, so no bridge rules
+    }
+
+    [Fact]
     public void Generated_runtime_css_is_valid_css()
     {
         var tools = Fixture.RequireTools();

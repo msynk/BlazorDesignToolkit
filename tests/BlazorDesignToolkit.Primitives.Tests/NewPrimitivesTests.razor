@@ -63,6 +63,31 @@
         AssertAccessible(cut.Markup);
     }
 
+    [Fact]
+    public void Range_slider_keeps_min_distance_when_it_is_not_a_whole_step()
+    {
+        (double Start, double End) committed = default;
+        var cut = Render(@<RangeSlider Label="Range" Min="0" Max="10" Step="1" DefaultStart="0" DefaultEnd="10" MinDistance="2.5"
+                                      ValueCommitted="v => committed = v" />);
+        cut.FindAll("[role=slider]")[0].KeyDown(Key("End"));
+        Assert.Equal((7d, 10d), committed); // the largest step within end − MinDistance (7.5), not 7.5 rounded up to 8
+        var start = cut.FindAll("[role=slider]")[0];
+        Assert.True(double.Parse(start.Attr("aria-valuenow")!, CultureInfo.InvariantCulture) <= double.Parse(start.Attr("aria-valuemax")!, CultureInfo.InvariantCulture));
+        cut.FindAll("[role=slider]")[1].KeyDown(Key("Home"));
+        Assert.Equal((7d, 10d), committed); // start + MinDistance = 9.5: the end thumb's nearest step inside is 10
+    }
+
+    [Fact]
+    public void Snap_handles_many_decimals_and_bounds()
+    {
+        // Decimals of step and min add up to more than Math.Round accepts (15).
+        Assert.Equal(0.3, SliderMath.Snap(0.3, 0.1 + 0.2, 1, 0.00001), 10);
+        Assert.Equal(7d, SliderMath.SnapWithin(7.5, 0, 10, 1, 0, 7.5));
+        Assert.Equal(3d, SliderMath.SnapWithin(2.4, 0, 10, 1, 2.5, 10));
+        Assert.Equal(4.5d, SliderMath.SnapWithin(9, 0, 10, 10, 3, 4.5)); // no step inside: the bound
+        Assert.Null(SliderMath.SnapWithin(5, 0, 10, 1, 6, 4));
+    }
+
     // ---- Number field ------------------------------------------------------------------------------------------
 
     [Fact]
@@ -155,6 +180,36 @@
         Assert.Equal(DayOfWeek.Monday, CalendarMath.MonthGrid(new DateOnly(2026, 12, 1), CultureInfo.GetCultureInfo("de-DE").DateTimeFormat.FirstDayOfWeek)[0].DayOfWeek);
     }
 
+    [Fact]
+    public void Date_picker_marks_the_local_date_as_today_by_default()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var cut = Render(@<DatePicker Label="Date" DefaultValue="today" Culture="@(CultureInfo.GetCultureInfo("en-US"))" />);
+        cut.Find("[data-date-picker-button]").Click();
+        var cell = cut.Find($"td[data-date='{today:yyyy-MM-dd}']");
+        Assert.Equal("date", cell.Attr("aria-current"));
+        Assert.True(cell.HasAttribute("data-today"));
+    }
+
+    [Theory]
+    [InlineData("th-TH")]  // Thai Buddhist calendar by default
+    [InlineData("ar-SA")]  // Um Al-Qura (Hijri) calendar by default
+    public void Date_picker_shows_gregorian_dates_for_cultures_with_another_default_calendar(string name)
+    {
+        var culture = CultureInfo.GetCultureInfo(name);
+        var gregorian = CalendarMath.WithGregorianCalendar(culture);
+        Assert.IsType<GregorianCalendar>(gregorian.DateTimeFormat.Calendar);
+        var date = new DateTime(2026, 11, 7);
+        var cut = Render(@<DatePicker Label="Date" DefaultValue="DateOnly.FromDateTime(date)" Culture="culture" />);
+        Assert.Equal(date.ToString(gregorian.DateTimeFormat.ShortDatePattern, gregorian), cut.Find("input").Attr("value"));
+        cut.Find("[data-date-picker-button]").Click();
+        var heading = cut.Find("[data-date-picker-heading]").TextContent;
+        Assert.Equal(date.ToString(gregorian.DateTimeFormat.YearMonthPattern, gregorian), heading);
+        // The culture's own calendar would name another month or year than the Gregorian grid shows.
+        Assert.NotEqual(date.ToString(culture.DateTimeFormat.YearMonthPattern, culture), heading);
+        Assert.Equal(30, cut.FindAll("td[data-date]").Count); // November has 30 days in the Gregorian grid
+    }
+
     // ---- Submenus and menubar ----------------------------------------------------------------------------------
 
     [Fact]
@@ -220,6 +275,29 @@
         Assert.Equal("true", cut.FindAll("[data-menubar-trigger]")[2].Attr("aria-expanded"));
         Assert.Equal("0", cut.FindAll("[data-menubar-trigger]")[2].Attr("tabindex"));
         AssertAccessible(cut.Markup);
+    }
+
+    [Fact]
+    public void Menubar_left_right_on_a_trigger_switches_the_open_menu()
+    {
+        var cut = Render(@<Menubar aria-label="Editor">
+            <Menu><MenubarTrigger>File</MenubarTrigger><MenuContent><MenuItem>New</MenuItem></MenuContent></Menu>
+            <Menu><MenubarTrigger>Edit</MenubarTrigger><MenuContent><MenuItem>Undo</MenuItem></MenuContent></Menu>
+            <Menu><MenubarTrigger>View</MenubarTrigger><MenuContent><MenuItem>Zoom</MenuItem></MenuContent></Menu>
+        </Menubar>);
+        IReadOnlyList<string?> Expanded() => cut.FindAll("[data-menubar-trigger]").Select(t => t.Attr("aria-expanded")).ToList();
+        cut.FindAll("[data-menubar-trigger]")[0].KeyDown(Key("ArrowDown"));
+        // Hovering another trigger while a menu is open opens its menu; focus stays on the trigger.
+        cut.FindAll("[data-menubar-trigger]")[1].TriggerEvent("onpointerenter", new PointerEventArgs());
+        Assert.Equal(["false", "true", "false"], Expanded());
+        cut.FindAll("[data-menubar-trigger]")[1].Focus();
+        cut.FindAll("[data-menubar-trigger]")[1].KeyDown(Key("ArrowRight"));
+        Assert.Equal(["false", "false", "true"], Expanded());
+        Assert.Equal("0", cut.FindAll("[data-menubar-trigger]")[2].Attr("tabindex"));
+        // Without an open menu, Left/Right only move focus.
+        cut.FindAll("[data-menubar-trigger]")[2].Click();
+        cut.FindAll("[data-menubar-trigger]")[2].KeyDown(Key("ArrowLeft"));
+        Assert.Equal(["false", "false", "false"], Expanded());
     }
 
     // ---- Virtualization ----------------------------------------------------------------------------------------

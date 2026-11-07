@@ -255,18 +255,23 @@ export function showDialog(dialog, modal, dotNetRef, options) {
   };
   // Browsers' close watchers may close a dialog without a cancelable 'cancel' event (for example on a second Escape
   // without user activation in between). Keep the .NET state authoritative: reopen when Escape must not close the dialog,
-  // otherwise report the dismissal so the state follows.
+  // otherwise report the dismissal and reopen when .NET keeps the dialog open (a controlled parent rejected the change).
   let closingByUs = false;
   let lastFocused = null;
   const onFocusIn = (event) => { lastFocused = event.target; };
+  const reopen = () => {
+    try { modal ? dialog.showModal() : dialog.show(); } catch { dialog.setAttribute('open', ''); }
+    if (lastFocused && dialog.contains(lastFocused)) lastFocused.focus();
+  };
   const onClose = () => {
     if (closingByUs) return;
     if (options?.closeOnEscape === false) {
-      try { modal ? dialog.showModal() : dialog.show(); } catch { dialog.setAttribute('open', ''); }
-      if (lastFocused && dialog.contains(lastFocused)) lastFocused.focus();
-    } else {
-      dotNetRef.invokeMethodAsync('OnDialogDismiss', 'close').catch(() => {});
+      reopen();
+      return;
     }
+    dotNetRef.invokeMethodAsync('OnDialogDismiss', 'close')
+      .then((stillOpen) => { if (stillOpen === true && !closingByUs && !dialog.open) reopen(); })
+      .catch(() => {});
   };
   const onClick = (event) => {
     if (event.target !== dialog || options?.closeOnBackdropClick !== true) return;

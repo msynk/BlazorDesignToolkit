@@ -94,7 +94,10 @@ module.exports = { "theme": { "extend": {
   build for dark and light colors, in light and dark mode. Rules use `:is()` so they win over Bootstrap's own `:root` and
   `[data-bs-theme]` rules.
 - **`bootstrap-css`:** the same variables and bridge for one token set and selector (`selector`, default
-  `:root, [data-bs-theme=light]`), for apps without the toolkit's themes.
+  `:root, [data-bs-theme=light]`), for apps without the toolkit's themes. The dark-mode variants of the emphasis and subtle
+  variables follow in a `[data-bs-theme=dark]` block (`darkSelector`; empty to omit), so Bootstrap's dark color mode keeps
+  working. For a file that only serves dark mode, set `dark` to `true` and `selector` to a dark selector. A translucent
+  theme color gets `--bs-<name>` but no derived variables and no bridge rules (its compiled Bootstrap colors stay).
 - **Remaining compile-time parts:** SVG icons that Bootstrap embeds as data URIs with compiled colors (select caret, form
   switch knob, accordion chevron, validation icons) and `$theme-colors` loops for colors you did not map keep their
   compiled values. Variables Bootstrap only reads in Sass are rejected for the runtime outputs.

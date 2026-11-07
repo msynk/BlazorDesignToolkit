@@ -24,8 +24,10 @@ compiled colors keep them. See [integrations.md](integrations.md#bootstrap-53-bl
 
 **A controlled component jumps back to its old value.**
 When you pass `Value` and handle `ValueChanged`, the component is controlled: if your handler does not store the new
-value (and you re-render), the change is reverted, as with Blazor's own inputs. Use `@bind-Value`, store the value in the
-handler, or pass only `DefaultValue` and `ValueChanged` for an uncontrolled component that just reports changes.
+value by the time it completes, the change is reverted. An asynchronous handler may await before storing it; the value is
+kept while it runs. The component that passes `Value` must re-render after the change (a `ShouldRender` that returns false,
+or a handler on another component, leaves the old value in place until its next render). Use `@bind-Value`, store the
+value in the handler, or pass only `DefaultValue` and `ValueChanged` for an uncontrolled component that just reports changes.
 
 **A virtualized listbox or tree renders every row, or jumps while scrolling.**
 Give it a height (`max-height` and `overflow: auto`; the starter styles do) so it is the scroll container, and keep every

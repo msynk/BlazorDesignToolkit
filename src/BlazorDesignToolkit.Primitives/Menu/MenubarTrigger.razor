@@ -74,11 +74,15 @@
         if (Disabled) return Task.CompletedTask;
         return e.Key switch
         {
-            "ArrowDown" or "Enter" or " " => Context.Owner.OpenAsync(Menu.MenuFocus.First),
-            "ArrowUp" => Context.Owner.OpenAsync(Menu.MenuFocus.Last),
+            "ArrowDown" or "Enter" or " " => OpenOrFocusAsync(Menu.MenuFocus.First),
+            "ArrowUp" => OpenOrFocusAsync(Menu.MenuFocus.Last),
             _ => Task.CompletedTask,
         };
     }
+
+    /// <summary>Opens the menu on its first/last item, or moves focus into it when it is already open (after hovering or Left/Right).</summary>
+    private Task OpenOrFocusAsync(Menu.MenuFocus focus)
+        => Context.Owner.IsOpen && Context.FocusEdge is { } edge ? edge(focus) : Context.Owner.OpenAsync(focus);
 
     /// <summary>While another menu of the menubar is open, hovering a trigger switches to its menu.</summary>
     private async Task OnPointerEnterAsync()

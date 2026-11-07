@@ -1,0 +1,20 @@
+@* A parent that controls a radio group and saves each change asynchronously before accepting (or rejecting) it. Blazor
+   renders it before the first await of its handler, still passing the old value. *@
+<RadioGroup TValue="string" Value="@Value" ValueChanged="OnChangedAsync" aria-label="Size">
+    <label><Radio Value="@("a")" /> Small</label>
+    <label><Radio Value="@("b")" /> Medium</label>
+</RadioGroup>
+
+@code {
+    public string? Value { get; private set; } = "b";
+    public TaskCompletionSource<bool> Save { get; private set; } = NewSave();
+
+    public void NextSave() => Save = NewSave();
+
+    private static TaskCompletionSource<bool> NewSave() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private async Task OnChangedAsync(string? value)
+    {
+        if (await Save.Task) Value = value;
+    }
+}

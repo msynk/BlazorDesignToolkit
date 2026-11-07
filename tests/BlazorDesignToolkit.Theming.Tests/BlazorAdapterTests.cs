@@ -89,6 +89,23 @@ public class BlazorAdapterTests : BunitContext
     }
 
     [Fact]
+    public void ThemeScope_does_not_recompute_for_equal_new_dictionaries()
+    {
+        Configure();
+        // With reference comparison this re-rendered forever: diagnostics → parent render → new dictionaries → diagnostics.
+        var cut = Render<ThemeScopeHost>();
+        Assert.Equal(1, cut.Instance.Reports);
+        Assert.NotEmpty(cut.Instance.Last!);
+        Assert.Matches(@"--[a-z-]*color-blue-600: #ff0000;", cut.Find("div").GetAttribute("style")!);
+        cut.Render();
+        Assert.Equal(1, cut.Instance.Reports);
+        // A real change recomputes and reports again.
+        cut.Render(p => p.Add(h => h.Mode, "light"));
+        Assert.Equal(2, cut.Instance.Reports);
+        Assert.Equal("light", cut.Find("div").GetAttribute("data-mode"));
+    }
+
+    [Fact]
     public void ThemeProvider_applies_state_follows_system_and_reacts_to_changes()
     {
         Configure();

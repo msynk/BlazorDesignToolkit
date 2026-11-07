@@ -64,6 +64,8 @@ public static class TailwindThemeExporter
     {
         var bag = new DiagnosticBag();
         var lines = new List<string>();
+        // Theme variable names across all mappings (Match only detects collisions within one mapping).
+        var names = new Dictionary<string, TokenPath>(StringComparer.Ordinal);
         if (!CheckPrefix(options, bag)) return new TokenExportOutput("", bag.ToSortedList());
         foreach (var mapping in options.Mappings)
         {
@@ -77,6 +79,14 @@ public static class TailwindThemeExporter
             foreach (var (token, suffix) in Match(tokens, mapping, bag))
             {
                 var name = suffix.Length == 0 ? $"--{mapping.Namespace}" : $"--{mapping.Namespace}-{suffix}";
+                if (names.TryGetValue(name, out var existing))
+                {
+                    // The same token mapped twice to the same name is harmless; a different token would silently win.
+                    if (existing != token.Path)
+                        bag.Report(DiagnosticCatalog.NameCollision, $"'{token.Path}' and '{existing}' both map to Tailwind variable {name}.", token.Path.ToString(), token.Location);
+                    continue;
+                }
+                names[name] = token.Path;
                 foreach (var line in Declarations(name, token, mapping.Namespace, options, bag)) AddLine(lines, line);
             }
         }
@@ -102,7 +112,10 @@ public static class TailwindThemeExporter
         return false;
     }
 
-    /// <summary>Tokens matched by <paramref name="mapping"/> with the utility-name suffix each one gets; reports type mismatches and collisions.</summary>
+    /// <summary>
+    /// Tokens matched by <paramref name="mapping"/> with the utility-name suffix each one gets; reports type mismatches and
+    /// collisions within this mapping. Callers detect collisions between mappings.
+    /// </summary>
     internal static IEnumerable<(ResolvedToken Token, string Suffix)> Match(ResolvedTokenSet tokens, TailwindMapping mapping, DiagnosticBag bag)
     {
         var types = Namespaces[mapping.Namespace];

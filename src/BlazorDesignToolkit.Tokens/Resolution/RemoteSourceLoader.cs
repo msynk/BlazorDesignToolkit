@@ -13,7 +13,10 @@ public sealed record RemoteSourceOptions
     /// </summary>
     public IReadOnlyList<Uri> AllowedPrefixes { get; init; } = [];
 
-    /// <summary>Time allowed for one request, including reading the body. Default 30 seconds.</summary>
+    /// <summary>Upper limit of <see cref="Timeout"/>.</summary>
+    public static readonly TimeSpan MaxTimeout = TimeSpan.FromHours(1);
+
+    /// <summary>Time allowed for one request, including reading the body. Default 30 seconds, at most <see cref="MaxTimeout"/>.</summary>
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Parse limits for fetched documents; <see cref="JsonParseOptions.MaxInputBytes"/> also limits the download size.</summary>
@@ -27,7 +30,8 @@ public sealed record RemoteSourceOptions
             if (!prefix.IsAbsoluteUri || prefix.Scheme != Uri.UriSchemeHttps) return $"Remote prefix '{prefix}' must be an absolute https:// URL.";
             if (!string.IsNullOrEmpty(prefix.Query) || !string.IsNullOrEmpty(prefix.Fragment)) return $"Remote prefix '{prefix}' must not contain a query or fragment.";
         }
-        return Timeout <= TimeSpan.Zero ? "The remote timeout must be positive." : null;
+        if (Timeout <= TimeSpan.Zero) return "The remote timeout must be positive.";
+        return Timeout > MaxTimeout ? $"The remote timeout must be at most {MaxTimeout.TotalSeconds:0} seconds." : null;
     }
 
     internal bool IsAllowed(Uri uri)
@@ -76,6 +80,8 @@ public sealed class HttpResolverSourceLoader(HttpClient client, RemoteSourceOpti
                 $"Remote reference '{reference}' is not allowed. Only https:// URLs under an allow-listed prefix are fetched.", reference,
                 "Add the URL prefix to the remote allow-list (CLI: \"remote\": { \"allow\": [ … ] }) or download the file.");
         }
+
+        if (Options.Validate() is { } invalid) return Fail(DiagnosticCatalog.InvalidConfiguration, invalid, reference);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Options.Timeout);
@@ -133,6 +139,11 @@ public sealed class HttpResolverSourceLoader(HttpClient client, RemoteSourceOpti
         catch (HttpRequestException ex)
         {
             return Fail(DiagnosticCatalog.FileNotFound, $"Fetching '{reference}' failed: {ex.Message}", reference);
+        }
+        catch (IOException ex)
+        {
+            // For example HttpIOException: the connection was reset while the body was being read.
+            return Fail(DiagnosticCatalog.FileNotFound, $"Fetching '{reference}' failed while reading the response: {ex.Message}", reference);
         }
     }
 

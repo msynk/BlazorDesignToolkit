@@ -117,15 +117,16 @@
 
     private async Task SetAsync(int index, double value, bool commit)
     {
+        // Snap first, then limit by the other thumb, so that rounding never breaks MinDistance or the thumb's aria bounds.
         if (index == 0)
         {
-            var next = SliderMath.Snap(Math.Min(value, EndValue - MinDistance), Min, Max, Step);
-            if (next != StartValue) await _start.SetAsync(next, StartChanged.HasDelegate, StartChanged);
+            var next = SliderMath.SnapWithin(value, Min, Max, Step, Min, EndValue - MinDistance);
+            if (next is { } n && n != StartValue) await _start.SetAsync(n, StartChanged.HasDelegate, StartChanged);
         }
         else
         {
-            var next = SliderMath.Snap(Math.Max(value, StartValue + MinDistance), Min, Max, Step);
-            if (next != EndValue) await _end.SetAsync(next, EndChanged.HasDelegate, EndChanged);
+            var next = SliderMath.SnapWithin(value, Min, Max, Step, StartValue + MinDistance, Max);
+            if (next is { } n && n != EndValue) await _end.SetAsync(n, EndChanged.HasDelegate, EndChanged);
         }
         if (commit && ValueCommitted.HasDelegate) await ValueCommitted.InvokeAsync((StartValue, EndValue));
     }

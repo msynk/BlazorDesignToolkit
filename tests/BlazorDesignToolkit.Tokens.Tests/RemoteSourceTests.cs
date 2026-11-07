@@ -96,6 +96,44 @@ public class RemoteSourceTests
         Assert.Contains((await Load(slow, "https://tokens.example.com/design/x.json")).Diagnostics, d => d.Message.Contains("timed out", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task Connection_errors_while_reading_the_body_become_diagnostics()
+    {
+        var (loader, _) = Create(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new ResettingStream()) });
+        var result = await Load(loader, "https://tokens.example.com/design/x.json");
+        Assert.Null(result.Root);
+        Assert.Contains(result.Diagnostics, d => d.RuleId == DiagnosticCatalog.FileNotFound.Id && d.Message.Contains("reading the response", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Timeouts_beyond_the_limit_are_diagnostics_not_exceptions()
+    {
+        var options = new RemoteSourceOptions { AllowedPrefixes = [s_allowed], Timeout = TimeSpan.FromSeconds(3_000_000) };
+        Assert.NotNull(options.Validate());
+        var (loader, handler) = Create(_ => Json(Tokens), options);
+        var result = await Load(loader, "https://tokens.example.com/design/x.json");
+        Assert.Contains(result.Diagnostics, d => d.RuleId == DiagnosticCatalog.InvalidConfiguration.Id);
+        Assert.Empty(handler.Requests);
+    }
+
+    /// <summary>A response body whose connection is reset after the first bytes.</summary>
+    private sealed class ResettingStream : MemoryStream
+    {
+        private bool _sent;
+
+        public ResettingStream() : base(System.Text.Encoding.UTF8.GetBytes("{ \"a\": ")) { }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_sent) throw new HttpIOException(HttpRequestError.ResponseEnded, "The response ended prematurely.");
+            _sent = true;
+            return base.ReadAsync(buffer, cancellationToken);
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+    }
+
     private sealed class SlowHandler : HttpMessageHandler
     {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

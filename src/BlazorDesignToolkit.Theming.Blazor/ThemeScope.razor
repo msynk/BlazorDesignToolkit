@@ -11,7 +11,13 @@
 
 @code {
     private IReadOnlyDictionary<string, object> _attributes = new Dictionary<string, object>();
-    private (string ThemeId, IReadOnlyDictionary<string, string>? Axes, IReadOnlyDictionary<string, SourceNode>? Overrides, string? Style)? _computedFor;
+    // Snapshots of the inputs the override style was computed for, compared by content: a parent that builds new
+    // dictionaries on every render (and re-renders when OverrideDiagnostics fires) must not cause another recomputation.
+    private bool _computed;
+    private string? _computedThemeId;
+    private Dictionary<string, string>? _computedAxes;
+    private Dictionary<string, SourceNode>? _computedOverrides;
+    private bool _reportedDiagnostics;
     private string _overrideStyle = "";
 
     [Parameter, EditorRequired] public string ThemeId { get; set; } = "";
@@ -31,10 +37,13 @@
     protected override async Task OnParametersSetAsync()
     {
         var style = AdditionalAttributes?.TryGetValue("style", out var s) == true ? s?.ToString() : null;
-        var key = (ThemeId, Axes, Overrides, style);
         IReadOnlyList<Diagnostic>? diagnostics = null;
-        if (_computedFor is not { } previous || previous.ThemeId != ThemeId || !ReferenceEquals(previous.Axes, Axes) || !ReferenceEquals(previous.Overrides, Overrides))
+        if (!_computed || _computedThemeId != ThemeId || !SameAxes(_computedAxes, Axes) || !SameOverrides(_computedOverrides, Overrides))
         {
+            _computed = true;
+            _computedThemeId = ThemeId;
+            _computedAxes = Axes is null ? null : new Dictionary<string, string>(Axes, StringComparer.Ordinal);
+            _computedOverrides = Overrides is null ? null : new Dictionary<string, SourceNode>(Overrides, StringComparer.Ordinal);
             _overrideStyle = "";
             if (Overrides is { Count: > 0 })
             {
@@ -43,8 +52,12 @@
                 _overrideStyle = string.Concat(declarations.Select(static d => $"{d.Name}: {d.Value}; "));
                 diagnostics = found;
             }
+            else if (_reportedDiagnostics)
+            {
+                // The overrides were removed: clear the diagnostics reported for them.
+                diagnostics = [];
+            }
         }
-        _computedFor = key;
 
         var result = new Dictionary<string, object>(AdditionalAttributes ?? new Dictionary<string, object>(), StringComparer.Ordinal);
         foreach (var (k, v) in ThemeRootAttributes.For(Catalog, new ThemeSelection(ThemeId, Axes), Options.Css)) result[k] = v;
@@ -53,6 +66,32 @@
         else result.Remove("style");
         _attributes = result;
 
-        if (diagnostics is not null && OverrideDiagnostics.HasDelegate) await OverrideDiagnostics.InvokeAsync(diagnostics);
+        if (diagnostics is not null && OverrideDiagnostics.HasDelegate)
+        {
+            _reportedDiagnostics = diagnostics.Count > 0;
+            await OverrideDiagnostics.InvokeAsync(diagnostics);
+        }
+    }
+
+    private static bool SameAxes(IReadOnlyDictionary<string, string>? previous, IReadOnlyDictionary<string, string>? current)
+    {
+        if (previous is null || current is null) return (previous?.Count ?? 0) == (current?.Count ?? 0);
+        if (previous.Count != current.Count) return false;
+        foreach (var (key, value) in current)
+        {
+            if (!previous.TryGetValue(key, out var other) || !string.Equals(value, other, StringComparison.Ordinal)) return false;
+        }
+        return true;
+    }
+
+    private static bool SameOverrides(IReadOnlyDictionary<string, SourceNode>? previous, IReadOnlyDictionary<string, SourceNode>? current)
+    {
+        if (previous is null || current is null) return (previous?.Count ?? 0) == (current?.Count ?? 0);
+        if (previous.Count != current.Count) return false;
+        foreach (var (key, value) in current)
+        {
+            if (!previous.TryGetValue(key, out var other) || !SourceNode.DeepEquals(value, other)) return false;
+        }
+        return true;
     }
 }

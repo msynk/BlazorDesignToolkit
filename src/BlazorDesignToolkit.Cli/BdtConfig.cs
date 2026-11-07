@@ -131,10 +131,19 @@ internal sealed class BdtConfig
                 if (Uri.TryCreate(prefix, UriKind.Absolute, out var uri)) prefixes.Add(uri);
                 else bag.Report(DiagnosticCatalog.InvalidConfiguration, $"Remote prefix '{prefix}' is not an absolute URL.", actual: prefix, location: r.Location);
             }
+            var timeout = TimeSpan.FromSeconds(30);
+            if (r["timeoutSeconds"] is SourceNumber t)
+            {
+                // Check the number before converting: TimeSpan.FromSeconds throws for values beyond its range.
+                if (double.IsFinite(t.Value) && t.Value > 0 && t.Value <= RemoteSourceOptions.MaxTimeout.TotalSeconds) timeout = TimeSpan.FromSeconds(t.Value);
+                else bag.Report(DiagnosticCatalog.InvalidConfiguration,
+                    $"\"timeoutSeconds\" must be a positive number of at most {RemoteSourceOptions.MaxTimeout.TotalSeconds:0} seconds.",
+                    actual: t.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), location: t.Location ?? r.Location);
+            }
             remote = new RemoteSourceOptions
             {
                 AllowedPrefixes = prefixes,
-                Timeout = r["timeoutSeconds"] is SourceNumber t ? TimeSpan.FromSeconds(t.Value) : TimeSpan.FromSeconds(30),
+                Timeout = timeout,
                 ParseOptions = parse,
             };
             if (remote.Validate() is { } error) bag.Report(DiagnosticCatalog.InvalidConfiguration, error, location: r.Location);

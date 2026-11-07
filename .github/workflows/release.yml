@@ -35,8 +35,12 @@ jobs:
           node-version: 22
       - id: version
         name: Determine version
+        # The input goes through the environment, never into the script text, so it cannot inject shell code.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then v="${{ inputs.version }}"; else v="${GITHUB_REF_NAME#v}"; fi
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then v="$INPUT_VERSION"; else v="${GITHUB_REF_NAME#v}"; fi
           echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || { echo "Invalid version '$v'"; exit 1; }
           echo "version=$v" >> "$GITHUB_OUTPUT"
       - run: npm ci --prefix tests/integration-tools --no-audit --no-fund

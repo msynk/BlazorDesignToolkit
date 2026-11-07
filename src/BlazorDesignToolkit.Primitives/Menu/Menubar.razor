@@ -2,7 +2,8 @@
 @* WAI-ARIA Menubar: a horizontal role="menubar" whose items are MenubarTriggers, each opening the Menu it belongs to.
    One trigger is in the tab sequence (roving tabindex). Left/Right move between triggers (wrapping) and, while a menu is
    open, open the adjacent menu; Home/End go to the first/last trigger; Down/Enter/Space open a menu on its first item, Up on
-   its last; Escape closes the menu and returns focus to its trigger. Label the menubar with aria-label. *@
+   its last (when the menu is already open, they move focus into it); Escape closes the menu and returns focus to its
+   trigger. Label the menubar with aria-label. *@
 @inherits PrimitiveBase
 
 <CascadingValue Value="Context" IsFixed="true">
@@ -47,9 +48,15 @@
         var current = Context.Triggers.Focused ?? Context.Triggers.FindById(await Js.InvokeAsync<string?>("activeElementId")) ?? Context.Current;
         var target = Context.Triggers.Navigate(current, intent, loop: true);
         if (target is null) return;
+        // Focus is on a trigger while its menu is open after hovering; Left/Right then switch to the adjacent menu.
+        Menu? open = null;
+        if (intent is NavigationIntent.Previous or NavigationIntent.Next && Context.OpenMenu is { IsOpen: true } menu && menu != target.Owner) open = menu;
+        if (open is not null) await open.CloseAsync();
         Context.Current = target;
         Context.NotifyStateChanged();
         await target.FocusAsync();
+        // Focus stays on the trigger, as when the menu is opened by hovering; Down/Up move into the menu.
+        if (open is not null) await target.Owner.OpenAsync(null);
     }
 
     internal sealed class MenubarContext : PrimitiveContext

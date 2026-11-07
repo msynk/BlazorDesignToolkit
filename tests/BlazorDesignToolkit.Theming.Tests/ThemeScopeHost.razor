@@ -1,0 +1,27 @@
+@* A parent that builds new Axes and Overrides dictionaries on every render and re-renders when diagnostics arrive. *@
+@using BlazorDesignToolkit.Theming.Blazor
+@using BlazorDesignToolkit.Tokens.Diagnostics
+@using BlazorDesignToolkit.Tokens.Json
+
+<ThemeScope ThemeId="aurora"
+            Axes="@(new Dictionary<string, string> { ["mode"] = Mode })"
+            Overrides="@(new Dictionary<string, SourceNode> { ["color.blue.600"] = Color(), ["no.such.token"] = Color() })"
+            OverrideDiagnostics="OnDiagnostics">
+    <p>@Reports</p>
+</ThemeScope>
+
+@code {
+    private const string Red = "{ \"colorSpace\": \"srgb\", \"components\": [1, 0, 0] }";
+
+    [Parameter] public string Mode { get; set; } = "dark";
+    public int Reports { get; private set; }
+    public IReadOnlyList<Diagnostic>? Last { get; private set; }
+
+    private static SourceNode Color() => SourceJsonParser.Parse(Red).Root!;
+
+    private void OnDiagnostics(IReadOnlyList<Diagnostic> diagnostics)
+    {
+        Reports++;
+        Last = diagnostics;
+    }
+}

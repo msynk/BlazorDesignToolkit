@@ -421,7 +421,8 @@
   border-color: color-mix(in srgb, var(--bs-primary) 50%, #ffffff);
   box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
 }
-.form-range:focus::-webkit-slider-thumb, .form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 1px var(--bs-body-bg), 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25); }
+.form-range:focus::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--bs-body-bg), 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25); }
+.form-range:focus::-moz-range-thumb { box-shadow: 0 0 0 1px var(--bs-body-bg), 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25); }
 .form-range::-webkit-slider-thumb { background-color: var(--bs-primary); }
 .form-range::-moz-range-thumb { background-color: var(--bs-primary); }
 .form-range::-webkit-slider-thumb:active { background-color: color-mix(in srgb, var(--bs-primary) 30%, #ffffff); }

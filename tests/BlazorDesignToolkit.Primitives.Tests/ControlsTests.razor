@@ -122,6 +122,30 @@
     }
 
     [Fact]
+    public void Controlled_value_waits_for_an_asynchronous_handler_before_reverting()
+    {
+        var cut = Render<SavingHost>();
+        var save = cut.Instance.Save;
+        _ = cut.FindAll("input[type=radio]")[0].ChangeAsync(new ChangeEventArgs { Value = "a" });
+        // The host rendered before its await, still passing "b": the group keeps "a" meanwhile instead of jumping back.
+        Assert.Equal("checked", cut.FindAll("input[type=radio]")[0].Attr("data-state"));
+        save.SetResult(true);
+        cut.WaitForAssertion(() => Assert.Equal("a", cut.Instance.Value));
+        Assert.Equal("checked", cut.FindAll("input[type=radio]")[0].Attr("data-state"));
+        Assert.Equal(0, Calls("syncRadioGroup"));
+
+        // Rejected once the save has completed: the group reverts.
+        cut.Instance.NextSave();
+        save = cut.Instance.Save;
+        _ = cut.FindAll("input[type=radio]")[1].ChangeAsync(new ChangeEventArgs { Value = "b" });
+        Assert.Equal("checked", cut.FindAll("input[type=radio]")[1].Attr("data-state"));
+        save.SetResult(false);
+        cut.WaitForAssertion(() => Assert.Equal("checked", cut.FindAll("input[type=radio]")[0].Attr("data-state")));
+        Assert.Equal("unchecked", cut.FindAll("input[type=radio]")[1].Attr("data-state"));
+        cut.WaitForAssertion(() => Assert.Equal(1, Calls("syncRadioGroup")));
+    }
+
+    [Fact]
     public void Default_value_with_change_handler_stays_uncontrolled()
     {
         var changes = 0;
