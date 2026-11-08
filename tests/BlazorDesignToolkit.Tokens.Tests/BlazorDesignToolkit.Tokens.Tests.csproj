@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\samples\tokens\**\*" LinkBase="SampleTokens" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\demo\tokens\**\*" LinkBase="SampleTokens" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

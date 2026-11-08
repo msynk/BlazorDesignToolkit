@@ -65,7 +65,7 @@
     }
   ],
   "coverage": {
-    "sources": ["BlazorDesignToolkit.Demo.Client/**/*.razor", "BlazorDesignToolkit.Demo.Client/**/*.css", "BlazorDesignToolkit.Demo/**/*.razor"],
+    "sources": ["Client/**/*.razor", "Client/**/*.css", "Server/**/*.razor"],
     "exclude": ["**/bin/**", "**/obj/**"],
     "manifests": ["tokens/components.manifest.json"],
     "entryPoints": ["color.white", "color.black"],

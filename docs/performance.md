@@ -44,7 +44,7 @@ spot large regressions; drop `[ShortRunJob]` for publishable numbers.
   - Design-system rules (`TokenValidator.Validate`, including duplicate-value detection)
   - Export CSS (`CssExporter.Export`, resolved values)
   - Write DTCG JSON (`DtcgWriter.Write`)
-- **`ThemeBenchmarks`** — the sample design system in `samples/tokens` (about 200 exported tokens per theme; brands Aurora and
+- **`ThemeBenchmarks`** — the sample design system in `demo/tokens` (about 200 exported tokens per theme; brands Aurora and
   Ember; axes mode × contrast × density, 8 combinations per brand).
   - Compose one theme selection without the catalog's cache (`ThemeComposer.Compose`)
   - Generate the full theme stylesheet (`ThemeStylesheetGenerator.Generate`, 2 brands × 8 combinations)

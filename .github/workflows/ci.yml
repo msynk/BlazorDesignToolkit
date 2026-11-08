@@ -34,7 +34,7 @@ jobs:
               --logger "trx;LogFileName=$project.trx" --results-directory TestResults
           done
       - name: Design token quality gates (validation, contrast, outputs up to date, coverage)
-        run: dotnet run --project src/BlazorDesignToolkit.Cli -c Release --no-build -- check --config samples/bdt.config.json --format github --report reports/bdt-check.json
+        run: dotnet run --project src/BlazorDesignToolkit.Cli -c Release --no-build -- check --config demo/bdt.config.json --format github --report reports/bdt-check.json
       - run: dotnet pack BlazorDesignToolkit.slnx -c Release --no-build -o artifacts
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1,5 +1,5 @@
 using BlazorDesignToolkit.Demo.Client;
-using BlazorDesignToolkit.Demo.Components;
+using BlazorDesignToolkit.Demo.Server.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 

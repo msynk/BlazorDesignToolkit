@@ -65,8 +65,8 @@ builder.Services.AddDesignTokenTheming(o =>
 ```
 
 ```bash
-dotnet run --project samples/BlazorDesignToolkit.Demo        # interactive demo (append ?mode=wasm for WebAssembly)
-dotnet run --project src/BlazorDesignToolkit.Cli -- check --config samples/bdt.config.json
+dotnet run --project demo/Server        # interactive demo (append ?mode=wasm for WebAssembly)
+dotnet run --project src/BlazorDesignToolkit.Cli -- check --config demo/bdt.config.json
 ```
 
 ## Documentation

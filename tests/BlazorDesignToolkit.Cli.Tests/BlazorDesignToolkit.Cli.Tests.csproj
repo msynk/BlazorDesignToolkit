@@ -5,9 +5,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\samples\tokens\**\*" LinkBase="samples\tokens" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\samples\bdt.config.json" Link="samples\bdt.config.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\samples\generated\**\*" LinkBase="samples\generated" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\demo\tokens\**\*" LinkBase="demo\tokens" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\demo\bdt.config.json" Link="demo\bdt.config.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\demo\generated\**\*" LinkBase="demo\generated" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

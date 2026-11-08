@@ -19,9 +19,9 @@
     <Project Path="tests/BlazorDesignToolkit.Cli.Tests/BlazorDesignToolkit.Cli.Tests.csproj" />
     <Project Path="tests/BlazorDesignToolkit.BrowserTests/BlazorDesignToolkit.BrowserTests.csproj" />
   </Folder>
-  <Folder Name="/samples/">
-    <Project Path="samples/BlazorDesignToolkit.Demo/BlazorDesignToolkit.Demo.csproj" />
-    <Project Path="samples/BlazorDesignToolkit.Demo.Client/BlazorDesignToolkit.Demo.Client.csproj" />
+  <Folder Name="/demo/">
+    <Project Path="demo/Server/BlazorDesignToolkit.Demo.Server.csproj" />
+    <Project Path="demo/Client/BlazorDesignToolkit.Demo.Client.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/BlazorDesignToolkit.Benchmarks/BlazorDesignToolkit.Benchmarks.csproj" />

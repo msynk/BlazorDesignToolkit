@@ -10,7 +10,7 @@
     <PackageVersion Include="System.CommandLine" Version="2.0.13" />
     <PackageVersion Include="AngleSharp" Version="1.8.6" />
   </ItemGroup>
-  <ItemGroup Label="Samples">
+  <ItemGroup Label="Demo">
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.14" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.14" />
   </ItemGroup>

@@ -10,7 +10,7 @@ public sealed class CliTests : IDisposable
     public CliTests()
     {
         _root = Path.Combine(Path.GetTempPath(), "bdt-cli-" + Guid.NewGuid().ToString("N"));
-        Copy(Path.Combine(AppContext.BaseDirectory, "samples"), _root);
+        Copy(Path.Combine(AppContext.BaseDirectory, "demo"), _root);
     }
 
     public void Dispose()
@@ -207,9 +207,9 @@ public sealed class CliTests : IDisposable
     [Fact]
     public async Task Check_runs_all_gates()
     {
-        Write("BlazorDesignToolkit.Demo.Client/Sample.razor", "<div style=\"color: var(--ds-color-text-default)\"></div>");
-        Write("BlazorDesignToolkit.Demo.Client/site.css", ".x { color: var(--ds-color-text-muted); }");
-        Write("BlazorDesignToolkit.Demo/App.razor", "<html></html>");
+        Write("Client/Sample.razor", "<div style=\"color: var(--ds-color-text-default)\"></div>");
+        Write("Client/site.css", ".x { color: var(--ds-color-text-muted); }");
+        Write("Server/App.razor", "<html></html>");
         var (exit, output, _) = await Run("check");
         Assert.True(exit == 0, output);
         Assert.Contains("PASSED", output);

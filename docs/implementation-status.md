@@ -15,7 +15,7 @@ finished.
 | D. Accessibility and audit tooling | Done (all automatable layers); manual screen-reader review is a release step | `BlazorDesignToolkit.Tokens` (contrast), `BlazorDesignToolkit.Testing`, browser tests |
 | E. Integrations | Done: plain CSS, Tailwind 4 and 3, Bootstrap 5.3 (incl. runtime theming of compiled components), all Fluent 2 tokens | `BlazorDesignToolkit.Tokens.Tailwind`, `.Bootstrap`, `.Fluent` |
 | CLI | Done | `BlazorDesignToolkit.Cli` (`bdt`) |
-| Demo app | Done (Interactive Server and WebAssembly) | `samples/BlazorDesignToolkit.Demo`, `.Demo.Client` |
+| Demo app | Done (Interactive Server and WebAssembly) | `demo/Server` (`BlazorDesignToolkit.Demo.Server`), `demo/Client` (`BlazorDesignToolkit.Demo.Client`) |
 | Documentation | Done | `docs/`, package READMEs, `CHANGELOG.md` |
 | Benchmarks | Done, with a CI regression gate | `benchmarks/BlazorDesignToolkit.Benchmarks`, [performance.md](performance.md) |
 | CI | Done (build, tests, quality gates, benchmark gate, pack, 3-browser matrix) | `.github/workflows/ci.yml` |

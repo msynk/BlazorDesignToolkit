@@ -113,7 +113,7 @@ AccessibilityAssert.NoViolations(cut.Markup);   // BlazorDesignToolkit.Testing
 ## Run the demo
 
 ```bash
-dotnet run --project samples/BlazorDesignToolkit.Demo
+dotnet run --project demo/Server
 ```
 
 Append `?mode=wasm` to switch to Interactive WebAssembly (`?mode=server` to switch back), or use the link in the page

@@ -85,7 +85,7 @@ be judged with real assistive technologies. Before a release:
 dotnet test tests/BlazorDesignToolkit.Primitives.Tests        # markup, behavior, audit rules
 dotnet test tests/BlazorDesignToolkit.BrowserTests            # Playwright + axe, ARIA snapshots, display adaptations
 BDT_BROWSER=firefox dotnet test tests/BlazorDesignToolkit.BrowserTests
-dotnet bdt validate --config samples/bdt.config.json          # token contrast in every theme combination
+dotnet bdt validate --config demo/bdt.config.json             # token contrast in every theme combination
 ```
 
 Use `AccessibilityAssert.NoViolations(cut.Markup)` in your own bUnit tests; it fails with a readable list of issues.

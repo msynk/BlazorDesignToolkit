@@ -51,7 +51,7 @@ jobs:
             dotnet test tests/BlazorDesignToolkit.$project.Tests -c Release --no-build
           done
       - name: Quality gates
-        run: dotnet run --project src/BlazorDesignToolkit.Cli -c Release --no-build -- check --config samples/bdt.config.json
+        run: dotnet run --project src/BlazorDesignToolkit.Cli -c Release --no-build -- check --config demo/bdt.config.json
       - name: Pack (with package validation and SourceLink)
         run: dotnet pack BlazorDesignToolkit.slnx -c Release --no-build -p:Version=${{ steps.version.outputs.version }} -o artifacts
       - uses: actions/upload-artifact@v4
