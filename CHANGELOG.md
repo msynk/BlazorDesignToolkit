@@ -45,3 +45,23 @@ known gaps.
 - `bdt check` reported `failOn: none` in JSON reports of passing runs.
 - Tailwind v4 breakpoints and container sizes used `var()`, which media and container queries do not accept.
 - Overlapping value changes (rapid pointer moves) could let an older change revert a newer one in controlled components.
+- Tokens: parsing minified (single-line) JSON was quadratic, because every source location was counted from the start of
+  its line. A 1,600-token minified file took over a second (and far longer in WebAssembly); it now takes milliseconds.
+- Starter styles: the check mark of checked menu checkbox and radio items pushed the item's label to the end of the row.
+- Demo: unknown addresses returned an empty 404 response, and the error page turned into "not found" once the page
+  became interactive. Both now render proper pages (`UseStatusCodePagesWithReExecute`, `Router.NotFoundPage`,
+  `[ExcludeFromInteractiveRouting]`).
+- Demo: the render-mode link in the footer navigated to the home page and kept the current render mode; it now reloads
+  the current page in the other mode.
+- Demo: pasting a token document larger than 32 KB on the import page disconnected the Interactive Server circuit.
+- Demo: the tree view and live editor kept showing values of the previous theme after a theme switch; the editor
+  re-resolved and re-validated all tokens several times per render.
+- Demo: the date picker example used a fixed "today" (now the real date, or `?today=yyyy-MM-dd`); table text broke
+  mid-word; the navigation filled the first screen on phones (now behind a Menu button, with the header on one row down to 320 CSS px); `components.manifest.json` no
+  longer reports 22 undeclared token usages; the command menu could not undo "Increase contrast" or "Compact density".
+
+### Demo additions
+
+- "Compare themes" page (token diff between any two theme selections), a live component preview and per-token override
+  removal in the live editor, file upload on the import page, a site map on the home and not-found pages, and browser
+  tests for each of the fixes above.

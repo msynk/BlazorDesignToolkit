@@ -42,7 +42,7 @@
                 <DialogTitle>Edit notes</DialogTitle>
                 <FormField>
                     <FormLabel>Notes</FormLabel>
-                    <FieldInput Value="@_notes" />
+                    <FieldInput @bind-Value="_notes" />
                 </FormField>
                 <DialogClose>Done</DialogClose>
             </DialogContent>
@@ -55,7 +55,7 @@
 @code {
     private bool _open;
     private bool _editorOpen;
-    private string _notes = "Draft";
+    private string? _notes = "Draft";
     private string? _name = "Ada";
     private string _status = "";
 

@@ -18,13 +18,13 @@
             <caption>Packages</caption>
             <thead><tr><th scope="col">Package</th><th scope="col">Use it for</th><th scope="col">Depends on</th></tr></thead>
             <tbody>
-                <tr><th scope="row"><code>BlazorDesignToolkit.Tokens</code></th><td>DTCG parsing, references, validation, contrast, CSS export, coverage, diff</td><td>.NET only</td></tr>
-                <tr><th scope="row"><code>BlazorDesignToolkit.Theming</code></th><td>Brands, modes, contrast and density axes, theme stylesheets, theme manager</td><td>Tokens</td></tr>
-                <tr><th scope="row"><code>BlazorDesignToolkit.Theming.Blazor</code></th><td>Runtime switching, system preferences, persistence, no-flash startup</td><td>Theming, Blazor</td></tr>
-                <tr><th scope="row"><code>BlazorDesignToolkit.Primitives</code></th><td>Accessible headless components</td><td>Blazor only</td></tr>
-                <tr><th scope="row"><code>BlazorDesignToolkit.Primitives.StarterStyles</code></th><td>Optional CSS for the primitives</td><td>None</td></tr>
-                <tr><th scope="row"><code>BlazorDesignToolkit.Tokens.Tailwind / .Bootstrap / .Fluent</code></th><td>Type-checked framework integrations</td><td>Tokens</td></tr>
-                <tr><th scope="row"><code>BlazorDesignToolkit.Testing</code></th><td>Accessibility assertions for component tests</td><td>AngleSharp</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.<wbr>Tokens</code></th><td>DTCG parsing, references, validation, contrast, CSS export, coverage, diff</td><td>.NET only</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.<wbr>Theming</code></th><td>Brands, modes, contrast and density axes, theme stylesheets, theme manager</td><td>Tokens</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.<wbr>Theming.<wbr>Blazor</code></th><td>Runtime switching, system preferences, persistence, no-flash startup</td><td>Theming, Blazor</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.<wbr>Primitives</code></th><td>Accessible headless components</td><td>Blazor only</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.<wbr>Primitives.<wbr>StarterStyles</code></th><td>Optional CSS for the primitives</td><td>None</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.<wbr>Tokens.<wbr>Tailwind / .Bootstrap / .Fluent</code></th><td>Type-checked framework integrations</td><td>Tokens</td></tr>
+                <tr><th scope="row"><code>BlazorDesignToolkit.<wbr>Testing</code></th><td>Accessibility assertions for component tests</td><td>AngleSharp</td></tr>
                 <tr><th scope="row"><code>bdt</code> (dotnet tool)</th><td>validate, build, export, coverage, diff, check in CI</td><td>—</td></tr>
             </tbody>
         </table>
@@ -45,6 +45,13 @@
             <TabPanel Value="tokens"><p>Tokens are validated before anything is exported.</p></TabPanel>
             <TabPanel Value="themes"><p>Themes only change attributes at runtime; the CSS is generated once.</p></TabPanel>
         </Tabs>
+    </ChildContent>
+</Example>
+
+<Example Title="Explore the demo">
+    <Description><p>Every page runs in Interactive Server or Interactive WebAssembly mode (switch in the footer), follows the theme chosen in the header, and is checked with axe-core and keyboard tests in CI.</p></Description>
+    <ChildContent>
+        <SiteMap Label="Demo pages" HeadingLevel="3" />
     </ChildContent>
 </Example>
 

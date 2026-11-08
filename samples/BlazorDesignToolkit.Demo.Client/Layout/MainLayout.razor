@@ -1,25 +1,48 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject NavigationManager Navigation
 @inject ThemeManager Manager
 
 <ThemeProvider>
     @* Blazor intercepts same-page links, so the skip link moves focus explicitly; without interactivity the native fragment navigation applies. *@
     <a class="skip-link" href="#main" @onclick="SkipToMainAsync" @onclick:preventDefault>Skip to main content</a>
-    <div class="shell">
+    @* On narrow screens the navigation and theme settings collapse behind the Menu button. They stay expanded until the page
+       is interactive, so they are always reachable. *@
+    <div class="shell" data-nav="@(RendererInfo.IsInteractive && !_navOpen ? "closed" : "open")">
         <header class="site-header">
             <a class="brand" href="">BlazorDesignToolkit <span class="brand-sub">demo</span></a>
-            <ThemeControls />
-            <button type="button" class="command-hint" @onclick="() => _commandsOpen = true" aria-keyshortcuts="Control+K">
-                Commands <kbd aria-hidden="true">Ctrl K</kbd>
+            @if (RendererInfo.IsInteractive)
+            {
+                <button type="button" class="nav-toggle icon-button" aria-expanded="@(_navOpen ? "true" : "false")" aria-controls="site-nav theme-controls"
+                        @onclick="() => _navOpen = !_navOpen" data-testid="nav-toggle">
+                    @if (_navOpen)
+                    {
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+                    }
+                    <span class="icon-button-label">Menu</span>
+                </button>
+            }
+            <ThemeControls Id="theme-controls" />
+            @* On narrow screens only the icon is visible; the label stays in the accessible name. *@
+            <button type="button" class="command-hint icon-button" @onclick="() => _commandsOpen = true" aria-keyshortcuts="Control+K">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l5 5" /></svg>
+                <span class="icon-button-label">Commands</span>
+                <kbd aria-hidden="true">Ctrl K</kbd>
             </button>
         </header>
-        <NavMenu />
+        <NavMenu Id="site-nav" />
         <main id="main" tabindex="-1" @ref="_main">
             @Body
         </main>
         <footer class="site-footer">
             <p>Render mode: <strong>@(RendererInfo.IsInteractive ? RendererInfo.Name : "Static (prerendered)")</strong>.
-                <a href="@ModeLink">@ModeLinkText</a></p>
+                @* A render mode is chosen when the page loads, so switching needs a full page load (not client-side routing). *@
+                <a href="@ModeLink" data-enhance-nav="false" @onclick="SwitchModeAsync" @onclick:preventDefault="RendererInfo.IsInteractive">@ModeLinkText</a></p>
+            <p>Version @DemoServiceCollectionExtensions.Version · <a href="https://github.com/msynk/BlazorDesignToolkit">Source on GitHub</a></p>
         </footer>
     </div>
     <LiveRegion />
@@ -29,30 +52,75 @@
 
 @code {
     private bool _commandsOpen;
+    private bool _navOpen;
     private ElementReference _main;
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (!_navOpen) return;
+        _navOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
 
     private async Task SkipToMainAsync() => await _main.FocusAsync();
 
-    private string ModeLink => RendererInfo.Name == "WebAssembly" ? "?mode=server" : "?mode=wasm";
-    private string ModeLinkText => RendererInfo.Name == "WebAssembly" ? "Switch to Interactive Server" : "Switch to Interactive WebAssembly";
+    private bool IsWebAssembly => RendererInfo.Name == "WebAssembly";
+    private string TargetMode => IsWebAssembly ? "server" : "wasm";
+    private string ModeLink => Navigation.GetUriWithQueryParameter("mode", TargetMode);
+    private string ModeLinkText => IsWebAssembly ? "Switch to Interactive Server" : "Switch to Interactive WebAssembly";
 
-    private IEnumerable<CommandItem> Commands => NavMenu.Links.Select(l => new CommandItem("nav-" + l.Href, l.Title, () =>
+    private Task SwitchModeAsync()
     {
-        Navigation.NavigateTo(l.Href);
-        return Task.CompletedTask;
-    }) { Group = l.Group, Keywords = [l.Group] })
-    .Concat(
-    [
-        new CommandItem("mode-dark", "Use dark mode", () => SetAxis("mode", "dark")) { Group = "Theme", Keywords = ["appearance", "color"] },
-        new CommandItem("mode-light", "Use light mode", () => SetAxis("mode", "light")) { Group = "Theme", Keywords = ["appearance", "color"] },
-        new CommandItem("mode-system", "Follow system color mode", () => SetAxis("mode", "system")) { Group = "Theme" },
-        new CommandItem("contrast-more", "Increase contrast", () => SetAxis("contrast", "more")) { Group = "Theme", Keywords = ["high contrast"] },
-        new CommandItem("density-compact", "Compact density", () => SetAxis("density", "compact")) { Group = "Theme" },
-    ]);
-
-    private Task SetAxis(string axis, string value)
-    {
-        Manager.TrySetAxis(axis, value);
+        if (RendererInfo.IsInteractive) Navigation.NavigateTo(ModeLink, forceLoad: true);
         return Task.CompletedTask;
     }
+
+    private IEnumerable<CommandItem> Commands
+    {
+        get
+        {
+            foreach (var link in NavMenu.Links)
+            {
+                yield return new CommandItem("nav-" + link.Href, link.Title, () => Run(() => Navigation.NavigateTo(link.Href)))
+                {
+                    Group = link.Group,
+                    Keywords = [link.Group, "go to", "page"],
+                };
+            }
+            foreach (var theme in Manager.Catalog.Themes)
+            {
+                var id = theme.Id;
+                yield return new CommandItem("theme-" + id, $"Brand: {theme.DisplayName ?? id}", () => Run(() => Manager.TrySetTheme(id)))
+                {
+                    Group = "Theme",
+                    Keywords = ["brand", "theme", id],
+                };
+            }
+            foreach (var axis in Manager.Catalog.Axes)
+            {
+                var name = axis.Name;
+                foreach (var value in ThemeControls.Values(axis))
+                {
+                    var current = value;
+                    yield return new CommandItem($"axis-{name}-{current}", $"{axis.DisplayName ?? name}: {ThemeControls.Label(current)}", () => Run(() => Manager.TrySetAxis(name, current)))
+                    {
+                        Group = "Theme",
+                        Keywords = [name, current, "appearance"],
+                    };
+                }
+            }
+            yield return new CommandItem("theme-reset", "Reset theme to defaults", () => Manager.ResetAsync()) { Group = "Theme", Keywords = ["default", "clear"] };
+            yield return new CommandItem("render-mode", ModeLinkText, SwitchModeAsync) { Group = "Demo", Keywords = ["render mode", "wasm", "server", "interactive"] };
+        }
+    }
+
+    private static Task Run(Action action)
+    {
+        action();
+        return Task.CompletedTask;
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 }

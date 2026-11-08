@@ -5,19 +5,26 @@
       "name": "AuroraButton",
       "sources": ["**/AuroraButton.razor*"],
       "requiredTokens": ["component.button.primary.background", "component.button.primary.foreground", "component.button.radius", "component.button.height", "component.focus.ring"],
-      "tokens": ["component.button.padding-inline", "component.focus.offset", "transition.default", "typography.body", "color.interactive.hover", "opacity.disabled"]
+      "tokens": [
+        "component.button.padding-inline", "component.focus.offset", "transition.default", "typography.body", "font.weight.semibold", "opacity.disabled", "shadow.raised", "stroke.width.control",
+        "color.surface.default", "color.text.default", "color.border.default", "color.surface.danger", "color.on-surface.danger"
+      ]
     },
     {
       "name": "AuroraField",
       "sources": ["**/AuroraField.razor*"],
       "requiredTokens": ["component.input.border", "component.input.background", "color.text.default", "color.text.danger", "component.focus.ring"],
-      "tokens": ["color.text.muted", "component.focus.offset", "shape.radius.control", "size.control.height", "size.control.padding-inline", "typography.body", "space.1", "space.2"]
+      "tokens": ["color.text.muted", "component.focus.offset", "shape.radius.control", "size.control.height", "size.control.padding-inline", "typography.body", "font.weight.medium", "space.1"]
     },
     {
       "name": "AuroraDialog",
       "sources": ["**/AuroraDialog.razor*"],
-      "requiredTokens": ["component.dialog.scrim", "component.dialog.shadow", "color.surface.raised", "color.on-surface.raised"],
-      "tokens": ["shape.radius.surface", "space.4", "space.6", "typography.heading", "color.border.subtle"]
+      "requiredTokens": ["component.dialog.scrim", "component.dialog.shadow", "color.surface.raised", "color.on-surface.raised", "component.focus.ring"],
+      "tokens": [
+        "shape.radius.surface", "space.2", "space.4", "space.6", "typography.heading", "typography.body", "color.border.subtle", "stroke.width.control", "component.focus.offset",
+        "component.button.height", "component.button.padding-inline", "component.button.radius",
+        "color.surface.default", "color.text.default", "color.border.default", "color.surface.danger", "color.on-surface.danger"
+      ]
     }
   ]
 }

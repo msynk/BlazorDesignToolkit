@@ -84,7 +84,7 @@
         cut.WaitForAssertion(() => Assert.Single(cut.FindAll("li")), TimeSpan.FromSeconds(5));
         Assert.Contains("Upload failed", cut.Markup);
         cut.Find("[data-toast-dismiss]").Click();
-        Assert.Empty(cut.FindAll("li"));
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("li"))); // the service re-renders the region asynchronously
     }
 
     [Fact]

@@ -8,7 +8,7 @@
 
 <Example Title="Listbox (multiple selection)">
     <ChildContent>
-        <FormField>
+        <FormField class="control">
             <FormLabel>Languages</FormLabel>
             <Listbox TItem="string" Items="Languages" Multiple="true" @bind-Values="_languages" class="listbox" data-testid="listbox" />
         </FormField>
@@ -20,9 +20,9 @@
 <Example Title="Virtualized listbox (10,000 options)">
     <Description><p>Only the visible options are rendered; each carries aria-setsize and aria-posinset.</p></Description>
     <ChildContent>
-        <FormField>
+        <FormField class="control">
             <FormLabel>Ticket</FormLabel>
-            <Listbox TItem="string" Items="Tickets" Virtualize="true" ItemSize="36" @bind-Value="_ticket" data-testid="virtual-listbox" />
+            <Listbox TItem="string" Items="Tickets" Virtualize="true" ItemSize="36" @bind-Value="_ticket" class="listbox" data-testid="virtual-listbox" />
         </FormField>
         <p role="status">Ticket: @(_ticket ?? "none")</p>
     </ChildContent>
@@ -30,7 +30,7 @@
 
 <Example Title="Select">
     <ChildContent>
-        <FormField>
+        <FormField class="control">
             <FormLabel>Country</FormLabel>
             <Select TItem="string" Items="Countries" @bind-Value="_country" Placeholder="Choose a country" Name="country" data-testid="select" />
         </FormField>
@@ -41,7 +41,7 @@
 
 <Example Title="Combobox">
     <ChildContent>
-        <FormField>
+        <FormField class="control">
             <FormLabel>City</FormLabel>
             <Combobox TItem="string" Items="Cities" @bind-Value="_city" data-testid="combobox" />
             <FormDescription>Type to filter. The number of results is announced.</FormDescription>

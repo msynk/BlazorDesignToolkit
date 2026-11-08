@@ -10,27 +10,40 @@
     The components' token usage is declared in <code>components.manifest.json</code> and checked by coverage analysis.</p>
 
 <Example Title="Buttons">
+    <Description><p>Variants map to semantic tokens: <code>primary</code> to the component button tokens, <code>secondary</code> to the default surface, <code>danger</code> to the danger surface.</p></Description>
     <ChildContent>
         <div class="actions">
             <AuroraButton OnClick="@(() => Toasts.Show("Saved", ToastKind.Success))">Save</AuroraButton>
-            <AuroraButton Variant="secondary">Cancel</AuroraButton>
-            <AuroraButton Variant="danger">Delete</AuroraButton>
+            <AuroraButton Variant="secondary" OnClick="@(() => Toasts.Show("Changes discarded"))">Cancel</AuroraButton>
+            <AuroraButton Variant="danger" OnClick="@(() => Toasts.Show("Item deleted", ToastKind.Warning))">Delete</AuroraButton>
             <AuroraButton Disabled="true">Unavailable</AuroraButton>
         </div>
     </ChildContent>
 </Example>
 
 <Example Title="Form fields">
+    <Description><p><code>AuroraField</code> wraps the headless <code>FormField</code>, so the label, description and error are wired to the input (<code>aria-describedby</code>, <code>aria-invalid</code>, <code>aria-errormessage</code>).</p></Description>
     <ChildContent>
         <form class="stack" @onsubmit="Submit" @onsubmit:preventDefault novalidate>
             <AuroraField Label="Project name" @bind-Value="_name" Required="true" Error="@_nameError" Description="Shown on the dashboard." Autocomplete="off" />
-            <AuroraField Label="Contact email" Type="email" @bind-Value="_email" Autocomplete="email" />
+            <AuroraField Label="Contact email" Type="email" @bind-Value="_email" Error="@_emailError" Description="Optional." Autocomplete="email" />
             <AuroraButton Type="submit">Create project</AuroraButton>
         </form>
+        @if (_projects.Count > 0)
+        {
+            <h3>Created projects</h3>
+            <ul>
+                @foreach (var project in _projects)
+                {
+                    <li>@project</li>
+                }
+            </ul>
+        }
     </ChildContent>
 </Example>
 
 <Example Title="Confirmation dialog">
+    <Description><p><code>AuroraDialog</code> gets its behavior (modal, focus containment, Escape, focus restoration, <code>alertdialog</code> role) from the headless <code>Dialog</code>; Cancel receives initial focus because the action is destructive.</p></Description>
     <ChildContent>
         <AuroraDialog TriggerText="Delete project…" Title="Delete this project?" Message="This permanently removes the project and its history."
                       ConfirmText="Delete" Destructive="true" OnConfirm="@(() => Toasts.Show("Project deleted", ToastKind.Warning))" />
@@ -41,10 +54,23 @@
     private string? _name;
     private string? _email;
     private string? _nameError;
+    private string? _emailError;
+    private readonly List<string> _projects = [];
 
     private void Submit()
     {
         _nameError = string.IsNullOrWhiteSpace(_name) ? "Enter a project name." : null;
-        if (_nameError is null) Toasts.Show($"Project “{_name}” created", ToastKind.Success);
+        _emailError = !string.IsNullOrWhiteSpace(_email) && !IsEmail(_email.Trim()) ? "Enter an email address such as name@example.com." : null;
+        if (_nameError is not null || _emailError is not null) return;
+        var name = _name!.Trim();
+        _projects.Add(string.IsNullOrWhiteSpace(_email) ? name : $"{name} ({_email.Trim()})");
+        Toasts.Show($"Project “{name}” created", ToastKind.Success);
+        _name = _email = null;
+    }
+
+    private static bool IsEmail(string value)
+    {
+        var at = value.IndexOf('@');
+        return at > 0 && at == value.LastIndexOf('@') && value.IndexOf('.', at) > at + 1 && !value.EndsWith('.') && !value.Any(char.IsWhiteSpace);
     }
 }

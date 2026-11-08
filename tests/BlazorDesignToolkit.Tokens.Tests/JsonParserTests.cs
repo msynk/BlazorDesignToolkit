@@ -27,6 +27,48 @@ public class JsonParserTests
     }
 
     [Fact]
+    public void Records_columns_in_minified_documents_and_after_line_breaks()
+    {
+        // Columns are counted on from the previous node on the same line; they must match a count from the line start.
+        const string json = "{\"é\":{\"a\":1,\"ü\":[true,\"x\"]},\"b\":2,\n \"c\":{\"d\":3}}";
+        var root = (SourceObject)SourceJsonParser.Parse(json).Root!;
+        var e = root.GetPropertyEntry("é")!;
+        Assert.Equal((1, 2), (e.NameLocation!.Line, e.NameLocation.Column));
+        Assert.Equal(6, e.Value.Location!.Column);
+        var u = ((SourceObject)e.Value).GetPropertyEntry("ü")!;
+        Assert.Equal(13, u.NameLocation!.Column);
+        Assert.Equal(23, ((SourceArray)u.Value).Items[1].Location!.Column);
+        Assert.Equal(29, root.GetPropertyEntry("b")!.NameLocation!.Column);
+        var c = root.GetPropertyEntry("c")!;
+        Assert.Equal((2, 2), (c.NameLocation!.Line, c.NameLocation.Column));
+        Assert.Equal((2, 11), (((SourceObject)c.Value).GetPropertyEntry("d")!.Value.Location!.Line, ((SourceObject)c.Value).GetPropertyEntry("d")!.Value.Location!.Column));
+    }
+
+    [Fact]
+    public void Parsing_a_minified_document_scales_linearly()
+    {
+        // Regression: every location used to be counted from the start of its line, which made single-line documents
+        // quadratic (a 50 KB minified file took seconds in WebAssembly). Compare sizes instead of absolute times.
+        static string Doc(int n) => "{" + string.Join(",", Enumerable.Range(0, n).Select(i => $"\"t{i}\":{{\"$type\":\"number\",\"$value\":{i}}}")) + "}";
+        static double Time(string json)
+        {
+            var best = double.MaxValue;
+            for (var run = 0; run < 3; run++)
+            {
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                SourceJsonParser.Parse(json, new JsonParseOptions { MaxInputBytes = 16 * 1024 * 1024 });
+                best = Math.Min(best, watch.Elapsed.TotalMilliseconds);
+            }
+            return best;
+        }
+        Time(Doc(1000)); // warm up
+        var small = Time(Doc(5_000));
+        var large = Time(Doc(40_000));
+        // Eight times the input: linear is about 8x; the quadratic version was about 64x.
+        Assert.True(large < small * 24 + 50, $"5,000 tokens: {small:F1} ms; 40,000 tokens: {large:F1} ms");
+    }
+
+    [Fact]
     public void Duplicate_keys_are_reported_and_last_value_wins()
     {
         var result = SourceJsonParser.Parse("""{ "a": 1, "a": 2 }""");

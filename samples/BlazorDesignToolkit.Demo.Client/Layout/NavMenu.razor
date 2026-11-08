@@ -1,4 +1,4 @@
-<nav class="site-nav" aria-label="Main">
+<nav class="site-nav" id="@Id" aria-label="Main">
     @foreach (var group in Links.GroupBy(l => l.Group))
     {
         <h2 class="nav-group" id="nav-@group.Key.ToLowerInvariant()">@group.Key</h2>
@@ -12,6 +12,8 @@
 </nav>
 
 @code {
+    [Parameter] public string? Id { get; set; }
+
     public sealed record Link(string Group, string Title, string Href);
 
     public static readonly IReadOnlyList<Link> Links =
@@ -19,6 +21,7 @@
         new("Overview", "Introduction", ""),
         new("Tokens", "Token explorer", "tokens"),
         new("Tokens", "Themes and brands", "themes"),
+        new("Tokens", "Compare themes", "compare"),
         new("Tokens", "Live editor", "editor"),
         new("Tokens", "Import and export", "import-export"),
         new("Tokens", "Validation", "validation"),

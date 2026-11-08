@@ -7,7 +7,7 @@
 
 <Example Title="Slider">
     <ChildContent>
-        <FormField>
+        <FormField class="control">
             <FormLabel>Volume</FormLabel>
             <Slider Min="0" Max="100" Step="5" @bind-Value="_volume" ValueText="@(v => $"{v} percent")" data-testid="slider" />
         </FormField>
@@ -18,18 +18,18 @@
 
 <Example Title="Range slider">
     <ChildContent>
-        <FormField>
+        <FormField class="control">
             <FormLabel>Price range</FormLabel>
             <RangeSlider Min="0" Max="1000" Step="10" MinDistance="50" @bind-Start="_from" @bind-End="_to"
-                         StartLabel="Minimum price" EndLabel="Maximum price" ValueText="@(v => v.ToString("C0", CultureInfo.GetCultureInfo("en-US")))" data-testid="range" />
+                         StartLabel="Minimum price" EndLabel="Maximum price" ValueText="Price" data-testid="range" />
         </FormField>
-        <p role="status">From @_from to @_to</p>
+        <p role="status">From @Price(_from) to @Price(_to)</p>
     </ChildContent>
 </Example>
 
 <Example Title="Number field (spinbutton)">
     <ChildContent>
-        <FormField>
+        <FormField class="control">
             <FormLabel>Quantity</FormLabel>
             <FormDescription>Between 1 and 20, in steps of 0.5.</FormDescription>
             <NumberField Min="1" Max="20" Step="0.5" @bind-Value="_quantity" data-testid="number" />
@@ -40,14 +40,14 @@
 </Example>
 
 <Example Title="Date picker">
-    <Description><p>Weekends cannot be chosen. Dates before today are disabled.</p></Description>
+    <Description><p>Weekends cannot be chosen, and dates before today (@_today.ToString("D", Culture)) are disabled.</p></Description>
     <ChildContent>
-        <FormField>
+        <FormField class="control">
             <FormLabel>Delivery date</FormLabel>
-            <DatePicker @bind-Value="_date" Culture="@CultureInfo.GetCultureInfo("en-US")" Min="@_today" Today="@_today"
+            <DatePicker @bind-Value="_date" Culture="@Culture" Min="@_today" Today="@_today"
                         IsDateDisabled="@(d => d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)" ShowKeyboardHelp="true" data-testid="date" />
         </FormField>
-        <p role="status">Delivery: @(_date?.ToString("D", CultureInfo.GetCultureInfo("en-US")) ?? "not chosen")</p>
+        <p role="status">Delivery: @(_date?.ToString("D", Culture) ?? "not chosen")</p>
         <KeyboardTable Rows="@DateKeys" />
     </ChildContent>
 </Example>
@@ -58,8 +58,18 @@
     private double _to = 600;
     private double? _quantity = 2;
     private DateOnly? _date;
-    // Fixed so that the example (and its tests) behave the same on every day.
-    private readonly DateOnly _today = new(2026, 11, 2);
+    private DateOnly _today;
+    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("en-US");
+
+    /// <summary>Pins "today" (yyyy-MM-dd), so that the example and its browser tests behave the same on every day.</summary>
+    [SupplyParameterFromQuery(Name = "today")] private string? TodayParameter { get; set; }
+
+    protected override void OnParametersSet()
+        => _today = DateOnly.TryParseExact(TodayParameter, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var pinned)
+            ? pinned
+            : DateOnly.FromDateTime(DateTime.Today);
+
+    private static string Price(double value) => value.ToString("C0", Culture);
 
     private static readonly IReadOnlyList<(string, string)> SliderKeys =
     [

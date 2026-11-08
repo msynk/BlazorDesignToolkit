@@ -1,97 +1,143 @@
 @page "/tokens"
+@using BlazorDesignToolkit.Tokens.Diagnostics
 @using BlazorDesignToolkit.Tokens.Export
 @using BlazorDesignToolkit.Tokens.Resolution
 
 <PageTitle>Token explorer · BlazorDesignToolkit</PageTitle>
 
-<h1 tabindex="-1">Token explorer</h1>
-<p>All tokens of the current theme selection (<strong>@Resolution.Selection</strong>), resolved by the DTCG engine.
-    Aliases show their reference chain; the layer column follows the configured primitive/semantic/component conventions.</p>
+@{ var resolution = Manager.Resolve(); var visible = Filter(resolution.Tokens); }
 
-<div class="toolbar" role="search">
+<h1 tabindex="-1">Token explorer</h1>
+<p>All tokens of the current theme selection (<strong>@resolution.Selection</strong>), resolved by the DTCG engine.
+    Aliases show their reference chain; the layer column follows the primitive/semantic/component conventions configured in
+    <code>aurora.validation.json</code>. Change the theme in the header and the values follow.</p>
+
+<div class="toolbar" role="search" aria-label="Filter tokens">
     <FormField class="control">
-        <FormLabel>Filter by path</FormLabel>
-        <FieldInput @bind-Value="_filter" placeholder="e.g. color.text" />
+        <FormLabel>Filter by path or description</FormLabel>
+        <FieldInput @bind-Value="_filter" @bind-Value:after="ResetPaging" placeholder="e.g. color.text" Type="search" data-testid="token-filter" />
     </FormField>
     <FormField class="control">
         <FormLabel>Type</FormLabel>
-        <Select TItem="string" Items="Types" Value="_type" ValueChanged="v => _type = v ?? AllTypes" />
+        <Select TItem="string" Items="Types(resolution.Tokens)" Value="_type" ValueChanged="v => { _type = v ?? AllTypes; ResetPaging(); }" />
     </FormField>
     <FormField class="control">
         <FormLabel>Layer</FormLabel>
-        <Select TItem="string" Items="Layers" Value="_layer" ValueChanged="v => _layer = v ?? AllLayers" />
+        <Select TItem="string" Items="Layers" Value="_layer" ValueChanged="v => { _layer = v ?? AllLayers; ResetPaging(); }" />
     </FormField>
+    @if (IsFiltered)
+    {
+        <AuroraButton Variant="secondary" OnClick="ClearFilters">Clear filters</AuroraButton>
+    }
 </div>
 
-<p role="status">@Visible.Count of @Resolution.Tokens.Count tokens shown.</p>
+<p role="status">@visible.Count of @resolution.Tokens.Count tokens shown.</p>
 
-<div class="table-scroll" tabindex="0" role="region" aria-label="Tokens">
-    <table class="data-table tokens-table">
-        <caption>Resolved tokens</caption>
-        <thead>
-            <tr>
-                <th scope="col">Token</th>
-                <th scope="col">Type</th>
-                <th scope="col">Value</th>
-                <th scope="col">References</th>
-                <th scope="col">Layer</th>
-                <th scope="col">CSS variable</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var token in Visible.Take(_limit))
-            {
-                <tr @key="token.Path">
-                    <th scope="row"><code>@token.Path</code>@if (token.IsDeprecated) {<span class="badge">deprecated</span>}</th>
-                    <td>@token.Type</td>
-                    <td>
-                        @if (token.Value is ColorValue color)
-                        {
-                            <span class="swatch" style="background:@(CssExporter.FormatValue(color))" aria-hidden="true"></span>
-                        }
-                        <code>@(token.Value is null ? "invalid" : CssExporter.FormatValue(token.Value, DemoTokens.Css))</code>
-                    </td>
-                    <td>@(token.AliasOf is null ? "—" : string.Join(" → ", Resolution.Tokens.GetAliasChain(token.Path)))</td>
-                    <td>@Layer(token.Path)</td>
-                    <td><code>@CssExporter.GetVariableName(token.Path, DemoTokens.Css)</code></td>
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
-@if (Visible.Count > _limit)
+@if (visible.Count == 0)
 {
-    <button type="button" class="link-button" @onclick="() => _limit += 100">Show 100 more</button>
+    <p>No token matches these filters.</p>
+}
+else
+{
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Tokens">
+        <table class="data-table tokens-table">
+            <caption>Resolved tokens</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Token</th>
+                    <th scope="col">Type</th>
+                    <th scope="col">Value</th>
+                    <th scope="col">References</th>
+                    <th scope="col">Layer</th>
+                    <th scope="col">CSS variable</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var token in visible.Take(_limit))
+                {
+                    <tr @key="token.Path">
+                        <th scope="row">
+                            <code>@token.Path</code>@if (token.IsDeprecated) {<span class="badge">deprecated</span>}
+                            @if (token.Description is { Length: > 0 } description)
+                            {
+                                <div class="muted">@description</div>
+                            }
+                        </th>
+                        <td>@token.Type</td>
+                        <td>
+                            @if (token.Value is ColorValue color)
+                            {
+                                <span class="swatch" style="background:@(CssExporter.FormatValue(color))" aria-hidden="true"></span>
+                            }
+                            <code>@(token.Value is null ? "invalid" : CssExporter.FormatValue(token.Value, DemoTokens.Css))</code>
+                        </td>
+                        <td>@(token.AliasOf is null ? "—" : string.Join(" → ", resolution.Tokens.GetAliasChain(token.Path)))</td>
+                        <td>@Layer(token.Path)</td>
+                        <td><code>@CssExporter.GetVariableName(token.Path, DemoTokens.Css)</code></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (visible.Count > _limit)
+    {
+        <div class="actions">
+            <AuroraButton Variant="secondary" OnClick="() => _limit += PageSize">Show @Math.Min(PageSize, visible.Count - _limit) more</AuroraButton>
+            <AuroraButton Variant="secondary" OnClick="() => _limit = visible.Count">Show all @visible.Count</AuroraButton>
+        </div>
+    }
 }
 
 @code {
     private const string AllTypes = "All types";
     private const string AllLayers = "All layers";
+    private const int PageSize = 100;
     private string? _filter = "";
     private string _type = AllTypes;
     private string _layer = AllLayers;
-    private int _limit = 100;
+    private int _limit = PageSize;
 
     [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    // Re-renders the table when the theme changes.
     [CascadingParameter] private ThemeState State { get; set; } = default!;
 
-    private ThemeResolution Resolution => Manager.Resolve();
-    private IEnumerable<string> Types => new[] { AllTypes }.Concat(TokenTypes.All.Order());
+    private bool IsFiltered => !string.IsNullOrWhiteSpace(_filter) || _type != AllTypes || _layer != AllLayers;
+
+    /// <summary>Only the types that occur in the current tokens.</summary>
+    private static IEnumerable<string> Types(ResolvedTokenSet tokens)
+        => new[] { AllTypes }.Concat(tokens.Tokens.Select(t => t.Type).OfType<string>().Distinct().Order(StringComparer.Ordinal));
+
     private static IEnumerable<string> Layers => [AllLayers, "primitive", "semantic", "component", "other"];
 
-    private List<ResolvedToken> Visible => Resolution.Tokens.Tokens
-        .Where(t => string.IsNullOrWhiteSpace(_filter) || t.Path.ToString().Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase))
-        .Where(t => _type == AllTypes || t.Type == _type)
-        .Where(t => _layer == AllLayers || Layer(t.Path) == _layer)
-        .ToList();
+    private List<ResolvedToken> Filter(ResolvedTokenSet tokens)
+    {
+        var filter = _filter?.Trim();
+        return tokens.Tokens
+            .Where(t => string.IsNullOrEmpty(filter)
+                || t.Path.ToString().Contains(filter, StringComparison.OrdinalIgnoreCase)
+                || t.Description?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true)
+            .Where(t => _type == AllTypes || t.Type == _type)
+            .Where(t => _layer == AllLayers || Layer(t.Path) == _layer)
+            .ToList();
+    }
+
+    private void ResetPaging() => _limit = PageSize;
+
+    private void ClearFilters()
+    {
+        _filter = "";
+        _type = AllTypes;
+        _layer = AllLayers;
+        ResetPaging();
+    }
 
     private static string Layer(TokenPath path)
     {
         var text = path.ToString();
         var layers = DemoTokens.Validation.Layers!;
-        if (layers.Component.Any(p => BlazorDesignToolkit.Tokens.Diagnostics.TokenPathPattern.IsMatch(p, text))) return "component";
-        if (layers.Semantic.Any(p => BlazorDesignToolkit.Tokens.Diagnostics.TokenPathPattern.IsMatch(p, text))) return "semantic";
-        if (layers.Primitive.Any(p => BlazorDesignToolkit.Tokens.Diagnostics.TokenPathPattern.IsMatch(p, text))) return "primitive";
+        if (layers.Component.Any(p => TokenPathPattern.IsMatch(p, text))) return "component";
+        if (layers.Semantic.Any(p => TokenPathPattern.IsMatch(p, text))) return "semantic";
+        if (layers.Primitive.Any(p => TokenPathPattern.IsMatch(p, text))) return "primitive";
         return "other";
     }
 }

@@ -26,16 +26,18 @@
         <p>The Aurora design system is validated for each theme × mode × contrast × density combination
             (@Units.Count combinations, @Contrast.Count contrast checks).</p>
         <p role="status">@AuroraFailures contrast check(s) fail; @AuroraIndeterminate cannot be determined.</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Closest contrast checks">
         <table class="data-table">
             <caption>Contrast checks that are closest to failing</caption>
             <thead><tr><th scope="col">Scope</th><th scope="col">Foreground</th><th scope="col">Background</th><th scope="col">Ratio</th><th scope="col">Required</th></tr></thead>
             <tbody>
                 @foreach (var r in Contrast.Where(c => c.Ratio is not null).OrderBy(c => c.Ratio - c.Required).Take(12))
                 {
-                    <tr><td>@r.Scope</td><th scope="row"><code>@r.Foreground</code></th><td><code>@r.Background</code></td><td>@r.RatioText</td><td>@r.Required:1</td></tr>
+                    <tr><td>@r.Scope?.Replace("|", " | ")</td><th scope="row"><code>@r.Foreground</code></th><td><code>@r.Background</code></td><td>@r.RatioText</td><td>@r.Required:1</td></tr>
                 }
             </tbody>
         </table>
+        </div>
     </TabPanel>
     <TabPanel Value="rules">
         <table class="data-table">

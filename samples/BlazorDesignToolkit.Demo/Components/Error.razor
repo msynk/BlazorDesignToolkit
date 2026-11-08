@@ -1,6 +1,19 @@
 @page "/error"
+@using System.Diagnostics
+@* Rendered statically: the interactive router lives in the client assembly and does not know this server-only page. *@
+@attribute [ExcludeFromInteractiveRouting]
 
-<PageTitle>Error</PageTitle>
+<PageTitle>Error · BlazorDesignToolkit</PageTitle>
 
-<h1>Something went wrong</h1>
-<p>The request could not be completed. Please try again.</p>
+<h1 tabindex="-1">Something went wrong</h1>
+<p>The request could not be completed. Please try again, or go back to the <a href="">introduction</a>.</p>
+@if (RequestId is not null)
+{
+    <p class="muted">Request id: <code>@RequestId</code></p>
+}
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId => Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

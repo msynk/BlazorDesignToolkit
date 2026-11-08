@@ -12,9 +12,12 @@
         <dl class="facts">
             <dt>Requested</dt><dd><code>@State.Selection</code></dd>
             <dt>Effective</dt><dd><code>@State.EffectiveSelection</code></dd>
-            <dt>System preferences</dt><dd>color scheme: @(State.SystemPreferences.ColorScheme ?? "unknown"), contrast: @(State.SystemPreferences.Contrast ?? "unknown"), reduced motion: @State.SystemPreferences.ReducedMotion</dd>
+            <dt>System preferences</dt><dd>color scheme: @(State.SystemPreferences.ColorScheme ?? "unknown"), contrast: @(State.SystemPreferences.Contrast ?? "unknown"), reduced motion: @YesNo(State.SystemPreferences.ReducedMotion), forced colors: @YesNo(State.SystemPreferences.ForcedColors)</dd>
+            <dt>Persistence</dt><dd>Cookie <code>bdt-theme</code>, so the server renders the selected theme on the first response.</dd>
         </dl>
-        <AuroraButton Variant="secondary" OnClick="ResetAsync">Reset to defaults</AuroraButton>
+        <div class="actions">
+            <AuroraButton Variant="secondary" OnClick="ResetAsync">Reset to defaults</AuroraButton>
+        </div>
     </ChildContent>
 </Example>
 
@@ -28,8 +31,10 @@
                     <p class="preview-title">@theme · @mode · @contrast</p>
                     <p>Body text on the default surface.</p>
                     <p class="muted">Muted supporting text.</p>
-                    <AuroraButton tabindex="-1">Primary action</AuroraButton>
-                    <a href="themes" tabindex="-1">A link</a>
+                    <div class="actions">
+                        <AuroraButton tabindex="-1">Primary action</AuroraButton>
+                        <a href="themes" tabindex="-1">A link</a>
+                    </div>
                 </ThemeScope>
             }
         </div>
@@ -68,4 +73,6 @@
     ];
 
     private Task ResetAsync() => Manager.ResetAsync();
+
+    private static string YesNo(bool value) => value ? "yes" : "no";
 }

@@ -75,12 +75,12 @@ against a real Bootstrap 5.3.8 build); all 467 Fluent 2 tokens (catalog verified
 
 | Suite | Result |
 |---|---|
-| Tokens unit and conformance tests | 240 passed |
-| Theming tests | 41 passed |
-| Primitives bUnit tests | 86 passed |
-| Integration tests (real Tailwind 4/3 and Bootstrap compiles, Fluent package check) | 26 passed |
+| Tokens unit and conformance tests | 244 passed |
+| Theming tests | 42 passed |
+| Primitives bUnit tests | 93 passed, 15 consecutive runs each in Debug and Release |
+| Integration tests (real Tailwind 4/3 and Bootstrap compiles, Fluent package check) | 31 passed |
 | CLI tests | 16 passed |
-| Browser tests, Chromium / Firefox / WebKit | 104 / 103 / 103 passed, two consecutive full runs each (1 skipped outside Chromium: forced-colors emulation) |
+| Browser tests, Chromium / Firefox / WebKit | 123 / 122 / 122 passed, two consecutive full runs each (1 skipped outside Chromium: forced-colors emulation) |
 | Benchmark regression gate | Passed against `benchmarks/baseline.json` (18 benchmarks) |
 | `bdt check` on the sample design system | Passed: 0 errors, 0 warnings, 240/240 contrast checks; all 8 configured outputs up to date |
 | `dotnet build -c Release` | 0 warnings (warnings are errors) |

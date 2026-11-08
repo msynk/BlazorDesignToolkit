@@ -1,0 +1,33 @@
+@* Every page of the demo, grouped like the main navigation. *@
+<nav aria-label="@Label" class="sitemap">
+    @foreach (var group in NavMenu.Links.Where(l => l.Href != "").GroupBy(l => l.Group))
+    {
+        var id = $"{_id}-{group.Key.ToLowerInvariant()}";
+        <section aria-labelledby="@id">
+            @if (HeadingLevel == 3)
+            {
+                <h3 id="@id">@group.Key</h3>
+            }
+            else
+            {
+                <h2 id="@id">@group.Key</h2>
+            }
+            <ul>
+                @foreach (var link in group)
+                {
+                    <li><a href="@link.Href">@link.Title</a></li>
+                }
+            </ul>
+        </section>
+    }
+</nav>
+
+@code {
+    private static int s_next;
+    private readonly string _id = "sitemap-" + Interlocked.Increment(ref s_next);
+
+    [Parameter] public string Label { get; set; } = "All demo pages";
+
+    /// <summary>2 on a page of its own, 3 inside a section.</summary>
+    [Parameter] public int HeadingLevel { get; set; } = 2;
+}

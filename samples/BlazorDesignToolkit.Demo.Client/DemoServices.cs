@@ -78,6 +78,13 @@ public static class DemoTokens
     }
 }
 
+/// <summary>Limits shared by the server host and the pages.</summary>
+public static class DemoLimits
+{
+    /// <summary>Largest token document the import page accepts (pasted or opened from a file).</summary>
+    public const int MaxImportBytes = 2 * 1024 * 1024;
+}
+
 public static class DemoServiceCollectionExtensions
 {
     /// <summary>Services shared by the server host and the WebAssembly client.</summary>
@@ -95,5 +102,6 @@ public static class DemoServiceCollectionExtensions
         return services;
     }
 
-    internal static string Version => typeof(DemoTokens).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
+    /// <summary>Package version without build metadata (the "+commit" suffix).</summary>
+    internal static string Version { get; } = typeof(DemoTokens).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "dev";
 }

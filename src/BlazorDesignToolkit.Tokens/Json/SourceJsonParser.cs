@@ -218,6 +218,11 @@ public static class SourceJsonParser
         private readonly byte[] _bytes;
         private readonly List<int> _lineStarts = [0];
         private readonly string? _source;
+        // The parser asks for increasing offsets. Counting on from the previous position keeps minified (single-line)
+        // documents linear; counting from the start of the line every time made them quadratic.
+        private int _lastLine = -1;
+        private int _lastOffset;
+        private int _lastColumn;
 
         public LineMap(ReadOnlySpan<byte> utf8, string? source)
         {
@@ -233,12 +238,22 @@ public static class SourceJsonParser
         {
             var line = _lineStarts.BinarySearch(offset);
             if (line < 0) line = ~line - 1;
-            var start = _lineStarts[line];
-            var column = 1;
-            for (var i = start; i < offset && i < _bytes.Length; i++)
+            int i, column;
+            if (line == _lastLine && offset >= _lastOffset)
+            {
+                i = _lastOffset;
+                column = _lastColumn;
+            }
+            else
+            {
+                i = _lineStarts[line];
+                column = 1;
+            }
+            for (; i < offset && i < _bytes.Length; i++)
             {
                 if ((_bytes[i] & 0xC0) != 0x80) column++;
             }
+            (_lastLine, _lastOffset, _lastColumn) = (line, i, column);
             return new SourceLocation(_source, line + 1, column);
         }
     }

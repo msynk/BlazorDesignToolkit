@@ -42,6 +42,8 @@
     private Node? _selected;
 
     [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    // Re-renders the selected token's value when the theme changes.
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
 
     public sealed record Node(string Name, TokenPath? Token, IReadOnlyList<Node> Children);
 

@@ -32,10 +32,13 @@ public sealed class Example : ComponentBase
             builder.AddContent(8, Description);
             builder.CloseElement();
         }
-        builder.OpenElement(9, "div");
-        builder.AddAttribute(10, "class", "example-stage");
-        builder.AddContent(11, ChildContent);
-        builder.CloseElement();
+        if (ChildContent is not null)
+        {
+            builder.OpenElement(9, "div");
+            builder.AddAttribute(10, "class", "example-stage");
+            builder.AddContent(11, ChildContent);
+            builder.CloseElement();
+        }
         if (Code is not null)
         {
             builder.OpenComponent<CodeBlock>(12);
@@ -47,9 +50,10 @@ public sealed class Example : ComponentBase
 }
 
 /// <summary>Code sample with a copy button.</summary>
-public sealed class CodeBlock : ComponentBase
+public sealed class CodeBlock : ComponentBase, IDisposable
 {
     private string _status = "";
+    private CancellationTokenSource? _clearStatus;
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Parameter, EditorRequired] public string Code { get; set; } = "";
@@ -64,33 +68,53 @@ public sealed class CodeBlock : ComponentBase
         }
         catch (JSException)
         {
+            // The Clipboard API is unavailable on insecure origins and when the permission is denied.
             _status = "Copy failed; select the text manually";
         }
+
+        // Clear the status after a moment so that a later copy is announced again.
+        _clearStatus?.Cancel();
+        _clearStatus = new CancellationTokenSource();
+        var token = _clearStatus.Token;
+        _ = Task.Delay(TimeSpan.FromSeconds(3), token).ContinueWith(_ => InvokeAsync(() =>
+        {
+            _status = "";
+            StateHasChanged();
+        }), token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
     }
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
         builder.OpenElement(0, "div");
         builder.AddAttribute(1, "class", "code-block");
-        builder.OpenElement(2, "button");
-        builder.AddAttribute(3, "type", "button");
-        builder.AddAttribute(4, "class", "copy");
-        builder.AddAttribute(5, "onclick", EventCallback.Factory.Create(this, CopyAsync));
-        builder.AddContent(6, Label is null ? "Copy code" : $"Copy {Label}");
+        builder.OpenElement(2, "div");
+        builder.AddAttribute(3, "class", "code-toolbar");
+        builder.OpenElement(4, "span");
+        builder.AddAttribute(5, "role", "status");
+        builder.AddAttribute(6, "class", "copy-status");
+        builder.AddContent(7, _status);
         builder.CloseElement();
-        builder.OpenElement(7, "span");
-        builder.AddAttribute(8, "role", "status");
-        builder.AddAttribute(9, "class", "copy-status");
-        builder.AddContent(10, _status);
-        builder.CloseElement();
-        builder.OpenElement(11, "pre");
-        builder.AddAttribute(12, "tabindex", "0");
-        builder.AddAttribute(13, "aria-label", Label ?? "Code sample");
-        builder.OpenElement(14, "code");
-        builder.AddContent(15, Code);
+        builder.OpenElement(8, "button");
+        builder.AddAttribute(9, "type", "button");
+        builder.AddAttribute(10, "class", "copy");
+        builder.AddAttribute(11, "onclick", EventCallback.Factory.Create(this, CopyAsync));
+        builder.AddContent(12, Label is null ? "Copy code" : $"Copy {Label}");
         builder.CloseElement();
         builder.CloseElement();
+        builder.OpenElement(13, "pre");
+        builder.AddAttribute(14, "tabindex", "0");
+        builder.AddAttribute(15, "aria-label", Label ?? "Code sample");
+        builder.OpenElement(16, "code");
+        builder.AddContent(17, Code);
         builder.CloseElement();
+        builder.CloseElement();
+        builder.CloseElement();
+    }
+
+    public void Dispose()
+    {
+        _clearStatus?.Cancel();
+        _clearStatus?.Dispose();
     }
 }
 

@@ -78,7 +78,8 @@
   [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"] { display: flex; align-items: center; gap: var(--bdt-gap); padding: 0.375rem 0.625rem; border-radius: calc(var(--bdt-radius) - 2px); cursor: default; }
   [role="option"]:hover, [role="menuitem"]:hover, [role="menuitemcheckbox"]:hover, [role="menuitemradio"]:hover, [data-highlighted] { background: var(--bdt-hover); }
   [role="option"][aria-selected="true"] { background: var(--bdt-selected); }
-  [role="option"][aria-selected="true"]::after, [aria-checked="true"][role^="menuitem"]::before { content: "✓"; content: "✓" / ""; margin-inline-start: auto; }
+  /* ::after, not ::before: the auto margin pushes the mark to the end; on a leading pseudo-element it shifts the label too. */
+  [role="option"][aria-selected="true"]::after, [aria-checked="true"][role^="menuitem"]::after { content: "✓"; content: "✓" / ""; margin-inline-start: auto; }
   [role="separator"] { block-size: 1px; margin-block: 0.25rem; background: var(--bdt-border-subtle); }
   button[role="combobox"], input[role="combobox"] { min-block-size: var(--bdt-control-height); padding-inline: 0.75rem; border: 1px solid var(--bdt-border); border-radius: var(--bdt-radius); background: var(--bdt-surface); color: var(--bdt-text); font: inherit; text-align: start; }
 

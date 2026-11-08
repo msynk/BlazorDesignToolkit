@@ -116,4 +116,6 @@ AccessibilityAssert.NoViolations(cut.Markup);   // BlazorDesignToolkit.Testing
 dotnet run --project samples/BlazorDesignToolkit.Demo
 ```
 
-Append `?mode=wasm` to switch to Interactive WebAssembly (`?mode=server` to switch back).
+Append `?mode=wasm` to switch to Interactive WebAssembly (`?mode=server` to switch back), or use the link in the page
+footer; the choice is remembered in a cookie. Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command menu (pages, brands and
+theme axes). The date picker example uses today's date; append `?today=2026-11-02` to its page to pin it.

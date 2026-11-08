@@ -1,0 +1,204 @@
+@page "/compare"
+@using BlazorDesignToolkit.Tokens.Analysis
+@using BlazorDesignToolkit.Tokens.Export
+@using BlazorDesignToolkit.Tokens.Resolution
+
+<PageTitle>Compare themes · BlazorDesignToolkit</PageTitle>
+
+<h1 tabindex="-1">Compare themes</h1>
+<p>Pick two theme selections and see exactly which tokens differ, using the same token diff that <code>bdt diff</code>
+    runs in CI to review design-system changes. Removed tokens and type changes are flagged as breaking.</p>
+
+<Example Title="Selections">
+    <ChildContent>
+        <div class="compare-pickers">
+            @foreach (var side in Sides)
+            {
+                var current = side;
+                <fieldset>
+                    <legend>@current</legend>
+                    <FormField class="control">
+                        <FormLabel>Brand</FormLabel>
+                        <Select TItem="ThemeDefinition" Items="Catalog.Themes" ItemLabel="t => t.DisplayName ?? t.Id"
+                                Value="Catalog.FindTheme(Get(current).ThemeId)" ValueChanged="t => { if (t is not null) Set(current, Get(current).WithTheme(t.Id)); }"
+                                data-testid="@($"{current.ToString().ToLowerInvariant()}-theme")" />
+                    </FormField>
+                    @foreach (var axis in Catalog.Axes)
+                    {
+                        var name = axis.Name;
+                        <FormField class="control">
+                            <FormLabel>@(axis.DisplayName ?? name)</FormLabel>
+                            <Select TItem="string" Items="axis.Values" ItemLabel="ThemeControls.Label"
+                                    Value="Get(current)[name]" ValueChanged="v => { if (v is not null) Set(current, Get(current).WithAxis(name, v)); }"
+                                    data-testid="@($"{current.ToString().ToLowerInvariant()}-{name}")" />
+                        </FormField>
+                    }
+                </fieldset>
+            }
+        </div>
+        <div class="actions">
+            <AuroraButton Variant="secondary" OnClick="Swap">Swap</AuroraButton>
+            <AuroraButton Variant="secondary" OnClick="UseCurrent">Compare the current theme with its defaults</AuroraButton>
+        </div>
+    </ChildContent>
+</Example>
+
+<Example Title="Differences">
+    <ChildContent>
+        @{ var diff = Diff; var rows = diff.Changes.GroupBy(c => c.Path).ToList(); }
+        <p role="status">
+            @if (!diff.HasChanges)
+            {
+                @:No differences between @_before.Key and @_after.Key.
+            }
+            else
+            {
+                @($"{rows.Count} token(s) differ: {Summary(diff)}.")
+                @if (diff.HasBreakingChanges)
+                {
+                    <span class="badge badge--danger">breaking</span>
+                }
+            }
+        </p>
+        @if (diff.HasChanges)
+        {
+            <div class="toolbar">
+                <FormField class="control">
+                    <FormLabel>Show</FormLabel>
+                    <Select TItem="string" Items="KindFilters(diff)" Value="_kind" ValueChanged="v => _kind = v ?? AllKinds" ItemLabel="KindLabel" />
+                </FormField>
+            </div>
+            <div class="table-scroll" tabindex="0" role="region" aria-label="Differences">
+                <table class="data-table">
+                    <caption>Changed tokens from @_before.Key to @_after.Key</caption>
+                    <thead><tr><th scope="col">Token</th><th scope="col">Change</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in rows.Where(r => _kind == AllKinds || r.Any(c => c.Kind.ToString() == _kind)))
+                        {
+                            <tr @key="row.Key">
+                                <th scope="row"><code>@row.Key</code></th>
+                                <td>
+                                    @string.Join(", ", row.Select(c => KindLabel(c.Kind.ToString())))
+                                    @if (row.Any(c => c.IsBreaking))
+                                    {
+                                        <span class="badge badge--danger">breaking</span>
+                                    }
+                                </td>
+                                <td>@Value(_beforeTokens, row.Key)</td>
+                                <td>@Value(_afterTokens, row.Key)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </ChildContent>
+</Example>
+
+@code {
+    private enum Side { Before, After }
+
+    private static readonly Side[] Sides = [Side.Before, Side.After];
+    private const string AllKinds = "all";
+
+    private ThemeSelection _before = default!;
+    private ThemeSelection _after = default!;
+    private string _kind = AllKinds;
+    private (string, string)? _diffKey;
+    private TokenDiffResult _diff = new([]);
+    private ResolvedTokenSet? _beforeTokens;
+    private ResolvedTokenSet? _afterTokens;
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+
+    private ThemeCatalog Catalog => Manager.Catalog;
+
+    protected override void OnInitialized()
+    {
+        // Start with the most instructive pair: the default theme in light and dark mode.
+        _before = Catalog.DefaultSelection;
+        _after = Catalog.Axes.Any(a => a.Name == "mode" && a.Values.Contains("dark")) ? _before.WithAxis("mode", "dark") : _before;
+    }
+
+    private ThemeSelection Get(Side side) => side == Side.Before ? _before : _after;
+
+    private void Set(Side side, ThemeSelection selection)
+    {
+        if (side == Side.Before) _before = selection; else _after = selection;
+        _kind = AllKinds;
+    }
+
+    private void Swap() => (_before, _after) = (_after, _before);
+
+    private void UseCurrent()
+    {
+        _before = Catalog.DefaultSelection;
+        _after = Manager.State.EffectiveSelection;
+        _kind = AllKinds;
+    }
+
+    private TokenDiffResult Diff
+    {
+        get
+        {
+            var key = (_before.Key, _after.Key);
+            if (_diffKey == key) return _diff;
+            _beforeTokens = Catalog.Resolve(_before).Tokens;
+            _afterTokens = Catalog.Resolve(_after).Tokens;
+            _diff = TokenDiff.Compare(_beforeTokens, _afterTokens);
+            _diffKey = key;
+            return _diff;
+        }
+    }
+
+    private static string Summary(TokenDiffResult diff)
+        => string.Join(", ", diff.Changes.GroupBy(c => c.Kind).OrderBy(g => g.Key).Select(g => $"{g.Count()} {KindLabel(g.Key.ToString()).ToLowerInvariant()}"));
+
+    private static IEnumerable<string> KindFilters(TokenDiffResult diff)
+        => new[] { AllKinds }.Concat(diff.Changes.Select(c => c.Kind).Distinct().Order().Select(k => k.ToString()));
+
+    private static string KindLabel(string kind) => kind switch
+    {
+        AllKinds => "All changes",
+        nameof(TokenChangeKind.Added) => "Added",
+        nameof(TokenChangeKind.Removed) => "Removed",
+        nameof(TokenChangeKind.TypeChanged) => "Type changed",
+        nameof(TokenChangeKind.ValueChanged) => "Value changed",
+        nameof(TokenChangeKind.ReferenceChanged) => "Reference changed",
+        nameof(TokenChangeKind.Deprecated) => "Deprecated",
+        nameof(TokenChangeKind.Undeprecated) => "No longer deprecated",
+        nameof(TokenChangeKind.DescriptionChanged) => "Description changed",
+        _ => kind,
+    };
+
+    /// <summary>The token's resolved value as CSS, with the referenced token when it is an alias; a dash when it is absent.</summary>
+    private static RenderFragment Value(ResolvedTokenSet? tokens, string path) => builder =>
+    {
+        if (tokens?[TokenPath.Parse(path)] is not { } token)
+        {
+            builder.AddContent(0, "—");
+            return;
+        }
+        if (token.Value is ColorValue color)
+        {
+            builder.OpenElement(1, "span");
+            builder.AddAttribute(2, "class", "swatch");
+            builder.AddAttribute(3, "style", $"background:{CssExporter.FormatValue(color)}");
+            builder.AddAttribute(4, "aria-hidden", "true");
+            builder.CloseElement();
+        }
+        builder.OpenElement(5, "code");
+        builder.AddContent(6, token.Value is null ? "invalid" : CssExporter.FormatValue(token.Value, DemoTokens.Css));
+        builder.CloseElement();
+        if (token.AliasOf is { } alias)
+        {
+            builder.OpenElement(7, "div");
+            builder.AddAttribute(8, "class", "muted");
+            builder.AddContent(9, "alias of ");
+            builder.OpenElement(10, "code");
+            builder.AddContent(11, alias.ToString());
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+    };
+}

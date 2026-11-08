@@ -119,7 +119,7 @@ public class NewPrimitivesBrowserTests(DemoServer server) : IAsyncDisposable
     public async Task Date_picker_dialog_follows_the_apg_keyboard_contract(string mode)
     {
         var page = await server.NewPageAsync();
-        await page.OpenAsync("/primitives/inputs", mode);
+        await page.OpenAsync("/primitives/inputs?today=2026-11-02", mode); // pins "today" (Monday, 2 November 2026)
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Choose date" });
         await button.FocusAsync();
         await page.Keyboard.PressAsync("Enter");

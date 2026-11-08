@@ -1,4 +1,5 @@
 @page "/editor"
+@using BlazorDesignToolkit.Theming
 @using BlazorDesignToolkit.Tokens.Colors
 @using BlazorDesignToolkit.Tokens.Json
 @using BlazorDesignToolkit.Tokens.Validation
@@ -8,55 +9,86 @@
 
 <h1 tabindex="-1">Live token editor</h1>
 <p>Override palette or semantic colors at runtime. Overrides are applied as inline custom properties on the root
-    element — only the declarations that actually change are written — and every contrast pair of the design system is
-    re-checked immediately.</p>
+    element — only the declarations that actually change are written — so the whole demo follows them, and every contrast
+    pair of the design system is re-checked immediately. Overrides last until you clear them or reload the page.</p>
 
 <div class="editor-grid">
     <Example Title="Override a color">
         <ChildContent>
             <FormField class="control">
                 <FormLabel>Token</FormLabel>
-                <Combobox TItem="string" Items="ColorTokens" Value="_token" ValueChanged="SelectToken" />
-                <FormDescription>Type to search the color tokens.</FormDescription>
+                <Combobox TItem="string" Items="_colorTokens" Value="_token" ValueChanged="SelectToken" />
+                <FormDescription>Type to search the @_colorTokens.Count color tokens of the current theme.</FormDescription>
             </FormField>
             @if (_token is not null)
             {
                 <FormField class="control" Context="field">
                     <FormLabel>New value for @_token</FormLabel>
-                    <input type="color" value="@_hex" @onchange="OnColorChanged" @attributes="field.ControlAttributes" />
-                    <FormDescription>Current: <code>@_hex</code></FormDescription>
+                    <div class="inline-field">
+                        <input type="color" value="@_hex" @onchange="OnColorChanged" @attributes="field.ControlAttributes" />
+                        <code>@_hex</code>
+                        @if (Manager.State.Overrides.ContainsKey(_token))
+                        {
+                            <span class="badge">overridden</span>
+                        }
+                    </div>
+                    <FormDescription>The value in the current theme (@Manager.State.EffectiveSelection.Key).</FormDescription>
                 </FormField>
             }
             <div class="actions">
-                <AuroraButton Variant="secondary" OnClick="Clear" Disabled="State.Overrides.IsEmpty">Clear overrides</AuroraButton>
+                <AuroraButton Variant="secondary" OnClick="Clear" Disabled="Manager.State.Overrides.IsEmpty">Clear overrides</AuroraButton>
             </div>
-            @if (!State.Overrides.IsEmpty)
+            @if (!Manager.State.Overrides.IsEmpty)
             {
                 <h3>Active overrides</h3>
-                <ul>
-                    @foreach (var (path, value) in State.Overrides)
+                <ul class="override-list">
+                    @foreach (var path in Manager.State.Overrides.Keys)
                     {
-                        <li><code>@path</code> = <code>@value.ToJson()</code></li>
+                        var current = path;
+                        <li>
+                            <span class="swatch" style="background:@(OverrideColor(current))" aria-hidden="true"></span>
+                            <code>@path</code>
+                            <button type="button" class="link-button" @onclick="() => Remove(current)" aria-label="@($"Remove override for {current}")">Remove</button>
+                        </li>
                     }
                 </ul>
             }
         </ChildContent>
     </Example>
 
+    <Example Title="Preview">
+        <Description><p>Aurora components and semantic surfaces, styled only with tokens.</p></Description>
+        <ChildContent>
+            <div class="preview-surface">
+                <p>Body text on the default surface, with <a href="editor">a link</a>.</p>
+                <p class="muted">Muted supporting text.</p>
+                <div class="actions">
+                    <AuroraButton tabindex="-1">Primary</AuroraButton>
+                    <AuroraButton Variant="secondary" tabindex="-1">Secondary</AuroraButton>
+                    <AuroraButton Variant="danger" tabindex="-1">Danger</AuroraButton>
+                </div>
+                <p class="preview-callout preview-callout--accent">Accent surface</p>
+                <p class="preview-callout preview-callout--success">Success surface</p>
+                <p class="preview-callout preview-callout--warning">Warning surface</p>
+                <p class="preview-callout preview-callout--danger">Danger surface</p>
+            </div>
+        </ChildContent>
+    </Example>
+
     <Example Title="Contrast in the current theme">
         <ChildContent>
-            <p role="status">@Failures of @Results.Count checks fail.</p>
+            <p role="status">@(Failures == 0 ? $"All {_results.Count} checks pass." : $"{Failures} of {_results.Count} checks fail.")</p>
             <table class="data-table">
                 <caption>WCAG 2.2 contrast checks</caption>
-                <thead><tr><th scope="col">Foreground</th><th scope="col">Background</th><th scope="col">Ratio</th><th scope="col">Required</th><th scope="col">Result</th></tr></thead>
+                <thead><tr><th scope="col">Foreground</th><th scope="col">Background</th><th scope="col" class="num">Ratio</th><th scope="col" class="num">Required</th><th scope="col">Result</th></tr></thead>
                 <tbody>
-                    @foreach (var r in Results)
+                    @foreach (var r in _results)
                     {
                         <tr class="@(r.Passed == false ? "fail" : null)">
                             <th scope="row"><code>@r.Foreground</code></th>
                             <td><code>@r.Background</code></td>
-                            <td>@r.RatioText</td>
-                            <td>@r.Required:1</td>
+                            <td class="num">@r.RatioText</td>
+                            <td class="num">@r.Required:1</td>
                             <td>@(r.Passed switch { true => "Pass", false => "Fail" + (r.SuggestedForeground is { } s ? $" (try {s})" : ""), null => "Unknown: " + r.IndeterminateReason })</td>
                         </tr>
                     }
@@ -69,41 +101,61 @@
 @code {
     private string? _token;
     private string _hex = "#000000";
-    private int _lastFailures = -1;
+    private ThemeState? _resolvedFor;
+    private IReadOnlyList<string> _colorTokens = [];
+    private IReadOnlyList<ContrastResult> _results = [];
+    private ThemeResolution? _resolution;
 
     [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
     [CascadingParameter] private ThemeState State { get; set; } = default!;
 
-    private IEnumerable<string> ColorTokens => Manager.Resolve().Tokens.Tokens.Where(t => t.Type == TokenTypes.Color && !t.IsAlias).Select(t => t.Path.ToString());
+    private int Failures => _results.Count(r => r.Passed == false);
 
-    private IReadOnlyList<ContrastResult> Results => TokenValidator.Validate(Manager.Resolve().Tokens, DemoTokens.Validation).ContrastResults;
+    // The cascaded State triggers re-rendering when the theme changes anywhere (for example in the header); the data is read
+    // from the manager, which is already up to date while the cascade is still pending.
+    protected override void OnParametersSet() => Refresh();
 
-    private int Failures => Results.Count(r => r.Passed == false);
+    private void Refresh()
+    {
+        // Resolving with overrides is not cached by the catalog, so resolve and validate once per theme state, not per render.
+        var state = Manager.State;
+        if (ReferenceEquals(_resolvedFor, state)) return;
+        _resolvedFor = state;
+        _resolution = Manager.Resolve();
+        _colorTokens = _resolution.Tokens.Tokens.Where(t => t.Type == TokenTypes.Color && t.IsValid).Select(t => t.Path.ToString()).ToList();
+        _results = TokenValidator.Validate(_resolution.Tokens, DemoTokens.Validation).ContrastResults;
+        if (_token is not null) _hex = CurrentHex(_token) ?? _hex;
+    }
+
+    private string? CurrentHex(string token)
+        => _resolution?.Tokens[TokenPath.Parse(token)]?.Value is ColorValue c ? c.ToSrgbGamutMapped().ToHex(false) : null;
+
+    private string OverrideColor(string path) => CurrentHex(path) ?? "transparent";
 
     private void SelectToken(string? token)
     {
         _token = token;
-        if (token is not null && Manager.Resolve().Tokens[TokenPath.Parse(token)]?.Value is ColorValue c) _hex = c.ToSrgb().ToHex(false);
+        if (token is not null) _hex = CurrentHex(token) ?? "#000000";
     }
 
     private void OnColorChanged(ChangeEventArgs e)
     {
         if (_token is null || e.Value?.ToString() is not { } hex || !SrgbColor.TryParseHex(hex, out var color)) return;
         _hex = hex;
-        Manager.SetOverride(_token, ColorValue.FromSrgb(color).ToSourceNode());
-        Announce();
+        Announce(() => Manager.SetOverride(_token, ColorValue.FromSrgb(color).ToSourceNode()));
     }
 
-    private void Clear()
-    {
-        Manager.ClearOverrides();
-        Announce();
-    }
+    private void Remove(string path) => Announce(() => Manager.RemoveOverride(path));
 
-    private void Announce()
+    private void Clear() => Announce(Manager.ClearOverrides);
+
+    /// <summary>Applies a change and announces the contrast result when the number of failures changes.</summary>
+    private void Announce(Action change)
     {
-        var failures = Failures;
-        if (failures != _lastFailures) Announcer.Announce(failures == 0 ? "All contrast checks pass." : $"{failures} contrast checks fail.");
-        _lastFailures = failures;
+        var before = Failures;
+        change();
+        Refresh();
+        var after = Failures;
+        if (after != before) Announcer.Announce(after == 0 ? "All contrast checks pass." : $"{after} contrast checks fail.");
     }
 }

@@ -53,7 +53,7 @@ public class AssistiveTechnologyTests(DemoServer server) : IAsyncDisposable
     public async Task Accessibility_tree_of_the_date_picker_dialog()
     {
         var page = await server.NewPageAsync();
-        await page.OpenAsync("/primitives/inputs");
+        await page.OpenAsync("/primitives/inputs?today=2026-11-02"); // pins "today", so the calendar opens on a known month
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Choose date" });
         await Assertions.Expect(button).ToHaveAttributeAsync("aria-haspopup", "dialog");
         await button.ClickAsync();

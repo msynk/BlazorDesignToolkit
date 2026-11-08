@@ -1,8 +1,10 @@
 @page "/import-export"
+@using System.Text
 @using BlazorDesignToolkit.Tokens.Bootstrap
 @using BlazorDesignToolkit.Tokens.Diagnostics
 @using BlazorDesignToolkit.Tokens.Export
 @using BlazorDesignToolkit.Tokens.Fluent
+@using BlazorDesignToolkit.Tokens.Json
 @using BlazorDesignToolkit.Tokens.Resolution
 @using BlazorDesignToolkit.Tokens.Tailwind
 @using BlazorDesignToolkit.Tokens.Validation
@@ -10,33 +12,45 @@
 <PageTitle>Import and export · BlazorDesignToolkit</PageTitle>
 
 <h1 tabindex="-1">Import and export</h1>
-<p>Paste a DTCG 2025.10 token document. It is parsed with source locations, validated, and exported to every supported
-    target. Nothing leaves your browser session; the engine runs in .NET.</p>
+<p>Paste a DTCG 2025.10 token document or open a <code>.tokens.json</code> file. It is parsed with source locations,
+    validated, and exported to every supported target. Nothing is uploaded anywhere: the engine runs in .NET, in your
+    browser (WebAssembly) or in your session on the demo server (Interactive Server).</p>
 
 <Example Title="Token document">
     <ChildContent>
         <FormField class="control" Context="field">
             <FormLabel>DTCG JSON</FormLabel>
-            <textarea @attributes="field.ControlAttributes" rows="14" spellcheck="false" @bind="_json" @bind:event="oninput"></textarea>
-            <FormDescription>Example tokens are prefilled. Try breaking a reference or a value.</FormDescription>
+            <textarea @attributes="field.ControlAttributes" class="code-input" rows="16" spellcheck="false" @bind="_json" data-testid="token-json"></textarea>
+            <FormDescription>Example tokens are prefilled. Try breaking a reference or a value, then validate. Up to @(DemoLimits.MaxImportBytes / 1024 / 1024) MB.</FormDescription>
+        </FormField>
+        <FormField class="control" Context="field" Invalid="_fileError is not null">
+            <FormLabel>Or open a file</FormLabel>
+            <InputFile OnChange="OpenFileAsync" accept=".json,application/json" @attributes="field.ControlAttributes" />
+            <FormError>@_fileError</FormError>
         </FormField>
         <div class="actions">
-            <AuroraButton OnClick="Process">Validate and export</AuroraButton>
+            <AuroraButton OnClick="Process" data-testid="process">Validate and export</AuroraButton>
             <AuroraButton Variant="secondary" OnClick="LoadSample">Load the Aurora foundation</AuroraButton>
+            <AuroraButton Variant="secondary" OnClick="LoadExample">Restore the example</AuroraButton>
         </div>
     </ChildContent>
 </Example>
 
-@if (_result is not null)
+@if (_result is not null && _tokens is not null)
 {
     <Example Title="Diagnostics">
         <ChildContent>
-            <p role="status">@_result.ErrorCount error(s), @_result.WarningCount warning(s), @_result.InfoCount info.</p>
+            <p role="status">@_source: @_tokens.Count tokens, @_result.ErrorCount error(s), @_result.WarningCount warning(s), @_result.InfoCount info.</p>
+            @if (_typeCounts.Count > 0)
+            {
+                <p class="muted">@string.Join(" · ", _typeCounts.Select(t => $"{t.Count} {t.Type}"))</p>
+            }
             <DiagnosticList Diagnostics="_result.Diagnostics" />
         </ChildContent>
     </Example>
 
     <Example Title="Outputs">
+        <Description><p>Framework mappings are chosen automatically for this preview; real projects configure them (see the Integrations page and <code>bdt.config.json</code>).</p></Description>
         <ChildContent>
             <Tabs DefaultValue="css">
                 <TabList aria-label="Export formats">
@@ -55,7 +69,7 @@
 }
 
 @code {
-    private string _json = """
+    private const string Example = """
         {
           "color": {
             "$type": "color",
@@ -77,7 +91,12 @@
         }
         """;
 
+    private string _json = Example;
+    private string _source = "input.tokens.json";
+    private string? _fileError;
+    private ResolvedTokenSet? _tokens;
     private DiagnosticResult? _result;
+    private List<(string Type, int Count)> _typeCounts = [];
     private List<(string Key, string Label, string Content)> _outputs = [];
 
     protected override void OnInitialized() => Process();
@@ -85,35 +104,73 @@
     private void LoadSample()
     {
         _json = DemoTokens.Files["foundation.tokens.json"];
+        _source = "foundation.tokens.json";
         Process();
+    }
+
+    private void LoadExample()
+    {
+        _json = Example;
+        _source = "input.tokens.json";
+        Process();
+    }
+
+    private async Task OpenFileAsync(InputFileChangeEventArgs e)
+    {
+        _fileError = null;
+        if (e.File.Size > DemoLimits.MaxImportBytes)
+        {
+            _fileError = $"{e.File.Name} is {e.File.Size / 1024:N0} KB; the limit is {DemoLimits.MaxImportBytes / 1024:N0} KB.";
+            return;
+        }
+        try
+        {
+            await using var stream = e.File.OpenReadStream(DemoLimits.MaxImportBytes);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            _json = await reader.ReadToEndAsync();
+            _source = e.File.Name;
+            Process();
+        }
+        catch (IOException ex)
+        {
+            _fileError = $"{e.File.Name} could not be read: {ex.Message}";
+        }
     }
 
     private void Process()
     {
-        var tokens = TokenResolver.Resolve(_json, new BlazorDesignToolkit.Tokens.Json.JsonParseOptions { SourceName = "input.tokens.json", MaxInputBytes = 2 * 1024 * 1024 });
+        var tokens = TokenResolver.Resolve(_json, new JsonParseOptions { SourceName = _source, MaxInputBytes = DemoLimits.MaxImportBytes });
         var report = TokenValidator.Validate(tokens, new ValidationOptions { ReportDuplicateValues = false });
         var exportBag = new DiagnosticBag();
-        var css = CssExporter.Export(tokens, new CssExportOptions { Prefix = "ds" });
+        var css = CssExporter.Export(tokens, new CssExportOptions { Prefix = DemoTokens.Prefix });
         exportBag.AddRange(css.Diagnostics);
-        var preserve = CssExporter.Export(tokens, new CssExportOptions { Prefix = "ds", References = CssReferenceMode.Preserve });
+        var preserve = CssExporter.Export(tokens, new CssExportOptions { Prefix = DemoTokens.Prefix, References = CssReferenceMode.Preserve });
         var json = DtcgWriter.Write(tokens);
         var tailwind = TailwindThemeExporter.Export(tokens, new TailwindExportOptions
         {
-            Css = new CssExportOptions { Prefix = "ds" },
+            Css = new CssExportOptions { Prefix = DemoTokens.Prefix },
             Mappings = [new("color.**", "color", "color"), new("radius.*", "radius"), new("shadow.*", "shadow"), new("typography.*", "text")],
         });
         exportBag.AddRange(tailwind.Diagnostics);
-        var colorTokens = tokens.Tokens.Where(t => t.Type == TokenTypes.Color && t.IsValid).Select(t => t.Path.ToString()).ToList();
+
+        // Map the most likely brand color: a token named like an accent or primary color, otherwise the first color.
+        var colors = tokens.Tokens.Where(t => t.Type == TokenTypes.Color && t.IsValid).Select(t => t.Path.ToString()).ToList();
+        var brand = colors.FirstOrDefault(p => p.Contains("accent", StringComparison.OrdinalIgnoreCase) || p.Contains("primary", StringComparison.OrdinalIgnoreCase))
+            ?? colors.FirstOrDefault();
         var bootstrap = BootstrapExporter.Export(tokens, new BootstrapExportOptions
         {
-            Mappings = colorTokens.Take(1).Select(p => new TargetMapping("primary", p)).ToList(),
+            Mappings = brand is null ? [] : [new TargetMapping("primary", brand)],
         });
         var fluent = FluentExporter.Export(tokens, new FluentExportOptions
         {
-            Css = new CssExportOptions { Prefix = "ds" },
-            Mappings = colorTokens.Take(1).Select(p => new TargetMapping("colorBrandBackground", p)).ToList(),
+            Css = new CssExportOptions { Prefix = DemoTokens.Prefix },
+            Mappings = brand is null ? [] : [new TargetMapping("colorBrandBackground", brand)],
         });
+
+        _tokens = tokens;
         _result = DiagnosticPolicy.Default.Apply(report.Diagnostics.Concat(exportBag.Items));
+        _typeCounts = tokens.Tokens.Where(t => t.Type is not null).GroupBy(t => t.Type!).OrderByDescending(g => g.Count()).ThenBy(g => g.Key)
+            .Select(g => (g.Key, g.Count())).ToList();
         _outputs =
         [
             ("css", "CSS (resolved)", css.Css),

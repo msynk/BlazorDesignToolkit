@@ -44,7 +44,9 @@
             HttpContext.Response.Cookies.Append("bdt-render-mode", requested, new CookieOptions { Path = "/", SameSite = SameSiteMode.Lax, IsEssential = true });
         }
         var mode = requested is "wasm" or "server" ? requested : HttpContext.Request.Cookies["bdt-render-mode"];
-        PageRenderMode = mode == "wasm" ? new InteractiveWebAssemblyRenderMode() : new InteractiveServerRenderMode();
+        // Pages marked [ExcludeFromInteractiveRouting] (the error page) are rendered statically.
+        PageRenderMode = !HttpContext.AcceptsInteractiveRouting() ? null
+            : mode == "wasm" ? new InteractiveWebAssemblyRenderMode() : new InteractiveServerRenderMode();
 
         // Render the persisted theme on the server: correct on the first paint, with or without JavaScript.
         var preference = ThemeRootAttributes.FromCookie(HttpContext.Request.Cookies[ThemingOptions.StorageKey]);
