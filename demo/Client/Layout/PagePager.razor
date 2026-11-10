@@ -1,0 +1,51 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+@* Previous and next page in the order of the main navigation, so the demo can be read from start to end. *@
+
+@if (Index is var index and >= 0)
+{
+    <nav class="pager" aria-label="Previous and next page">
+        @if (index > 0)
+        {
+            var previous = NavMenu.Links[index - 1];
+            <a class="pager__link pager__link--previous" href="@previous.Href" rel="prev">
+                <span class="pager__direction">Previous<span class="visually-hidden">:</span></span>
+                <span class="pager__title">@previous.Title</span>
+                <span class="pager__group">@previous.Group</span>
+            </a>
+        }
+        @if (index < NavMenu.Links.Count - 1)
+        {
+            var next = NavMenu.Links[index + 1];
+            <a class="pager__link pager__link--next" href="@next.Href" rel="next">
+                <span class="pager__direction">Next<span class="visually-hidden">:</span></span>
+                <span class="pager__title">@next.Title</span>
+                <span class="pager__group">@next.Group</span>
+            </a>
+        }
+    </nav>
+}
+
+@code {
+    private int Index
+    {
+        get
+        {
+            var path = Navigation.ToBaseRelativePath(Navigation.Uri);
+            var end = path.IndexOfAny(['?', '#']);
+            if (end >= 0) path = path[..end];
+            path = path.TrimEnd('/');
+            for (var i = 0; i < NavMenu.Links.Count; i++)
+            {
+                if (string.Equals(NavMenu.Links[i].Href, path, StringComparison.OrdinalIgnoreCase)) return i;
+            }
+            return -1;
+        }
+    }
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

@@ -1,0 +1,367 @@
+@page "/style-guide"
+@using BlazorDesignToolkit.Tokens.Colors
+@using BlazorDesignToolkit.Tokens.Export
+@using BlazorDesignToolkit.Tokens.Resolution
+@using BlazorDesignToolkit.Tokens.Validation
+
+<PageTitle>Visual style guide · BlazorDesignToolkit</PageTitle>
+
+<p class="eyebrow">Design tokens</p>
+<h1 tabindex="-1">Visual style guide</h1>
+<p class="lead">This page is generated from the @Tokens.Count tokens of the current theme,
+    <strong>@Resolution.Selection</strong>, and every specimen is painted with the token's CSS variable. Change the brand,
+    color mode, contrast or density in the header: the whole guide follows at once, and nothing is regenerated.</p>
+
+<nav class="toc" aria-label="On this page">
+    <ul>
+        @foreach (var (id, title) in Sections)
+        {
+            <li><a href="@($"style-guide#{id}")">@title</a></li>
+        }
+    </ul>
+</nav>
+
+<section class="guide-section" id="scales" aria-labelledby="scales-title">
+    <h2 id="scales-title">Color scales</h2>
+    <p class="section-lead">Primitive tokens: the raw palette. Components never use these directly; semantic tokens give them a
+        purpose, which is what lets a brand or a dark mode swap them.</p>
+    @foreach (var scale in Scales)
+    {
+        <h3 class="guide-subtitle" id="@($"scale-{scale.Name}")"><code>color.@scale.Name</code></h3>
+        <ul class="scale" aria-labelledby="@($"scale-{scale.Name}")">
+            @foreach (var step in scale.Steps)
+            {
+                <li class="scale-step" style="background: var(@Var(step.Path)); color: var(@step.Ink)">
+                    <span class="scale-step__name">@step.Path.Name</span>
+                    <code class="scale-step__value">@step.Value</code>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<section class="guide-section" id="semantic" aria-labelledby="semantic-title">
+    <h2 id="semantic-title">Semantic colors</h2>
+    <p class="section-lead">What each color is for. These are the tokens the UI uses; switch the color mode or the brand and
+        watch them point at other primitives.</p>
+    @foreach (var group in SemanticColors)
+    {
+        <h3 class="guide-subtitle">@group.Title</h3>
+        <ul class="token-tiles">
+            @foreach (var token in group.Tokens)
+            {
+                <li class="token-tile">
+                    @switch (group.Key)
+                    {
+                        case "text":
+                            <span class="token-tile__sample" style="background: var(@Var(token.Path.Name == "inverse" ? "color.surface.inverse" : "color.surface.default")); color: var(@Var(token.Path))" aria-hidden="true">Aa</span>
+                            break;
+                        case "on-surface" when Tokens.Contains(TokenPath.Parse("color.surface." + token.Path.Name)):
+                            <span class="token-tile__sample" style="background: var(@Var("color.surface." + token.Path.Name)); color: var(@Var(token.Path))" aria-hidden="true">Aa</span>
+                            break;
+                        default:
+                            <span class="token-tile__sample token-tile__sample--fill" style="background: var(@Var(token.Path))" aria-hidden="true"></span>
+                            break;
+                    }
+                    <span class="token-tile__name"><code>@token.Path</code></span>
+                    <span class="token-tile__value">@Describe(token)</span>
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+<section class="guide-section" id="contrast" aria-labelledby="contrast-title">
+    <h2 id="contrast-title">Contrast</h2>
+    <p class="section-lead">The pairs that <code>aurora.validation.json</code> requires, measured by the toolkit in this theme
+        against WCAG 2.2. <strong>@Contrast.Count(c => c.Passed == true) of @Contrast.Count pass.</strong> Switch to
+        <em>More</em> contrast and the ratios go up.</p>
+    <ul class="contrast-grid">
+        @foreach (var result in Contrast)
+        {
+            <li class="contrast-tile">
+                @if (result.Kind is ContrastKind.Text or ContrastKind.LargeText)
+                {
+                    <span class="contrast-tile__sample" style="background: var(@Var(result.Background)); color: var(@Var(result.Foreground))" aria-hidden="true">Aa</span>
+                }
+                else
+                {
+                    <span class="contrast-tile__sample" style="background: var(@Var(result.Background))" aria-hidden="true">
+                        <span class="contrast-tile__ring" style="border-color: var(@Var(result.Foreground))"></span>
+                    </span>
+                }
+                <span class="contrast-tile__pair"><code>@result.Foreground</code> on <code>@result.Background</code></span>
+                <span class="contrast-tile__result">
+                    <strong>@result.RatioText</strong>
+                    <span class="muted">needs @ContrastResult.FormatRatio(result.Required) · @KindLabel(result.Kind)</span>
+                    <span class="badge @(result.Passed == true ? "badge--success" : result.Passed == false ? "badge--danger" : "")">@(result.Passed switch { true => "pass", false => "fail", null => "unknown" })</span>
+                </span>
+            </li>
+        }
+    </ul>
+</section>
+
+<section class="guide-section" id="typography" aria-labelledby="typography-title">
+    <h2 id="typography-title">Typography</h2>
+    <p class="section-lead">Composite <code>typography</code> tokens bundle family, size, weight, line height and letter
+        spacing into one CSS <code>font</code> value; the scales below are the primitives they are built from.</p>
+    <h3 class="guide-subtitle">Text styles</h3>
+    <ul class="type-specimens">
+        @foreach (var token in OfType(TokenTypes.Typography))
+        {
+            <li class="type-specimen">
+                <p class="type-specimen__sample" style="font: var(@Var(token.Path))">@SampleText(token.Path.Name)</p>
+                <p class="type-specimen__meta"><code>@token.Path</code> <span class="muted">@Value(token)</span></p>
+            </li>
+        }
+    </ul>
+    <div class="split">
+        <div>
+            <h3 class="guide-subtitle">Font sizes</h3>
+            <ul class="type-scale">
+                @foreach (var token in Under("font.size"))
+                {
+                    <li>
+                        <span class="type-scale__label"><code>@token.Path.Name</code> <span class="muted">@Value(token)</span></span>
+                        <span class="type-scale__sample" style="font-size: var(@Var(token.Path))">Tokens keep it consistent</span>
+                    </li>
+                }
+            </ul>
+        </div>
+        <div>
+            <h3 class="guide-subtitle">Families and weights</h3>
+            <ul class="type-scale">
+                @foreach (var token in Under("font.family"))
+                {
+                    <li>
+                        <span class="type-scale__label"><code>family.@token.Path.Name</code></span>
+                        <span class="type-scale__sample" style="font-family: var(@Var(token.Path))">@string.Join(", ", ((FontFamilyValue)token.Value!).Families.Take(2))</span>
+                    </li>
+                }
+                @foreach (var token in Under("font.weight"))
+                {
+                    <li>
+                        <span class="type-scale__label"><code>weight.@token.Path.Name</code> <span class="muted">@Value(token)</span></span>
+                        <span class="type-scale__sample" style="font-weight: var(@Var(token.Path))">The quick brown fox</span>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+    <h3 class="guide-subtitle">Line heights</h3>
+    <ul class="line-heights">
+        @foreach (var token in Under("font.line-height"))
+        {
+            <li>
+                <p class="line-heights__label"><code>@token.Path.Name</code> <span class="muted">@Value(token)</span></p>
+                <p class="line-heights__sample" style="line-height: var(@Var(token.Path))">A design token is a named design decision. Change it once and every screen that uses it follows.</p>
+            </li>
+        }
+    </ul>
+</section>
+
+<section class="guide-section" id="spacing" aria-labelledby="spacing-title">
+    <h2 id="spacing-title">Spacing and sizing</h2>
+    <p class="section-lead">The spacing scale, and the density tokens built on it. Switch <em>Density</em> to
+        <em>Compact</em> in the header: the controls below, and every control of the site, shrink.</p>
+    <div class="split">
+        <ul class="space-scale">
+            @foreach (var token in Under("space").Where(t => t.Type == TokenTypes.Dimension && t.Path.Length == 2 && !t.IsAlias))
+            {
+                <li>
+                    <code class="space-scale__name">@token.Path</code>
+                    <span class="space-scale__bar" style="inline-size: var(@Var(token.Path))" aria-hidden="true"></span>
+                    <span class="muted">@Value(token)</span>
+                </li>
+            }
+        </ul>
+        <div class="density-demo">
+            <p class="density-demo__row" style="gap: var(@Var("space.gap"))" aria-hidden="true">
+                <span class="density-demo__control" style="min-block-size: var(@Var("size.control.height")); padding-inline: var(@Var("size.control.padding-inline"))">Control</span>
+                <span class="density-demo__control" style="min-block-size: var(@Var("size.control.height")); padding-inline: var(@Var("size.control.padding-inline"))">Control</span>
+            </p>
+            <dl class="facts">
+                @foreach (var path in DensityTokens)
+                {
+                    if (Tokens[TokenPath.Parse(path)] is { } token)
+                    {
+                        <dt><code>@path</code></dt>
+                        <dd>@Describe(token)</dd>
+                    }
+                }
+            </dl>
+        </div>
+    </div>
+</section>
+
+<section class="guide-section" id="shape" aria-labelledby="shape-title">
+    <h2 id="shape-title">Shape and elevation</h2>
+    <p class="section-lead">Corner radii, stroke widths and shadows. Shadows are composite tokens: several layers of offset,
+        blur, spread and color in one value.</p>
+    <ul class="shape-grid">
+        @foreach (var token in Under("radius").Concat(Under("shape.radius")))
+        {
+            <li class="shape-tile">
+                <span class="shape-tile__box" style="border-radius: var(@Var(token.Path))" aria-hidden="true"></span>
+                <code>@token.Path</code>
+                <span class="muted">@Describe(token)</span>
+            </li>
+        }
+        @foreach (var token in OfType(TokenTypes.Shadow))
+        {
+            <li class="shape-tile">
+                <span class="shape-tile__box shape-tile__box--shadow" style="box-shadow: var(@Var(token.Path))" aria-hidden="true"></span>
+                <code>@token.Path</code>
+                <span class="muted">@Describe(token)</span>
+            </li>
+        }
+        @foreach (var token in Under("border.width").Concat(Under("stroke.width")))
+        {
+            <li class="shape-tile">
+                <span class="shape-tile__line" style="block-size: var(@Var(token.Path))" aria-hidden="true"></span>
+                <code>@token.Path</code>
+                <span class="muted">@Describe(token)</span>
+            </li>
+        }
+    </ul>
+</section>
+
+<section class="guide-section" id="states" aria-labelledby="states-title">
+    <h2 id="states-title">Interaction states</h2>
+    <p class="section-lead">Hover, selection, focus and disabled styles come from tokens too, so they adapt to every theme.</p>
+    <ul class="state-row">
+        <li><span class="state-sample">Default</span><code>color.surface.default</code></li>
+        <li><span class="state-sample" style="background: var(@Var("color.interactive.hover"))">Hover</span><code>color.interactive.hover</code></li>
+        <li><span class="state-sample" style="background: var(@Var("color.interactive.selected"))">Selected</span><code>color.interactive.selected</code></li>
+        <li><span class="state-sample" style="outline: var(@Var("component.focus.ring")); outline-offset: var(@Var("component.focus.offset"))">Focused</span><code>component.focus.ring</code></li>
+        <li><span class="state-sample state-sample--accent">Primary</span><code>component.button.primary.*</code></li>
+        @* A real disabled control: inactive components are exempt from the contrast requirement (WCAG 1.4.3). *@
+        <li><button type="button" class="state-sample" style="opacity: var(@Var("opacity.disabled"))" disabled>Disabled</button><code>opacity.disabled</code></li>
+    </ul>
+</section>
+
+<section class="guide-section" id="motion" aria-labelledby="motion-title">
+    <h2 id="motion-title">Motion</h2>
+    <p class="section-lead"><code>duration</code> and <code>cubicBezier</code> tokens drive every transition. Play them to
+        compare; with reduced motion turned on in your system, the starter styles make them instant.</p>
+    <AuroraButton OnClick="() => _playing = !_playing" data-testid="play-motion">@(_playing ? "Play backwards" : "Play")</AuroraButton>
+    <ul class="motion" data-run="@(_playing ? "" : null)" aria-label="Durations and easings">
+        @foreach (var token in OfType(TokenTypes.Duration))
+        {
+            <li>
+                <span class="motion__label"><code>@token.Path</code> <span class="muted">@Value(token)</span></span>
+                <span class="motion__track" aria-hidden="true"><span class="motion__dot" style="transition-duration: var(@Var(token.Path)); transition-timing-function: var(@Var("easing.standard"))"></span></span>
+            </li>
+        }
+        @foreach (var token in OfType(TokenTypes.CubicBezier))
+        {
+            <li>
+                <span class="motion__label"><code>@token.Path</code> <span class="muted">@Value(token)</span></span>
+                <span class="motion__track" aria-hidden="true"><span class="motion__dot" style="transition-duration: calc(var(@Var("duration.slow")) * 3); transition-timing-function: var(@Var(token.Path))"></span></span>
+            </li>
+        }
+    </ul>
+</section>
+
+<p class="callout">Every token above is also in the <a href="tokens">token explorer</a>, with its references and CSS
+    variable. To see which tokens a part of this site uses, open the <strong>Inspect</strong> tool in the header and click it.</p>
+
+@code {
+    private static readonly (string Id, string Title)[] Sections =
+    [
+        ("scales", "Color scales"), ("semantic", "Semantic colors"), ("contrast", "Contrast"), ("typography", "Typography"),
+        ("spacing", "Spacing and sizing"), ("shape", "Shape and elevation"), ("states", "Interaction states"), ("motion", "Motion"),
+    ];
+
+    private static readonly string[] DensityTokens = ["size.control.height", "size.control.padding-inline", "space.gap"];
+
+    private static readonly (string Key, string Title)[] SemanticGroups =
+    [
+        ("text", "Text"), ("surface", "Surfaces"), ("on-surface", "Content on surfaces"), ("border", "Borders"),
+        ("interactive", "Interaction"), ("focus", "Focus"), ("overlay", "Overlays"),
+    ];
+
+    private bool _playing;
+    private ThemeState? _validatedFor;
+    private IReadOnlyList<ContrastResult> _contrast = [];
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    // Re-renders the guide when the theme changes.
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    private ThemeResolution Resolution => Manager.Resolve();
+
+    private ResolvedTokenSet Tokens => Resolution.Tokens;
+
+    private IReadOnlyList<ContrastResult> Contrast => _contrast;
+
+    protected override void OnParametersSet()
+    {
+        // Validate once per theme state, not per render.
+        if (ReferenceEquals(_validatedFor, Manager.State)) return;
+        _validatedFor = Manager.State;
+        _contrast = TokenValidator.Validate(Tokens, DemoTokens.Validation).ContrastResults
+            .Where(c => IsToken(c.Foreground) && IsToken(c.Background))
+            .ToList();
+    }
+
+    private bool IsToken(string path) => Tokens.Contains(TokenPath.Parse(path));
+
+    private sealed record Step(TokenPath Path, string Value, string Ink);
+
+    private sealed record Scale(string Name, IReadOnlyList<Step> Steps);
+
+    /// <summary>Numbered color families (color.blue.50 … color.blue.950), with a legible ink for the label of each step.</summary>
+    private IEnumerable<Scale> Scales => Tokens.Tokens
+        .Where(t => t.Value is ColorValue && t.Path.Length == 3 && t.Path.Segments[0] == "color" && int.TryParse(t.Path.Name, out _))
+        .GroupBy(t => t.Path.Segments[1])
+        .Where(g => g.Count() >= 3)
+        .Select(g => new Scale(g.Key, g.OrderBy(t => int.Parse(t.Path.Name)).Select(t => new Step(t.Path, Value(t), Ink((ColorValue)t.Value!))).ToList()));
+
+    private static string Ink(ColorValue color)
+    {
+        var srgb = color.ToSrgbGamutMapped();
+        var white = ColorValue.FromHex("#ffffff").ToSrgb();
+        var black = ColorValue.FromHex("#000000").ToSrgb();
+        return Wcag.ContrastRatio(srgb, white) >= Wcag.ContrastRatio(srgb, black) ? Var("color.white") : Var("color.black");
+    }
+
+    private IEnumerable<(string Key, string Title, IReadOnlyList<ResolvedToken> Tokens)> SemanticColors => SemanticGroups
+        .Select(g => (g.Key, g.Title, (IReadOnlyList<ResolvedToken>)Tokens.Tokens
+            .Where(t => t.Value is ColorValue && t.Path.Length == 3 && t.Path.Segments[0] == "color" && t.Path.Segments[1] == g.Key)
+            .ToList()))
+        .Where(g => g.Item3.Count > 0);
+
+    private IEnumerable<ResolvedToken> OfType(string type) => Tokens.Tokens.Where(t => t.Type == type && t.Value is not null);
+
+    private IEnumerable<ResolvedToken> Under(string prefix)
+    {
+        var path = TokenPath.Parse(prefix);
+        return Tokens.Tokens.Where(t => t.Value is not null && t.Path.Length == path.Length + 1 && t.Path.StartsWith(path));
+    }
+
+    private static string Var(TokenPath path) => CssExporter.GetVariableName(path, DemoTokens.Css);
+
+    private static string Var(string path) => Var(TokenPath.Parse(path));
+
+    private static string Value(ResolvedToken token) => token.Value is null ? "invalid" : CssExporter.FormatValue(token.Value, DemoTokens.Css) ?? "";
+
+    /// <summary>The value, and for an alias the token it points to.</summary>
+    private string Describe(ResolvedToken token)
+        => token.IsAlias ? $"→ {Tokens.GetAliasChain(token.Path)[^1]} · {Value(token)}" : Value(token);
+
+    private static string SampleText(string name) => name switch
+    {
+        "heading" => "Ship a design system with confidence",
+        "code" => "var tokens = TokenResolver.Resolve(json);",
+        _ => "Design tokens are named design decisions, stored as data and shared by every platform.",
+    };
+
+    private static string KindLabel(ContrastKind kind) => kind switch
+    {
+        ContrastKind.Text => "text",
+        ContrastKind.LargeText => "large text",
+        ContrastKind.NonText => "non-text",
+        _ => "focus indicator",
+    };
+}

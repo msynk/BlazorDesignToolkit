@@ -1,0 +1,455 @@
+@using System.Text.Json
+@using BlazorDesignToolkit.Tokens.Export
+@using BlazorDesignToolkit.Tokens.Resolution
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@* Site-wide inspector (see wwwroot/js/inspector.js). For the element picked with the mouse, or focused with the keyboard,
+   it shows what assistive technology is told about it and which design tokens its styles come from, through every
+   reference down to the value of the current theme. It also logs live-region announcements. The panel is built from the
+   headless primitives and styled with Aurora tokens like the rest of the site. *@
+
+@if (Open)
+{
+    <aside class="inspector" aria-labelledby="inspector-title" data-inspector-ui="" data-testid="inspector" @ref="_panel">
+        <div class="inspector__header">
+            <h2 id="inspector-title">Inspector</h2>
+            <ToggleButton Pressed="_picking" PressedChanged="SetPickingAsync" class="inspector__pick" data-testid="inspector-pick">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4l6.5 16 2.2-6.8L19.5 11z" /></svg>
+                Pick an element
+            </ToggleButton>
+            <button type="button" class="icon-only" aria-label="Close inspector" @onclick="CloseAsync" data-testid="inspector-close">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+        </div>
+        <p class="inspector__hint" role="status">
+            @if (_picking)
+            {
+                @:Click any element of the page. <kbd>Esc</kbd> cancels.
+            }
+            else if (_current is null)
+            {
+                @:Pick an element, or move focus with <kbd>Tab</kbd>: the inspector follows the focus.
+            }
+        </p>
+        @if (_current is { } current)
+        {
+            <p class="inspector__target">
+                <code data-testid="inspector-target">@current.Element</code>
+                @if (!current.Connected)
+                {
+                    <span class="badge">no longer on the page</span>
+                }
+            </p>
+        }
+        <Tabs @bind-Value="_tab">
+            <TabList aria-label="Inspector views">
+                <Tab Value="accessibility">Accessibility</Tab>
+                <Tab Value="tokens">Tokens <span class="inspector__count">@(_current?.Styles.Count ?? 0)</span></Tab>
+                <Tab Value="announcements">Announcements <span class="inspector__count">@_announcements.Count</span></Tab>
+            </TabList>
+            <TabPanel Value="accessibility" data-testid="inspector-accessibility">
+                @if (_current?.Accessibility is { } a11y)
+                {
+                    <p class="inspector__speech-label">A screen reader would announce something like</p>
+                    <p class="inspector__speech" data-testid="inspector-speech">@Speech(a11y)</p>
+                    @if (a11y.Hidden)
+                    {
+                        <p class="inspector__warning">Hidden from assistive technology: it is inside <code>aria-hidden</code>, <code>inert</code> or <code>hidden</code> content.</p>
+                    }
+                    else if (IsInteractive(a11y.Role) && a11y.Name.Length == 0)
+                    {
+                        <p class="inspector__warning">This @RoleName(a11y.Role) has no accessible name (WCAG 4.1.2).</p>
+                    }
+                    <dl class="inspector__facts">
+                        <dt>Role</dt>
+                        <dd>
+                            @if (a11y.Role.Length == 0)
+                            {
+                                <span>none <span class="muted">(generic container)</span></span>
+                            }
+                            else
+                            {
+                                <code>@a11y.Role</code> <span class="muted">@(a11y.RoleSource == "explicit" ? "from the role attribute" : "implicit, from the HTML element")</span>
+                            }
+                        </dd>
+                        <dt>Name</dt>
+                        <dd>
+                            @if (a11y.Name.Length == 0)
+                            {
+                                <span class="muted">none</span>
+                            }
+                            else
+                            {
+                                <span>“@a11y.Name”</span> <span class="muted">from @a11y.NameSource</span>
+                            }
+                        </dd>
+                        @if (a11y.Description.Length > 0)
+                        {
+                            <dt>Description</dt>
+                            <dd>“@a11y.Description”</dd>
+                        }
+                        @if (a11y.States.Count > 0)
+                        {
+                            <dt>States and properties</dt>
+                            <dd>
+                                <ul class="inspector__chips">
+                                    @foreach (var state in a11y.States)
+                                    {
+                                        <li><code>@state.Name=@state.Value</code></li>
+                                    }
+                                </ul>
+                            </dd>
+                        }
+                        @if (a11y.Position.Length > 0)
+                        {
+                            <dt>Position</dt>
+                            <dd>@a11y.Position</dd>
+                        }
+                        <dt>Keyboard</dt>
+                        <dd>@a11y.Focus</dd>
+                        @if (a11y.Context.Count > 0)
+                        {
+                            <dt>Inside</dt>
+                            <dd>
+                                <ol class="inspector__path">
+                                    @foreach (var item in a11y.Context)
+                                    {
+                                        <li>@RoleName(item.Role)@(item.Name.Length > 0 ? $" “{item.Name}”" : "")</li>
+                                    }
+                                </ol>
+                            </dd>
+                        }
+                    </dl>
+                    <p class="inspector__note">Computed from the live DOM like the browser's accessibility tree; real screen readers word it in their own way.</p>
+                }
+                else
+                {
+                    <p class="muted">Nothing inspected yet.</p>
+                }
+            </TabPanel>
+            <TabPanel Value="tokens" data-testid="inspector-tokens">
+                @if (_current is null)
+                {
+                    <p class="muted">Nothing inspected yet.</p>
+                }
+                else if (_current.Styles.Count == 0)
+                {
+                    <p class="muted">No style of this element uses a design token. Pick a button, a heading or a card.</p>
+                }
+                else
+                {
+                    <p class="inspector__summary">@_current.Styles.Count @(_current.Styles.Count == 1 ? "property uses" : "properties use") @TokenCount(_current) design token(s) of the theme <strong>@Resolution.Selection</strong>.</p>
+                    <ul class="inspector__styles">
+                        @foreach (var style in _current.Styles)
+                        {
+                            <li>
+                                <p class="inspector__declaration">
+                                    <code class="inspector__property">@style.Property</code>
+                                    <span class="muted">@(style.InheritedFrom.Length > 0 ? $"inherited from {style.InheritedFrom}" : style.Selector)</span>
+                                </p>
+                                @foreach (var variables in style.Variables)
+                                {
+                                    <ol class="chain chain--compact" aria-label="@($"Where {style.Property} comes from")">
+                                        @foreach (var link in Links(variables))
+                                        {
+                                            <li>
+                                                <span class="chain-node">
+                                                    @if (link.Color is { } swatch)
+                                                    {
+                                                        <span><span class="swatch" style="background:@swatch" aria-hidden="true"></span><code>@link.Text</code></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <code>@link.Text</code>
+                                                    }
+                                                    <span class="layer @link.LayerClass">@link.Layer</span>
+                                                </span>
+                                            </li>
+                                        }
+                                    </ol>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    <p class="inspector__note">Switch the brand, mode, contrast or density in the header: the chains stay, the values follow.</p>
+                }
+            </TabPanel>
+            <TabPanel Value="announcements" data-testid="inspector-announcements">
+                @if (_announcements.Count == 0)
+                {
+                    <p class="muted">Messages of live regions appear here as screen readers would announce them. Try it: copy a code
+                        sample, change a theme setting on the introduction page, or add a task in the showcase app.</p>
+                }
+                else
+                {
+                    <ol class="inspector__log" reversed>
+                        @foreach (var item in _announcements)
+                        {
+                            <li>
+                                <span class="badge @(item.Politeness == "assertive" ? "badge--danger" : "badge--success")">@item.Politeness</span>
+                                <span>“@item.Text”</span>
+                                <span class="muted">@item.Time.ToString("HH:mm:ss") · @item.Source</span>
+                            </li>
+                        }
+                    </ol>
+                    <AuroraButton Variant="secondary" OnClick="() => _announcements.Clear()">Clear</AuroraButton>
+                }
+            </TabPanel>
+        </Tabs>
+    </aside>
+}
+
+@code {
+    private const int MaxAnnouncements = 30;
+
+    private ElementReference _panel;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<Inspector>? _self;
+    private bool _started;
+    private bool _picking;
+    private string? _tab = "accessibility";
+    private InspectedElement? _current;
+    private readonly List<Announcement> _announcements = [];
+    private ThemeState? _indexedFor;
+    private Dictionary<string, ResolvedToken> _byVariable = new(StringComparer.Ordinal);
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    // Re-renders the token values when the theme changes.
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
+    private ThemeResolution Resolution => Manager.Resolve();
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_indexedFor, Manager.State)) return;
+        _indexedFor = Manager.State;
+        _byVariable = new(StringComparer.Ordinal);
+        foreach (var token in Resolution.Tokens.Tokens) _byVariable.TryAdd(CssExporter.GetVariableName(token.Path, DemoTokens.Css), token);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Open == _started) return;
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/inspector.js");
+            if (Open)
+            {
+                _self ??= DotNetObjectReference.Create(this);
+                await _module.InvokeVoidAsync("start", _self, _panel, DemoTokens.Prefix);
+                // Opening the inspector starts picking, like the element picker of browser developer tools.
+                await SetPickingAsync(true);
+            }
+            else
+            {
+                await _module.InvokeVoidAsync("stop");
+                _picking = false;
+            }
+            _started = Open;
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+
+    private async Task SetPickingAsync(bool picking)
+    {
+        _picking = picking;
+        if (_module is not null && Open) await _module.InvokeVoidAsync("setPicking", picking);
+        StateHasChanged();
+    }
+
+    private Task CloseAsync() => OpenChanged.InvokeAsync(false);
+
+    // The data arrives as JsonElement and is read by hand: reflection-based deserialization is not trim-safe.
+    [JSInvokable]
+    public Task OnInspected(JsonElement data) => InvokeAsync(() =>
+    {
+        _current = InspectedElement.Read(data);
+        StateHasChanged();
+    });
+
+    [JSInvokable]
+    public Task OnPickingChanged(bool picking) => InvokeAsync(() =>
+    {
+        _picking = picking;
+        StateHasChanged();
+    });
+
+    [JSInvokable]
+    public Task OnAnnounced(JsonElement data) => InvokeAsync(() =>
+    {
+        _announcements.Insert(0, new Announcement(Text(data, "text"), Text(data, "politeness"), Text(data, "source"), DateTime.Now));
+        if (_announcements.Count > MaxAnnouncements) _announcements.RemoveAt(_announcements.Count - 1);
+        StateHasChanged();
+    });
+
+    /// <summary>One step of a chain: a CSS custom property, a token, or the resolved value.</summary>
+    private sealed record Link(string Text, string Layer, string LayerClass, string? Color = null);
+
+    /// <summary>From the custom property a declaration uses, through the token and its aliases, to the value.</summary>
+    private IEnumerable<Link> Links(IReadOnlyList<string> variables)
+    {
+        foreach (var variable in variables)
+        {
+            if (!_byVariable.TryGetValue(variable, out var token))
+            {
+                yield return new Link(variable, variable.StartsWith("--" + DemoTokens.Prefix + "-", StringComparison.Ordinal) ? "not a token" : "CSS mapping", "layer--css");
+                continue;
+            }
+            var layer = DemoTokens.LayerOf(token.Path);
+            yield return new Link(token.Path.ToString(), layer, "layer--" + layer);
+            foreach (var hop in Resolution.Tokens.GetAliasChain(token.Path))
+            {
+                var hopLayer = DemoTokens.LayerOf(hop);
+                yield return new Link(hop.ToString(), hopLayer, "layer--" + hopLayer);
+            }
+            if (token.Value is { } value)
+            {
+                var text = CssExporter.FormatValue(value, DemoTokens.Css) ?? "";
+                yield return new Link(text, "value", "layer--value", value is ColorValue color ? CssExporter.FormatValue(color) : null);
+            }
+            yield break;
+        }
+    }
+
+    private int TokenCount(InspectedElement element)
+        => element.Styles.SelectMany(s => s.Variables).Select(v => v.FirstOrDefault(_byVariable.ContainsKey)).OfType<string>().Distinct().Count();
+
+    private static readonly HashSet<string> Interactive = new(StringComparer.Ordinal)
+    {
+        "button", "link", "checkbox", "radio", "switch", "tab", "menuitem", "menuitemcheckbox", "menuitemradio", "option",
+        "treeitem", "textbox", "searchbox", "combobox", "listbox", "slider", "spinbutton", "dialog", "alertdialog",
+    };
+
+    private static bool IsInteractive(string role) => Interactive.Contains(role);
+
+    private static string RoleName(string role) => role switch
+    {
+        "menuitem" => "menu item",
+        "menuitemcheckbox" => "menu item checkbox",
+        "menuitemradio" => "menu item radio",
+        "treeitem" => "tree item",
+        "tabpanel" => "tab panel",
+        "tablist" => "tab list",
+        "listbox" => "list box",
+        "combobox" => "combo box",
+        "spinbutton" => "spin button",
+        "columnheader" => "column header",
+        "rowheader" => "row header",
+        "listitem" => "list item",
+        "contentinfo" => "content information",
+        "radiogroup" => "radio group",
+        "alertdialog" => "alert dialog",
+        "menubar" => "menu bar",
+        "searchbox" => "search box",
+        _ => role,
+    };
+
+    /// <summary>The element as a screen reader would roughly announce it: name, role, states, position, description.</summary>
+    private static string Speech(AccessibilityInfo a11y)
+    {
+        var parts = new List<string>();
+        if (a11y.Name.Length > 0) parts.Add($"“{a11y.Name}”");
+        if (a11y.Role.Length > 0 && a11y.Role is not ("paragraph" or "strong" or "emphasis" or "code" or "presentation" or "none")) parts.Add(RoleName(a11y.Role));
+        foreach (var state in a11y.States)
+        {
+            var phrase = (state.Name, state.Value) switch
+            {
+                ("checked", "true") => "checked",
+                ("checked", "false") => "not checked",
+                ("checked", "mixed") => "partially checked",
+                ("pressed", "true") => "pressed",
+                ("pressed", "false") => "not pressed",
+                ("pressed", "mixed") => "partially pressed",
+                ("expanded", "true") => "expanded",
+                ("expanded", "false") => "collapsed",
+                ("selected", "true") => "selected",
+                ("disabled", "true") => "unavailable",
+                ("invalid", "true") or ("invalid", "grammar") or ("invalid", "spelling") => "invalid entry",
+                ("required", "true") => "required",
+                ("readonly", "true") => "read only",
+                ("current", "page") => "current page",
+                ("current", "true") => "current",
+                ("current", "false") => null,
+                ("current", var kind) => $"current {kind}",
+                ("haspopup", "true") or ("haspopup", "menu") => "has pop-up menu",
+                ("haspopup", "false") => null,
+                ("haspopup", var kind) => $"has pop-up {kind}",
+                ("level", var level) => $"level {level}",
+                ("value", var value) => value.Length == 0 ? "blank" : value,
+                ("valuetext", var value) => value,
+                ("valuenow", var value) when !a11y.States.Any(s => s.Name == "valuetext") => value,
+                ("multiselectable", "true") => "multi-select",
+                ("keyshortcuts", var keys) => $"shortcut {keys}",
+                ("modal", "true") => "modal",
+                _ => null,
+            };
+            if (phrase is not null) parts.Add(phrase);
+        }
+        if (a11y.Position.Length > 0) parts.Add(a11y.Position);
+        if (parts.Count == 0 && a11y.Text.Length > 0) parts.Add(a11y.Text);
+        if (a11y.Description.Length > 0) parts.Add(a11y.Description);
+        return parts.Count == 0 ? "(nothing: not exposed to assistive technology)" : string.Join(", ", parts);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                if (_started) await _module.InvokeVoidAsync("stop");
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        _self?.Dispose();
+    }
+
+    private static string Text(JsonElement e, string name) => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString()! : "";
+
+    private static IReadOnlyList<T> ReadList<T>(JsonElement e, string name, Func<JsonElement, T> read)
+        => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array ? v.EnumerateArray().Select(read).ToList() : [];
+
+    public sealed record InspectedElement(string Element, bool Connected, AccessibilityInfo Accessibility, IReadOnlyList<StyleUse> Styles)
+    {
+        public static InspectedElement Read(JsonElement e) => new(
+            Text(e, "element"),
+            e.TryGetProperty("connected", out var c) && c.ValueKind == JsonValueKind.True,
+            AccessibilityInfo.Read(e.GetProperty("accessibility")),
+            ReadList(e, "styles", StyleUse.Read));
+    }
+
+    public sealed record AccessibilityInfo(string Role, string RoleSource, string Name, string NameSource, string Description,
+        IReadOnlyList<StateInfo> States, string Position, string Focus, bool Hidden, IReadOnlyList<ContextInfo> Context, string Text)
+    {
+        public static AccessibilityInfo Read(JsonElement e) => new(
+            Inspector.Text(e, "role"), Inspector.Text(e, "roleSource"), Inspector.Text(e, "name"), Inspector.Text(e, "nameSource"),
+            Inspector.Text(e, "description"),
+            ReadList(e, "states", s => new StateInfo(Inspector.Text(s, "name"), Inspector.Text(s, "value"))),
+            Inspector.Text(e, "position"), Inspector.Text(e, "focus"),
+            e.TryGetProperty("hidden", out var h) && h.ValueKind == JsonValueKind.True,
+            ReadList(e, "context", c => new ContextInfo(Inspector.Text(c, "role"), Inspector.Text(c, "name"))),
+            Inspector.Text(e, "text"));
+    }
+
+    public sealed record StateInfo(string Name, string Value);
+
+    public sealed record ContextInfo(string Role, string Name);
+
+    /// <summary>A declaration that uses custom properties; each entry of <see cref="Variables"/> is a chain of custom properties ending at a token variable.</summary>
+    public sealed record StyleUse(string Property, string Value, string Selector, string InheritedFrom, IReadOnlyList<IReadOnlyList<string>> Variables)
+    {
+        public static StyleUse Read(JsonElement e) => new(
+            Text(e, "property"), Text(e, "value"), Text(e, "selector"), Text(e, "inheritedFrom"),
+            ReadList<IReadOnlyList<string>>(e, "variables", chain => chain.EnumerateArray().Select(v => v.GetString() ?? "").ToList()));
+    }
+
+    public sealed record Announcement(string Text, string Politeness, string Source, DateTime Time);
+}

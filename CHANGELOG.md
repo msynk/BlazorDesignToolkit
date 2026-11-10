@@ -39,6 +39,10 @@ known gaps.
   sample tokens, a showcase app built only from primitives and tokens, a brand builder (OKLCH palette, contrast in every
   mode, DTCG export), a primitives overview with interchangeable skins, and a live markup inspector on every primitive
   example.
+- Demo: a site-wide inspector (pick an element or follow the focus to see each CSS property traced through its tokens to
+  the current theme's value, what a screen reader would announce, and a log of live-region announcements), a visual
+  style guide generated from the tokens (palettes, semantic colors, measured contrast, type, spacing, shape, elevation,
+  states and motion), previous and next page links, and header controls aligned on one row.
 - Tooling: benchmark regression gate in CI; tag-triggered release workflow (SourceLink, package validation, GitHub
   release, NuGet push behind an approval environment).
 

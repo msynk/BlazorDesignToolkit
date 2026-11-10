@@ -2,6 +2,7 @@ using System.Reflection;
 using BlazorDesignToolkit.Primitives;
 using BlazorDesignToolkit.Theming;
 using BlazorDesignToolkit.Theming.Blazor;
+using BlazorDesignToolkit.Tokens;
 using BlazorDesignToolkit.Tokens.Diagnostics;
 using BlazorDesignToolkit.Tokens.Export;
 using BlazorDesignToolkit.Tokens.Json;
@@ -62,6 +63,17 @@ public static class DemoTokens
 
     public static CssExportOptions Css => CssOptions.Css;
 
+    /// <summary>The layer of a token by the naming conventions of aurora.validation.json: primitive, semantic, component or other.</summary>
+    public static string LayerOf(TokenPath path)
+    {
+        var text = path.ToString();
+        var layers = Validation.Layers!;
+        if (layers.Component.Any(p => TokenPathPattern.IsMatch(p, text))) return "component";
+        if (layers.Semantic.Any(p => TokenPathPattern.IsMatch(p, text))) return "semantic";
+        if (layers.Primitive.Any(p => TokenPathPattern.IsMatch(p, text))) return "primitive";
+        return "other";
+    }
+
     private sealed class LazyFiles(string prefix) : IReadOnlyDictionary<string, string>
     {
         private Dictionary<string, string> Map => s_map ??= s_resources.Value.Where(kv => kv.Key.StartsWith(prefix, StringComparison.Ordinal))
@@ -75,6 +87,22 @@ public static class DemoTokens
         public bool TryGetValue(string key, out string value) => Map.TryGetValue(key, out value!);
         public IEnumerator<KeyValuePair<string, string>> GetEnumerator() => Map.GetEnumerator();
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+}
+
+/// <summary>Whether the demo's inspector panel is open; shared so any page can open it (scoped: one per user).</summary>
+public sealed class DemoInspector
+{
+    public bool Open { get; private set; }
+
+    public event Action? Changed;
+
+    public Task SetOpenAsync(bool open)
+    {
+        if (Open == open) return Task.CompletedTask;
+        Open = open;
+        Changed?.Invoke();
+        return Task.CompletedTask;
     }
 }
 
@@ -99,6 +127,7 @@ public static class DemoServiceCollectionExtensions
             options.StorageKey = "bdt-theme";
         });
         services.AddHeadlessPrimitives();
+        services.AddScoped<DemoInspector>();
         return services;
     }
 

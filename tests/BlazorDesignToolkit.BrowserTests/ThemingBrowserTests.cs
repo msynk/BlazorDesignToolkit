@@ -120,7 +120,7 @@ public class ThemingBrowserTests(DemoServer server) : IAsyncDisposable
     public async Task Layout_reflows_at_320_css_pixels_without_horizontal_scrolling()
     {
         var page = await server.NewPageAsync(width: 320, height: 640);
-        foreach (var path in new[] { "/", "/tour", "/showcase", "/brand-builder", "/primitives", "/tokens", "/compare", "/editor", "/import-export", "/primitives/tabs", "/primitives/listbox", "/primitives/inputs", "/design-system" })
+        foreach (var path in new[] { "/", "/tour", "/showcase", "/brand-builder", "/primitives", "/tokens", "/style-guide", "/compare", "/editor", "/import-export", "/primitives/tabs", "/primitives/listbox", "/primitives/inputs", "/design-system" })
         {
             await page.OpenAsync(path);
             var overflow = await page.EvaluateAsync<int>("() => document.documentElement.scrollWidth - document.documentElement.clientWidth");

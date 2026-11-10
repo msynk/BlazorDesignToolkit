@@ -10,7 +10,7 @@ public class AccessibilityScanTests(DemoServer server) : IAsyncDisposable
     public async ValueTask DisposeAsync() => await server.CloseContextsAsync();
 
     public static readonly TheoryData<string> Pages = new(
-        "/", "/tour", "/showcase", "/brand-builder", "/primitives", "/tokens", "/themes", "/compare", "/editor", "/import-export", "/validation", "/coverage", "/integrations", "/design-system", "/accessibility", "/not-found",
+        "/", "/tour", "/showcase", "/brand-builder", "/primitives", "/tokens", "/style-guide", "/themes", "/compare", "/editor", "/import-export", "/validation", "/coverage", "/integrations", "/design-system", "/accessibility", "/not-found",
         "/primitives/controls", "/primitives/forms", "/primitives/tabs", "/primitives/disclosure", "/primitives/dialog", "/primitives/popover",
         "/primitives/listbox", "/primitives/menu", "/primitives/inputs", "/primitives/tree", "/primitives/feedback");
 
@@ -68,6 +68,26 @@ public class AccessibilityScanTests(DemoServer server) : IAsyncDisposable
         var page = await server.NewPageAsync();
         await page.OpenAsync(path, "wasm");
         await AssertNoViolationsAsync(page, $"{path} (WebAssembly)");
+    }
+
+    [Fact]
+    public async Task Open_inspector_has_no_violations()
+    {
+        var page = await server.NewPageAsync();
+        await page.OpenAsync("/showcase");
+        await InspectorTests.OpenInspectorAsync(page);
+        await page.GetByRole(AriaRole.Tab, new() { Name = "Tasks" }).FocusAsync();
+        await page.GetByTestId("inspector-speech").WaitForAsync();
+        await AssertNoViolationsAsync(page, "inspector, accessibility view");
+
+        var inspector = page.GetByTestId("inspector");
+        await inspector.GetByRole(AriaRole.Tab, new() { Name = "Tokens" }).ClickAsync();
+        await page.GetByTestId("inspector-tokens").Locator(".chain").First.WaitForAsync();
+        await AssertNoViolationsAsync(page, "inspector, tokens view");
+
+        await inspector.GetByRole(AriaRole.Tab, new() { Name = "Announcements" }).ClickAsync();
+        await page.GetByTestId("inspector-announcements").WaitForAsync();
+        await AssertNoViolationsAsync(page, "inspector, announcements view");
     }
 
     [Fact]

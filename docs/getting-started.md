@@ -125,9 +125,14 @@ Where to start:
 | Showcase app (`/showcase`) | A small project tracker built only from primitives and tokens, in its own theme scope (brand, mode, density, right to left) |
 | Brand builder (`/brand-builder`) | One color becomes an OKLCH palette; previews and contrast checks in every mode; DTCG export; apply to the site |
 | Primitives (`/primitives`) | The same components with the starter styles, custom CSS and no CSS at all, and the full catalog |
+| Visual style guide (`/style-guide`) | Every token drawn with its CSS variable: palettes, semantic colors, measured contrast, type, spacing, shape, elevation, states and motion |
 
 Every primitive example has a **Live markup** panel that shows its rendered HTML, with roles, ARIA states and
 relationships highlighted, updating as you use it.
+
+**Inspect** in the header (or "Inspect an element" in the command menu) opens the inspector on any page: pick an element,
+or move the focus to it, to see each CSS property traced through its design tokens to the value of the current theme,
+and what a screen reader would announce (role, name, states, position). It also logs live-region announcements.
 
 Append `?mode=wasm` to switch to Interactive WebAssembly (`?mode=server` to switch back), or use the link in the page
 footer; the choice is remembered in a cookie. Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command menu (pages, brands and

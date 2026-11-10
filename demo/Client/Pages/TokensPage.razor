@@ -131,13 +131,5 @@ else
         ResetPaging();
     }
 
-    private static string Layer(TokenPath path)
-    {
-        var text = path.ToString();
-        var layers = DemoTokens.Validation.Layers!;
-        if (layers.Component.Any(p => TokenPathPattern.IsMatch(p, text))) return "component";
-        if (layers.Semantic.Any(p => TokenPathPattern.IsMatch(p, text))) return "semantic";
-        if (layers.Primitive.Any(p => TokenPathPattern.IsMatch(p, text))) return "primitive";
-        return "other";
-    }
+    private static string Layer(TokenPath path) => DemoTokens.LayerOf(path);
 }

@@ -79,6 +79,55 @@
     </ol>
 </section>
 
+<section aria-labelledby="inside-title">
+    <h2 id="inside-title">See inside any page</h2>
+    <p class="section-lead">Nothing on this site is a mock-up, and two tools let you check it. They are built with the toolkit
+        too: the token engine traces the values, and the panels are headless primitives styled with tokens.</p>
+    <div class="inside-grid">
+        <div class="card">
+            <h3>The inspector</h3>
+            <p>Pick any element of any page, or move focus to it with <kbd>Tab</kbd>. The inspector shows each CSS property that
+                uses a design token, traced through every reference to the value of the current theme, and what a screen
+                reader would announce: role, name, states and position. It also logs live-region announcements.</p>
+            <div class="card-demo">
+                <p class="muted">The background of the primary button, right now:</p>
+                <ol class="chain chain--compact" aria-label="Where the primary button background comes from">
+                    @foreach (var (text, layer) in ButtonChain)
+                    {
+                        <li><span class="chain-node"><code>@text</code><span class="layer layer--@layer">@layer</span></span></li>
+                    }
+                </ol>
+                <p class="inspector__speech inside-speech">“Tasks 4”, tab, selected, 2 of 3</p>
+            </div>
+            <div class="card-links">
+                @if (RendererInfo.IsInteractive)
+                {
+                    <AuroraButton OnClick="() => Inspector.SetOpenAsync(true)" data-testid="open-inspector">Open the inspector</AuroraButton>
+                }
+                <a href="showcase">Try it on the showcase app</a>
+            </div>
+        </div>
+        <div class="card">
+            <h3>The visual style guide</h3>
+            <p>Every token, drawn: palettes, semantic colors, measured contrast, type, spacing, radii, shadows and motion.
+                It is generated from the token files and painted with their CSS variables, so it follows every theme.</p>
+            <div class="card-demo">
+                <p class="muted">The accent scale of <strong>@(Manager.Catalog.FindTheme(State.ThemeId)?.DisplayName ?? State.ThemeId)</strong>:</p>
+                <ul class="mini-scale" aria-label="Accent color scale">
+                    @foreach (var step in AccentScale)
+                    {
+                        <li style="background: var(@step.Variable)" title="@step.Path"><span class="visually-hidden">@step.Path</span></li>
+                    }
+                </ul>
+                <p class="mini-type">Aa Bb Cc 0123</p>
+                <p class="muted">Measured in this theme: <strong>@ContrastPassed of @_contrast.Count</strong> required contrast pairs
+                    pass WCAG 2.2.</p>
+            </div>
+            <div class="card-links"><a class="button" href="style-guide">Open the style guide</a><a href="tokens">Token explorer</a></div>
+        </div>
+    </div>
+</section>
+
 <section aria-labelledby="explore-title">
     <h2 id="explore-title">Explore the features</h2>
     <ul class="card-grid">
@@ -86,7 +135,7 @@
             <h3>A standards-based token engine</h3>
             <p>Reads and writes DTCG 2025.10: aliases, JSON Pointer references, <code>$extends</code>, all 13 token types,
                 all 14 color spaces with CSS Color 4 gamut mapping, and the resolver module.</p>
-            <div class="card-links"><a href="tokens">Token explorer</a><a href="import-export">Import your own tokens</a></div>
+            <div class="card-links"><a href="tokens">Token explorer</a><a href="style-guide">Visual style guide</a><a href="import-export">Import your own tokens</a></div>
         </li>
         <li class="card">
             <h3>Validation you can put in CI</h3>
@@ -162,6 +211,36 @@
 
 @code {
     private ThemeState? _validatedFor;
+
+    [Inject] private DemoInspector Inspector { get; set; } = default!;
+
+    /// <summary>The primary button background, from component token to value, in the current theme.</summary>
+    private IEnumerable<(string Text, string Layer)> ButtonChain
+    {
+        get
+        {
+            var path = TokenPath.Parse("component.button.primary.background");
+            if (Resolution.Tokens[path] is not { } token) yield break;
+            yield return (path.ToString(), DemoTokens.LayerOf(path));
+            foreach (var hop in Resolution.Tokens.GetAliasChain(path)) yield return (hop.ToString(), DemoTokens.LayerOf(hop));
+            if (token.Value is { } value) yield return (BlazorDesignToolkit.Tokens.Export.CssExporter.FormatValue(value, DemoTokens.Css) ?? "", "value");
+        }
+    }
+
+    /// <summary>The numbered scale that the accent surface of the current theme comes from.</summary>
+    private IEnumerable<(string Path, string Variable)> AccentScale
+    {
+        get
+        {
+            var chain = Resolution.Tokens.GetAliasChain(TokenPath.Parse("color.surface.accent"));
+            if (chain.Count == 0 || chain[^1].Length != 3) return [];
+            var family = chain[^1].Parent;
+            return Resolution.Tokens.Tokens
+                .Where(t => t.Path.Parent.Equals(family) && int.TryParse(t.Path.Name, out _))
+                .OrderBy(t => int.Parse(t.Path.Name))
+                .Select(t => (t.Path.ToString(), BlazorDesignToolkit.Tokens.Export.CssExporter.GetVariableName(t.Path, DemoTokens.Css)));
+        }
+    }
     private IReadOnlyList<ContrastResult> _contrast = [];
 
     [CascadingParameter] private ThemeManager Manager { get; set; } = default!;

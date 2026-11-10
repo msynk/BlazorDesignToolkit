@@ -2,13 +2,14 @@
 @implements IDisposable
 @inject NavigationManager Navigation
 @inject ThemeManager Manager
+@inject DemoInspector InspectorState
 
 <ThemeProvider>
     @* Blazor intercepts same-page links, so the skip link moves focus explicitly; without interactivity the native fragment navigation applies. *@
     <a class="skip-link" href="#main" @onclick="SkipToMainAsync" @onclick:preventDefault>Skip to main content</a>
     @* On narrow screens the navigation and theme settings collapse behind the Menu button. They stay expanded until the page
        is interactive, so they are always reachable. *@
-    <div class="shell" data-nav="@(RendererInfo.IsInteractive && !_navOpen ? "closed" : "open")">
+    <div class="shell" data-nav="@(RendererInfo.IsInteractive && !_navOpen ? "closed" : "open")" data-inspector="@(InspectorState.Open ? "open" : null)">
         <header class="site-header">
             <a class="brand" href="">BlazorDesignToolkit <span class="brand-sub">demo</span></a>
             @if (RendererInfo.IsInteractive)
@@ -27,6 +28,14 @@
                 </button>
             }
             <ThemeControls Id="theme-controls" />
+            @if (RendererInfo.IsInteractive)
+            {
+                @* Shows the tokens and accessibility information of any element; marked as inspector UI so it stays clickable while picking. *@
+                <ToggleButton class="inspect-toggle icon-button" Pressed="InspectorState.Open" PressedChanged="InspectorState.SetOpenAsync" data-inspector-ui="" data-testid="inspect-toggle">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4l6.5 16 2.2-6.8L19.5 11z" /></svg>
+                    <span class="icon-button-label">Inspect</span>
+                </ToggleButton>
+            }
             @* On narrow screens only the icon is visible; the label stays in the accessible name. *@
             <button type="button" class="command-hint icon-button" @onclick="() => _commandsOpen = true" aria-keyshortcuts="Control+K">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l5 5" /></svg>
@@ -37,6 +46,7 @@
         <NavMenu Id="site-nav" />
         <main id="main" tabindex="-1" @ref="_main">
             @Body
+            <PagePager />
         </main>
         <footer class="site-footer">
             <p>Render mode: <strong>@(RendererInfo.IsInteractive ? RendererInfo.Name : "Static (prerendered)")</strong>.
@@ -48,6 +58,7 @@
     <LiveRegion />
     <ToastRegion />
     <CommandMenu Commands="Commands" @bind-Open="_commandsOpen" />
+    <Inspector Open="InspectorState.Open" OpenChanged="InspectorState.SetOpenAsync" />
 </ThemeProvider>
 
 @code {
@@ -55,7 +66,13 @@
     private bool _navOpen;
     private ElementReference _main;
 
-    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        InspectorState.Changed += OnInspectorChanged;
+    }
+
+    private void OnInspectorChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
@@ -111,6 +128,11 @@
                     };
                 }
             }
+            yield return new CommandItem("inspector", InspectorState.Open ? "Close the inspector" : "Inspect an element: tokens and accessibility", () => InspectorState.SetOpenAsync(!InspectorState.Open))
+            {
+                Group = "Demo",
+                Keywords = ["inspector", "tokens", "accessibility", "screen reader", "aria", "pick"],
+            };
             yield return new CommandItem("theme-reset", "Reset theme to defaults", () => Manager.ResetAsync()) { Group = "Theme", Keywords = ["default", "clear"] };
             yield return new CommandItem("render-mode", ModeLinkText, SwitchModeAsync) { Group = "Demo", Keywords = ["render mode", "wasm", "server", "interactive"] };
         }
@@ -122,5 +144,9 @@
         return Task.CompletedTask;
     }
 
-    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        InspectorState.Changed -= OnInspectorChanged;
+    }
 }
