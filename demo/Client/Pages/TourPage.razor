@@ -1,0 +1,386 @@
+@page "/tour"
+@using System.Diagnostics
+@using BlazorDesignToolkit.Tokens.Diagnostics
+@using BlazorDesignToolkit.Tokens.Export
+@using BlazorDesignToolkit.Tokens.Json
+@using BlazorDesignToolkit.Tokens.Resolution
+@using BlazorDesignToolkit.Tokens.Validation
+
+<PageTitle>Guided tour · BlazorDesignToolkit</PageTitle>
+
+<p class="eyebrow">Guided tour</p>
+<h1 tabindex="-1">From a JSON file to a themed, accessible app</h1>
+<p class="lead">Follow the sample <strong>Aurora</strong> design system through every stage of the toolkit. Nothing on this
+    page is a screenshot: each step is computed live by the toolkit from the token files that ship with the demo. Change the
+    theme in the header at any time and watch the values follow.</p>
+
+<nav class="tour-nav" aria-label="Tour steps">
+    <ol>
+        @foreach (var (id, title) in Steps)
+        {
+            <li><a href="@($"tour#{id}")">@title</a></li>
+        }
+    </ol>
+</nav>
+
+<section class="tour-step" id="author" aria-labelledby="author-title">
+    <h2 id="author-title"><span class="step-number" aria-hidden="true">1</span>@Steps[0].Title</h2>
+    <p class="section-lead">A design token is a named design decision stored as data. Aurora organizes its tokens in three
+        layers, each referring to the one below with a <code>{reference}</code>, so a decision is made exactly once.</p>
+    <div class="split split--3">
+        <div>
+            <h3>Primitive: the raw palette</h3>
+            <p class="muted"><code>foundation.tokens.json</code> holds plain values such as the blue scale.</p>
+            <CodeBlock Code="@Excerpt("foundation.tokens.json", "color.blue.600")" Label="primitive token" />
+        </div>
+        <div>
+            <h3>Semantic: what a color is for</h3>
+            <p class="muted"><code>semantic.light.tokens.json</code> gives colors a purpose. Dark mode maps the same names to other primitives.</p>
+            <CodeBlock Code="@Excerpt("semantic.light.tokens.json", "color.surface.accent")" Label="semantic token" />
+        </div>
+        <div>
+            <h3>Component: where it is used</h3>
+            <p class="muted"><code>components.tokens.json</code> gives each component its own contract, built from semantic tokens.</p>
+            <CodeBlock Code="@Excerpt("components.tokens.json", "component.button.primary.background")" Label="component token" />
+        </div>
+    </div>
+    <p class="callout">The format is the stable <a href="https://www.designtokens.org/tr/2025.10/">DTCG 2025.10</a>
+        specification, so the same files work with Figma plugins, Tokens Studio, Style Dictionary and other tools.
+        <a href="tokens">Browse all @Resolution.Tokens.Count tokens</a> or <a href="import-export">try your own</a>.</p>
+</section>
+
+<section class="tour-step" id="resolve" aria-labelledby="resolve-title">
+    <h2 id="resolve-title"><span class="step-number" aria-hidden="true">2</span>@Steps[1].Title</h2>
+    <p class="section-lead">The resolver follows every reference to a concrete value and remembers the chain, so you can
+        always see why a component looks the way it does.</p>
+    <FormField class="control">
+        <FormLabel>Trace a token</FormLabel>
+        <Combobox TItem="string" Items="_aliases" Value="_traced" ValueChanged="v => _traced = v ?? _traced" data-testid="trace-token" />
+        <FormDescription>Type to search the @_aliases.Count tokens that are references in the current theme.</FormDescription>
+    </FormField>
+    @if (Resolution.Tokens[TokenPath.Parse(_traced)] is { } traced)
+    {
+        var chain = Resolution.Tokens.GetAliasChain(traced.Path);
+        <ol class="chain" aria-label="@($"Reference chain of {traced.Path}")" data-testid="trace-chain">
+            <li><span class="chain-node"><code>@traced.Path</code><span class="layer @LayerClass(traced.Path)">@Layer(traced.Path)</span></span></li>
+            @foreach (var hop in chain)
+            {
+                <li><span class="chain-node"><code>@hop</code><span class="layer @LayerClass(hop)">@Layer(hop)</span></span></li>
+            }
+            <li>
+                <span class="chain-node">
+                    <span>@if (traced.Value is ColorValue color) {<span class="swatch" style="background:@CssExporter.FormatValue(color)" aria-hidden="true"></span>}<code>@(traced.Value is null ? "invalid" : CssExporter.FormatValue(traced.Value, DemoTokens.Css))</code></span>
+                    <span class="layer layer--value">value</span>
+                </span>
+            </li>
+        </ol>
+        <p class="muted">CSS variable <code>@CssExporter.GetVariableName(traced.Path, DemoTokens.Css)</code> ·
+            referenced directly by @Resolution.Tokens.GetDependents(traced.Path).Count other token(s).</p>
+    }
+    <p class="callout"><span class="callout-title">Try it:</span> switch the brand to <strong>Ember</strong> or the mode to
+        <strong>Dark</strong> in the header. The component token stays the same; the semantic layer points somewhere else.</p>
+</section>
+
+<section class="tour-step" id="validate" aria-labelledby="validate-title">
+    <h2 id="validate-title"><span class="step-number" aria-hidden="true">3</span>@Steps[2].Title</h2>
+    <p class="section-lead">Validation runs before anything is exported. Each finding has a stable rule id, a severity you
+        can configure, the token, the exact line and column, and a suggested fix.</p>
+    <div class="split">
+        <div>
+            <h3>An intentionally broken file</h3>
+            <p><code>broken.tokens.json</code> contains a reference cycle, a misspelled reference, a type mismatch, naming
+                problems and a low-contrast pair. The toolkit finds
+                <strong>@Broken.ErrorCount errors</strong> and <strong>@Broken.WarningCount warnings</strong>, for example:</p>
+            <DiagnosticList Diagnostics="BrokenHighlights" />
+            <p><a href="validation">See every diagnostic and the rule catalog</a></p>
+        </div>
+        <div>
+            <h3>The real design system, in every theme</h3>
+            <p>Contrast depends on the theme, so Aurora is checked in all @UnitCount combinations of brand, mode, contrast
+                and density, including the composited result of translucent colors.</p>
+            <p role="status" data-testid="all-themes-result">
+                @if (_allThemes is { } all)
+                {
+                    @:Checked <strong>@all.Themes themes</strong> and <strong>@all.Checks contrast pairs</strong> in @all.Milliseconds ms:
+                    @if (all.Failures == 0)
+                    {
+                        <span class="result-pass">all pass.</span>
+                    }
+                    else
+                    {
+                        <span class="result-fail">@all.Failures fail.</span>
+                    }
+                }
+            </p>
+            <AuroraButton Variant="secondary" OnClick="CheckAllThemes" data-testid="check-all-themes">Check all @UnitCount themes now</AuroraButton>
+        </div>
+    </div>
+</section>
+
+<section class="tour-step" id="compose" aria-labelledby="compose-title">
+    <h2 id="compose-title"><span class="step-number" aria-hidden="true">4</span>@Steps[3].Title</h2>
+    <p class="section-lead">A theme manifest declares brands and independent axes. Layers are applied only where their
+        conditions match, and brands extend each other, so @TokenFileCount token files yield @UnitCount complete themes.
+        Ember's own files hold only @EmberTokenCount tokens: everything else is inherited from Aurora.</p>
+    <ul class="matrix" aria-label="Themes rendered side by side">
+        @foreach (var theme in Manager.Catalog.Themes)
+        {
+            @foreach (var (mode, contrast) in Variants)
+            {
+                <li>
+                    <ThemeScope ThemeId="@theme.Id" Axes="@(new Dictionary<string, string> { ["mode"] = mode, ["contrast"] = contrast })" class="mini-ui">
+                        <p class="mini-ui-title">@(theme.DisplayName ?? theme.Id) · @mode · @(contrast == "more" ? "more contrast" : "standard")</p>
+                        <p>Body text and <span class="fake-link">a link</span>.</p>
+                        <p class="mini-ui-row"><span class="fake-button">Primary</span><span class="fake-chip">Selected</span></p>
+                    </ThemeScope>
+                </li>
+            }
+        }
+    </ul>
+    <p><a href="themes">Themes and brands</a> · <a href="compare">Compare two themes token by token</a></p>
+</section>
+
+<section class="tour-step" id="generate" aria-labelledby="generate-title">
+    <h2 id="generate-title"><span class="step-number" aria-hidden="true">5</span>@Steps[4].Title</h2>
+    <p class="section-lead">The theme stylesheet is generated once, at build or startup. The default theme declares every
+        token; every other block declares only what differs, so the file stays small however many combinations there are.</p>
+    <div class="split">
+        <div>
+            <p><strong>@Stylesheet.Blocks.Count rule blocks</strong>, @(Stylesheet.Css.Length / 1024) KB in total, covering
+                every theme combination and the <code>system</code> preferences:</p>
+            <ul class="block-list" aria-label="Rule blocks of the theme stylesheet">
+                @foreach (var block in Stylesheet.Blocks.Take(10))
+                {
+                    <li>
+                        <code>@BlockLabel(block)</code>
+                        <span class="meter" aria-hidden="true"><span style="inline-size:@Percent(block)%"></span></span>
+                        <span>@block.Declarations.Count declarations</span>
+                    </li>
+                }
+            </ul>
+            @if (Stylesheet.Blocks.Count > 10)
+            {
+                <p class="muted">… and @(Stylesheet.Blocks.Count - 10) more.</p>
+            }
+        </div>
+        <div>
+            <FormField class="control">
+                <FormLabel>Show the CSS of a block</FormLabel>
+                <Select TItem="ThemeCssBlock" Items="Stylesheet.Blocks" ItemLabel="BlockLabel" Value="_block" ValueChanged="b => _block = b" />
+            </FormField>
+            @if (_block is not null)
+            {
+                <CodeBlock Code="@BlockCss(_block)" Label="CSS of the block" />
+            }
+        </div>
+    </div>
+    <p class="callout">Need a CSS framework? The same tokens export to Tailwind CSS 4 and 3, Bootstrap 5.3 and Fluent 2:
+        <a href="integrations">see the outputs</a>.</p>
+</section>
+
+<section class="tour-step" id="switch" aria-labelledby="switch-title">
+    <h2 id="switch-title"><span class="step-number" aria-hidden="true">6</span>@Steps[5].Title</h2>
+    <p class="section-lead">At runtime, <code>ThemeManager</code> changes a few attributes on <code>&lt;html&gt;</code>.
+        The browser re-cascades; no CSS is generated and nothing reloads.</p>
+    <div class="split">
+        <ThemeSwitcher ShowMarkup="true" Label="Theme of this site" />
+        <ul class="check-list">
+            <li>The choice is saved in a cookie (<code>@Manager.ToPreference().Format()</code>), so the server renders the
+                right theme in the first response.</li>
+            <li><code>&lt;ThemeInitScript&gt;</code> applies it before the first paint, so there is no flash of the wrong theme.</li>
+            <li><code>System</code> follows <code>prefers-color-scheme</code> and <code>prefers-contrast</code> with media
+                queries, even with JavaScript disabled.</li>
+            <li><code>&lt;ThemeScope&gt;</code> applies another theme to part of a page, as in step 4.</li>
+        </ul>
+    </div>
+</section>
+
+<section class="tour-step" id="build" aria-labelledby="build-title">
+    <h2 id="build-title"><span class="step-number" aria-hidden="true">7</span>@Steps[6].Title</h2>
+    <p class="section-lead">The primitives handle behavior: keyboard interaction, focus management and ARIA. You provide
+        the styles; here they come from the optional starter styles mapped to Aurora tokens. Open <em>Live markup</em> and use
+        the controls to watch the roles and states change.</p>
+    <Example Title="Notification settings" Inspect="true">
+        <ChildContent>
+            <Tabs DefaultValue="email">
+                <TabList aria-label="Channels">
+                    <Tab Value="email">Email</Tab>
+                    <Tab Value="push">Push</Tab>
+                </TabList>
+                <TabPanel Value="email">
+                    <FormField>
+                        <FormLabel>Weekly summary</FormLabel>
+                        <Switch @bind-Checked="_summary" />
+                    </FormField>
+                    <FormField class="control">
+                        <FormLabel>Frequency</FormLabel>
+                        <Select TItem="string" Items="Frequencies" @bind-Value="_frequency" />
+                    </FormField>
+                </TabPanel>
+                <TabPanel Value="push">
+                    <FormField>
+                        <FormLabel>Mentions only</FormLabel>
+                        <Switch @bind-Checked="_mentions" />
+                    </FormField>
+                </TabPanel>
+            </Tabs>
+        </ChildContent>
+    </Example>
+    <p><a class="button button--primary" href="showcase">See a complete app built this way</a> <a class="button" href="primitives">All primitives</a></p>
+</section>
+
+<section class="tour-step" id="ci" aria-labelledby="ci-title">
+    <h2 id="ci-title"><span class="step-number" aria-hidden="true">8</span>@Steps[7].Title</h2>
+    <p class="section-lead">The <code>bdt</code> command-line tool runs the same checks in your pipeline: validation in every
+        theme, generated files that are out of date, token coverage and breaking changes. It reports as text, JSON, SARIF or
+        GitHub annotations. For the broken file of step 3, GitHub Actions would show:</p>
+    <CodeBlock Code="@Annotations" Label="GitHub annotations" />
+    <CodeBlock Code="@CiSnippet" Label="workflow step" />
+</section>
+
+@code {
+    private static readonly (string Id, string Title)[] Steps =
+    [
+        ("author", "Tokens are data"),
+        ("resolve", "References resolve through layers"),
+        ("validate", "Mistakes are caught before they ship"),
+        ("compose", "Themes are combinations, not copies"),
+        ("generate", "One stylesheet for every combination"),
+        ("switch", "Switching is an attribute change"),
+        ("build", "Build with accessible primitives"),
+        ("ci", "Keep it right in CI"),
+    ];
+
+    private static readonly (string Mode, string Contrast)[] Variants = [("light", "standard"), ("dark", "standard"), ("light", "more"), ("dark", "more")];
+    private static readonly string[] Frequencies = ["Daily", "Weekly", "Monthly"];
+
+    private string _traced = "component.button.primary.background";
+    private IReadOnlyList<string> _aliases = [];
+    private ThemeState? _resolvedFor;
+    private ThemeCssBlock? _block;
+    private (int Themes, int Checks, int Failures, long Milliseconds)? _allThemes;
+    private bool _summary = true;
+    private bool _mentions;
+    private string? _frequency = "Weekly";
+
+    private static DiagnosticResult? s_broken;
+    private static ThemeStylesheetResult? s_stylesheet;
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    // Re-renders the live values when the theme changes.
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    private ThemeResolution Resolution => Manager.Resolve();
+
+    private int UnitCount => Manager.Catalog.Themes.Length * Manager.Catalog.EnumerateAxisCombinations().Count();
+
+    private static int TokenFileCount => DemoTokens.Files.Keys.Count(k => k.EndsWith(".tokens.json", StringComparison.Ordinal));
+
+    private static int EmberTokenCount => DemoTokens.Files.Where(f => f.Key.StartsWith("brands/", StringComparison.Ordinal))
+        .Sum(f => TokenResolver.Resolve(f.Value).Count);
+
+    protected override void OnInitialized()
+    {
+        // The most instructive block: a brand in dark mode declares only what differs from its light mode.
+        _block = Stylesheet.Blocks.FirstOrDefault(b => b.ThemeId == "ember" && b.Assignment.GetValueOrDefault("mode") == "dark" && b.Assignment.Count == 1)
+            ?? Stylesheet.Blocks.FirstOrDefault();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_resolvedFor, Manager.State)) return;
+        _resolvedFor = Manager.State;
+        _aliases = Resolution.Tokens.Tokens.Where(t => t.AliasOf is not null).Select(t => t.Path.ToString()).Order(StringComparer.Ordinal).ToList();
+        if (!_aliases.Contains(_traced) && _aliases.Count > 0) _traced = _aliases[0];
+    }
+
+    private static string Excerpt(string file, string path)
+    {
+        var root = (SourceObject)SourceJsonParser.Parse(DemoTokens.Files[file]).Root!;
+        var segments = path.Split('.');
+        var parents = new List<SourceObject> { root };
+        foreach (var segment in segments[..^1]) parents.Add((SourceObject)parents[^1][segment]!);
+        SourceNode node = parents[^1][segments[^1]]!;
+        // Rebuild only the path to the token, keeping inherited $type declarations.
+        for (var i = segments.Length - 1; i >= 0; i--)
+        {
+            var properties = new List<(string, SourceNode)>();
+            if (parents[i]["$type"] is { } type) properties.Add(("$type", type));
+            properties.Add((segments[i], node));
+            node = SourceObject.Create([.. properties]);
+        }
+        return node.ToJson(indented: true);
+    }
+
+    private static string Layer(TokenPath path)
+    {
+        var text = path.ToString();
+        var layers = DemoTokens.Validation.Layers!;
+        if (layers.Component.Any(p => TokenPathPattern.IsMatch(p, text))) return "component";
+        if (layers.Semantic.Any(p => TokenPathPattern.IsMatch(p, text))) return "semantic";
+        if (layers.Primitive.Any(p => TokenPathPattern.IsMatch(p, text))) return "primitive";
+        return "other";
+    }
+
+    private static string LayerClass(TokenPath path) => "layer--" + Layer(path);
+
+    private static DiagnosticResult Broken => s_broken ??= ValidateBroken();
+
+    private static DiagnosticResult ValidateBroken()
+    {
+        var tokens = TokenResolver.Resolve(DemoTokens.Samples["broken.tokens.json"], new JsonParseOptions { SourceName = "broken.tokens.json" });
+        var options = new ValidationOptions
+        {
+            Naming = [new NamingRule { Case = NameCase.KebabCase }],
+            RequiredTokens = [new RequiredToken("color.focus.ring", "color")],
+            Accessibility = new AccessibilityRules { Pairs = [new ContrastPair("color.text.muted", "color.surface.default")] },
+        };
+        return TokenValidator.Validate(tokens, options).Result;
+    }
+
+    /// <summary>One finding of each of the most instructive kinds: a cycle, an unknown reference and a contrast failure.</summary>
+    private static IReadOnlyList<Diagnostic> BrokenHighlights => Broken.Diagnostics
+        .Where(d => d.Severity == DiagnosticSeverity.Error)
+        .GroupBy(d => d.RuleId).Select(g => g.First())
+        .Take(3).ToList();
+
+    private void CheckAllThemes()
+    {
+        var watch = Stopwatch.StartNew();
+        var catalog = Manager.Catalog;
+        var units = catalog.Themes.SelectMany(t => catalog.EnumerateAxisCombinations().Select(a => new ThemeSelection(t.Id, a))).ToList();
+        var results = units.SelectMany(u => TokenValidator.Validate(catalog.Resolve(u).Tokens, DemoTokens.Validation).ContrastResults).ToList();
+        watch.Stop();
+        _allThemes = (units.Count, results.Count, results.Count(r => r.Passed == false), watch.ElapsedMilliseconds);
+    }
+
+    private static ThemeStylesheetResult Stylesheet => s_stylesheet ??= ThemeStylesheetGenerator.Generate(DemoTokens.Catalog, DemoTokens.CssOptions);
+
+    private static string BlockLabel(ThemeCssBlock block)
+    {
+        var axes = string.Join(" · ", block.Assignment.Select(a => $"{a.Key}={a.Value}"));
+        return axes.Length == 0 ? $"{block.ThemeId} (base)" : $"{block.ThemeId} · {axes}";
+    }
+
+    private static int Percent(ThemeCssBlock block)
+    {
+        var max = Stylesheet.Blocks.Max(b => b.Declarations.Count);
+        return max == 0 ? 0 : Math.Max(1, block.Declarations.Count * 100 / max);
+    }
+
+    private static string BlockCss(ThemeCssBlock block)
+    {
+        const int Limit = 40;
+        var lines = block.Declarations.Take(Limit).Select(d => $"  {d.Name}: {d.Value};");
+        var more = block.Declarations.Count > Limit ? $"\n  /* … {block.Declarations.Count - Limit} more declarations */" : "";
+        return $"{block.Selector} {{\n{string.Join("\n", lines)}{more}\n}}";
+    }
+
+    private static string Annotations => string.Join("\n", Broken.Diagnostics.Take(6).Select(DiagnosticJson.ToGitHubAnnotation));
+
+    private const string CiSnippet = """
+        # .github/workflows/design-system.yml
+        - run: dotnet tool restore
+        - run: dotnet bdt check --config bdt.config.json --format github
+        """;
+}

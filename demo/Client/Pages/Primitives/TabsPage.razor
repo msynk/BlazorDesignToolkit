@@ -3,8 +3,11 @@
 <PageTitle>Tabs · BlazorDesignToolkit</PageTitle>
 
 <h1 tabindex="-1">Tabs</h1>
+<p class="lead">WAI-ARIA Tabs: one tab stop for the whole list, arrow keys between tabs, automatic or manual activation,
+    horizontal or vertical, mirrored in right-to-left layouts. Open <em>Live markup</em> to watch <code>aria-selected</code>,
+    <code>tabindex</code> and <code>hidden</code> follow your keys.</p>
 
-<Example Title="Automatic activation" Code="@Code">
+<Example Title="Automatic activation" Inspect="true" Code="@Code">
     <ChildContent>
         <Tabs DefaultValue="overview" data-testid="tabs-auto">
             <TabList aria-label="Project">
@@ -21,7 +24,7 @@
     </ChildContent>
 </Example>
 
-<Example Title="Manual activation, vertical">
+<Example Title="Manual activation, vertical" Inspect="true">
     <ChildContent>
         <Tabs DefaultValue="a" Activation="Tabs.TabsActivation.Manual" Orientation="Orientation.Vertical" class="vertical-tabs" data-testid="tabs-manual">
             <TabList aria-label="Account">

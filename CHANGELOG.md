@@ -35,6 +35,10 @@ known gaps.
   the no-Popover-API fallback hides closed popups.
 - Integrations: Tailwind CSS 3 preset (`tailwind-v3`); Bootstrap runtime variables per theme and mode with a component
   bridge (`bootstrap-themes`); all 467 Fluent 2 tokens.
+- Demo: an introduction that explains the toolkit with a site-wide theme switcher, a guided tour computed live from the
+  sample tokens, a showcase app built only from primitives and tokens, a brand builder (OKLCH palette, contrast in every
+  mode, DTCG export), a primitives overview with interchangeable skins, and a live markup inspector on every primitive
+  example.
 - Tooling: benchmark regression gate in CI; tag-triggered release workflow (SourceLink, package validation, GitHub
   release, NuGet push behind an approval environment).
 

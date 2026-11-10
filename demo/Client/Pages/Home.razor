@@ -1,21 +1,148 @@
 @page "/"
+@using BlazorDesignToolkit.Tokens.Diagnostics
+@using BlazorDesignToolkit.Tokens.Validation
 
 <PageTitle>BlazorDesignToolkit</PageTitle>
 
-<h1 tabindex="-1">Design tokens, theming and headless UI for Blazor</h1>
-<p class="lead">
-    Define a design system once in the <a href="https://www.designtokens.org/tr/2025.10/">DTCG 2025.10</a> format, validate it
-    (including WCAG contrast), export it to CSS and frameworks, switch themes at runtime, and build accessible interfaces
-    with unstyled primitives. Every page of this demo uses the toolkit itself.
-</p>
+<section class="hero" aria-labelledby="hero-title">
+    <div>
+        <p class="eyebrow">Design tokens · Theming · Accessible headless UI · for Blazor</p>
+        <h1 id="hero-title" tabindex="-1">Your design system as data: validated, themed and accessible</h1>
+        <p class="lead">
+            BlazorDesignToolkit takes your <strong>design tokens</strong> (the named colors, spacing, type and shadows of your
+            brand, in the open <a href="https://www.designtokens.org/tr/2025.10/">DTCG 2025.10</a> format that Figma plugins,
+            Tokens Studio and Style Dictionary use) and turns them into a design system your .NET app can trust.
+        </p>
+        <ul class="hero-points">
+            <li><strong>Catches mistakes before they ship:</strong> broken references, wrong types, inconsistent scales and
+                insufficient contrast, in every theme, with the exact file and line.</li>
+            <li><strong>Generates one stylesheet</strong> for every brand, color mode, contrast level and density.</li>
+            <li><strong>Switches themes instantly:</strong> no reload, no CSS rebuild, no flash of the wrong theme.</li>
+            <li><strong>Ships accessible, unstyled components:</strong> keyboard, focus and ARIA done right; the look is yours.</li>
+        </ul>
+        <div class="hero-actions">
+            <a class="button button--primary" href="tour">Take the guided tour</a>
+            <a class="button" href="showcase">See it in an app</a>
+            <a class="button" href="brand-builder">Build a brand</a>
+        </div>
+    </div>
+    <section class="hero-panel" aria-labelledby="try-title">
+        <h2 id="try-title">Try it: restyle this entire site</h2>
+        <p class="muted">Every color, size and font on these pages comes from tokens. Choose a combination:</p>
+        <ThemeSwitcher ShowMarkup="true" Label="Theme of this site" />
+        <p class="muted">Changing these attributes is all that happens: the stylesheet was generated once, nothing reloads,
+            and the server renders your choice on the next visit, even before any script runs.</p>
+    </section>
+</section>
 
-<Example Title="Adopt only what you need">
-    <Description>
-        <p>The modules are independent packages. None of them requires a CSS framework or a visual component library.</p>
-    </Description>
-    <ChildContent>
+<section aria-label="This demo in numbers">
+    <dl class="stats">
+        <div class="stat"><dt>design tokens in the current theme</dt><dd>@Resolution.Tokens.Count</dd></div>
+        <div class="stat"><dt>themes from @TokenFileCount token files</dt><dd>@ThemeCount</dd></div>
+        <div class="stat"><dt>contrast checks pass in this theme</dt><dd>@ContrastPassed / @_contrast.Count</dd></div>
+        <div class="stat"><dt>accessible headless components</dt><dd>@DemoCatalog.Primitives.Count</dd></div>
+        <div class="stat"><dt>validation rules with stable ids</dt><dd>@DiagnosticCatalog.All.Count</dd></div>
+        <div class="stat"><dt>export formats</dt><dd>@DemoCatalog.ExportFormats.Count</dd></div>
+    </dl>
+</section>
+
+<section aria-labelledby="how-title">
+    <h2 id="how-title">How it works</h2>
+    <p class="section-lead">One source of truth flows from a JSON file to the pixels on screen. Each step is a .NET API, a
+        <code>bdt</code> command for CI, and a page of this demo.</p>
+    <ol class="pipeline">
+        <li>
+            <h3>Author</h3>
+            <p>Write tokens in DTCG JSON, or export them from your design tool. Layer primitives, semantic and component tokens.</p>
+            <a href="tokens">Explore the tokens</a>
+        </li>
+        <li>
+            <h3>Validate</h3>
+            <p>References, types, naming, scales and WCAG 2.2 contrast in every theme, with stable rule ids for CI.</p>
+            <a href="validation">See diagnostics</a>
+        </li>
+        <li>
+            <h3>Compose</h3>
+            <p>Brands are independent of color mode, contrast and density. Layers apply only where they are needed.</p>
+            <a href="themes">Compare themes</a>
+        </li>
+        <li>
+            <h3>Generate</h3>
+            <p>One CSS file covers every combination, or export to Tailwind, Bootstrap and Fluent 2.</p>
+            <a href="integrations">See the outputs</a>
+        </li>
+        <li>
+            <h3>Build</h3>
+            <p>Use headless primitives with your own styles. Switch themes by flipping an attribute.</p>
+            <a href="primitives">Meet the primitives</a>
+        </li>
+    </ol>
+</section>
+
+<section aria-labelledby="explore-title">
+    <h2 id="explore-title">Explore the features</h2>
+    <ul class="card-grid">
+        <li class="card">
+            <h3>A standards-based token engine</h3>
+            <p>Reads and writes DTCG 2025.10: aliases, JSON Pointer references, <code>$extends</code>, all 13 token types,
+                all 14 color spaces with CSS Color 4 gamut mapping, and the resolver module.</p>
+            <div class="card-links"><a href="tokens">Token explorer</a><a href="import-export">Import your own tokens</a></div>
+        </li>
+        <li class="card">
+            <h3>Validation you can put in CI</h3>
+            <p>Diagnostics name the rule, token, file, line, expected and actual value, and a fix. Contrast is checked in every
+                theme combination and never guessed.</p>
+            <div class="card-links"><a href="validation">Validation</a><a href="coverage">Token coverage</a><a href="compare">Theme diff</a></div>
+        </li>
+        <li class="card">
+            <h3>Theming without rebuilds</h3>
+            <p>Brands, color modes, contrast and density from layered token files. Runtime overrides, scoped themes,
+                persistence, system preferences and no-flash startup.</p>
+            <div class="card-links"><a href="themes">Themes and brands</a><a href="brand-builder">Brand builder</a><a href="editor">Live editor</a></div>
+        </li>
+        <li class="card">
+            <h3>Headless, accessible primitives</h3>
+            <p>@DemoCatalog.Primitives.Count components that follow the WAI-ARIA Authoring Practices, built on native elements,
+                unstyled, localizable, and tested with axe-core and real keyboards.</p>
+            <div class="card-links"><a href="primitives">Overview and skins</a><a href="showcase">Showcase app</a></div>
+        </li>
+        <li class="card">
+            <h3>Works with your CSS framework</h3>
+            <p>Optional, type-checked adapters for Tailwind CSS 4 and 3, Bootstrap 5.3 (including runtime theming of its
+                compiled components) and all Fluent 2 tokens.</p>
+            <div class="card-links"><a href="integrations">Integrations</a></div>
+        </li>
+        <li class="card">
+            <h3>Fits an existing design system</h3>
+            <p>Keep your components; drive them with tokens. Component contracts declare which tokens a component needs, and
+                coverage analysis checks them.</p>
+            <div class="card-links"><a href="design-system">Design system example</a><a href="accessibility">Accessibility</a></div>
+        </li>
+    </ul>
+</section>
+
+<section aria-labelledby="start-title">
+    <h2 id="start-title">Get started in minutes</h2>
+    <p class="section-lead">Adopt one package or all of them. None requires a CSS framework or a visual component library.</p>
+    <Tabs DefaultValue="theming">
+        <TabList aria-label="Quick start">
+            <Tab Value="theming">Theming</Tab>
+            <Tab Value="primitives">Primitives</Tab>
+            <Tab Value="tokens">Tokens API</Tab>
+            <Tab Value="cli">CLI</Tab>
+        </TabList>
+        <TabPanel Value="theming" Focusable="false"><CodeBlock Code="@ThemingSnippet" Label="theming setup" /></TabPanel>
+        <TabPanel Value="primitives" Focusable="false"><CodeBlock Code="@PrimitiveSnippet" Label="primitives example" /></TabPanel>
+        <TabPanel Value="tokens" Focusable="false"><CodeBlock Code="@TokensSnippet" Label="tokens API example" /></TabPanel>
+        <TabPanel Value="cli" Focusable="false"><CodeBlock Code="@CliSnippet" Label="CLI commands" /></TabPanel>
+    </Tabs>
+</section>
+
+<section aria-labelledby="packages-title">
+    <h2 id="packages-title">Packages</h2>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Packages">
         <table class="data-table">
-            <caption>Packages</caption>
+            <caption class="visually-hidden">Packages</caption>
             <thead><tr><th scope="col">Package</th><th scope="col">Use it for</th><th scope="col">Depends on</th></tr></thead>
             <tbody>
                 <tr><th scope="row"><code>BlazorDesignToolkit.<wbr>Tokens</code></th><td>DTCG parsing, references, validation, contrast, CSS export, coverage, diff</td><td>.NET only</td></tr>
@@ -28,45 +155,45 @@
                 <tr><th scope="row"><code>bdt</code> (dotnet tool)</th><td>validate, build, export, coverage, diff, check in CI</td><td>—</td></tr>
             </tbody>
         </table>
-    </ChildContent>
-</Example>
-
-<Example Title="Quick start: theming" Code="@ThemingSnippet">
-    <Description><p>Register a catalog, render the stylesheet in <code>&lt;head&gt;</code>, and wrap the app in <code>ThemeProvider</code>.</p></Description>
-</Example>
-
-<Example Title="Quick start: headless primitive" Code="@PrimitiveSnippet">
-    <ChildContent>
-        <Tabs DefaultValue="tokens">
-            <TabList aria-label="Quick start tabs">
-                <Tab Value="tokens">Tokens</Tab>
-                <Tab Value="themes">Themes</Tab>
-            </TabList>
-            <TabPanel Value="tokens"><p>Tokens are validated before anything is exported.</p></TabPanel>
-            <TabPanel Value="themes"><p>Themes only change attributes at runtime; the CSS is generated once.</p></TabPanel>
-        </Tabs>
-    </ChildContent>
-</Example>
-
-<Example Title="Explore the demo">
-    <Description><p>Every page runs in Interactive Server or Interactive WebAssembly mode (switch in the footer), follows the theme chosen in the header, and is checked with axe-core and keyboard tests in CI.</p></Description>
-    <ChildContent>
-        <SiteMap Label="Demo pages" HeadingLevel="3" />
-    </ChildContent>
-</Example>
+    </div>
+    <p class="muted">Every page of this demo runs in Interactive Server or Interactive WebAssembly mode (switch in the footer),
+        follows the theme chosen above, and is checked with axe-core and keyboard tests in CI.</p>
+</section>
 
 @code {
+    private ThemeState? _validatedFor;
+    private IReadOnlyList<ContrastResult> _contrast = [];
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    // Re-renders the numbers when the theme changes.
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    private ThemeResolution Resolution => Manager.Resolve();
+
+    private int ThemeCount => Manager.Catalog.Themes.Length * Manager.Catalog.EnumerateAxisCombinations().Count();
+
+    private static int TokenFileCount => DemoTokens.Files.Keys.Count(k => k.EndsWith(".tokens.json", StringComparison.Ordinal));
+
+    private int ContrastPassed => _contrast.Count(c => c.Passed == true);
+
+    protected override void OnParametersSet()
+    {
+        // Validate once per theme state, not per render.
+        if (ReferenceEquals(_validatedFor, Manager.State)) return;
+        _validatedFor = Manager.State;
+        _contrast = TokenValidator.Validate(Resolution.Tokens, DemoTokens.Validation).ContrastResults;
+    }
+
     private const string ThemingSnippet = """
-        // Program.cs
-        var catalog = (await ThemeManifest.LoadAsync("tokens/aurora.themes.json")).Catalog!;
+        // Program.cs: load the theme manifest (brands × mode × contrast × density)
+        var catalog = (await ThemeManifest.LoadAsync("tokens/app.themes.json")).Catalog!;
         builder.Services.AddDesignTokenTheming(o =>
         {
             o.Catalog = catalog;
-            o.Css = ThemeCssOptions.Default with { Css = ThemeCssOptions.Default.Css with { Prefix = "ds" } };
-            o.Persistence = ThemePersistence.Cookie;
+            o.Persistence = ThemePersistence.Cookie; // the server renders the right theme on the first response
         });
 
-        <!-- App.razor -->
+        <!-- App.razor: one generated stylesheet, plus a tiny script that prevents a flash of the wrong theme -->
         <head>
             <ThemeStyles />
             <ThemeInitScript />
@@ -74,16 +201,50 @@
 
         <!-- MainLayout.razor -->
         <ThemeProvider>@Body</ThemeProvider>
+
+        // Anywhere: switch at runtime
+        Manager.SetTheme("ember");
+        Manager.SetAxis("mode", "dark");
         """;
 
     private const string PrimitiveSnippet = """
-        <Tabs DefaultValue="tokens">
-            <TabList aria-label="Quick start tabs">
-                <Tab Value="tokens">Tokens</Tab>
-                <Tab Value="themes">Themes</Tab>
-            </TabList>
-            <TabPanel Value="tokens">…</TabPanel>
-            <TabPanel Value="themes">…</TabPanel>
-        </Tabs>
+        <!-- Program.cs: builder.Services.AddHeadlessPrimitives(); -->
+
+        <FormField>
+            <FormLabel>Country</FormLabel>
+            <Select TItem="string" Items="countries" @bind-Value="country" Placeholder="Choose a country" />
+            <FormDescription>Used for shipping.</FormDescription>
+        </FormField>
+
+        <Dialog @bind-Open="open">
+            <DialogTrigger>Edit profile</DialogTrigger>
+            <DialogContent>
+                <DialogTitle>Edit profile</DialogTitle>
+                …
+                <DialogClose>Done</DialogClose>
+            </DialogContent>
+        </Dialog>
+        """;
+
+    private const string TokensSnippet = """
+        var tokens = TokenResolver.Resolve(File.ReadAllText("tokens/foundation.tokens.json"));
+
+        var report = TokenValidator.Validate(tokens, new ValidationOptions
+        {
+            Accessibility = new AccessibilityRules { Pairs = [new ContrastPair("color.text.muted", "color.surface.default")] },
+        });
+        foreach (var d in report.Diagnostics) Console.WriteLine($"{d.RuleId} {d.TokenPath}: {d.Message}");
+
+        var css = CssExporter.Export(tokens, new CssExportOptions { Prefix = "ds" }).Css;
+        File.WriteAllText("wwwroot/css/tokens.css", css);
+        """;
+
+    private const string CliSnippet = """
+        dotnet tool install --global BlazorDesignToolkit.Cli
+
+        bdt validate --themes tokens/app.themes.json        # every theme combination, WCAG contrast included
+        bdt export --config bdt.config.json                 # write CSS, Tailwind, Bootstrap and Fluent outputs
+        bdt diff old.tokens.json new.tokens.json --fail-on-breaking   # review design-system changes
+        bdt check --config bdt.config.json --format github  # every gate, reported as GitHub annotations
         """;
 }

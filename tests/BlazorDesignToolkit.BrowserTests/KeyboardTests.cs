@@ -26,6 +26,8 @@ public class KeyboardTests(DemoServer server) : IAsyncDisposable
         await Assertions.Expect(tabs.First).ToBeFocusedAsync();
         await page.Keyboard.PressAsync("End");
         await Assertions.Expect(tabs.Nth(3)).ToBeFocusedAsync();
+        // Focus moves before the selection is rendered; in Server mode, wait for it so that Tab finds the new panel.
+        await Assertions.Expect(tabs.Nth(3)).ToHaveAttributeAsync("aria-selected", "true");
         await page.Keyboard.PressAsync("Tab"); // into the active panel
         await Assertions.Expect(page.GetByTestId("tabs-auto").GetByRole(AriaRole.Tabpanel)).ToBeFocusedAsync();
         // Arrow keys did not scroll the page.

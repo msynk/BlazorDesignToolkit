@@ -116,6 +116,20 @@ AccessibilityAssert.NoViolations(cut.Markup);   // BlazorDesignToolkit.Testing
 dotnet run --project demo/Server
 ```
 
+Where to start:
+
+| Page | What it shows |
+|---|---|
+| Introduction (`/`) | What the toolkit does, a theme switcher for the whole site, and how the pieces fit together |
+| Guided tour (`/tour`) | The Aurora design system through every stage: tokens, references, validation, theme composition, the generated stylesheet, runtime switching, primitives and CI, all computed live |
+| Showcase app (`/showcase`) | A small project tracker built only from primitives and tokens, in its own theme scope (brand, mode, density, right to left) |
+| Brand builder (`/brand-builder`) | One color becomes an OKLCH palette; previews and contrast checks in every mode; DTCG export; apply to the site |
+| Primitives (`/primitives`) | The same components with the starter styles, custom CSS and no CSS at all, and the full catalog |
+
+Every primitive example has a **Live markup** panel that shows its rendered HTML, with roles, ARIA states and
+relationships highlighted, updating as you use it.
+
 Append `?mode=wasm` to switch to Interactive WebAssembly (`?mode=server` to switch back), or use the link in the page
 footer; the choice is remembered in a cookie. Press <kbd>Ctrl</kbd>+<kbd>K</kbd> for the command menu (pages, brands and
-theme axes). The date picker example uses today's date; append `?today=2026-11-02` to its page to pin it.
+theme axes). The date picker example and the showcase app use today's date; append `?today=2026-11-02` to their pages
+to pin it.

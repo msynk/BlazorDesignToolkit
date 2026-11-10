@@ -106,7 +106,7 @@ public class AssistiveTechnologyTests(DemoServer server) : IAsyncDisposable
         Assert.NotEqual("0px", await thumb.EvaluateAsync<string>("e => getComputedStyle(e).borderTopWidth"));
     }
 
-    public static readonly TheoryData<string> Pages = new("/", "/primitives/controls", "/primitives/forms", "/primitives/menu", "/primitives/inputs", "/primitives/listbox", "/themes");
+    public static readonly TheoryData<string> Pages = new("/", "/tour", "/showcase", "/brand-builder", "/primitives", "/primitives/controls", "/primitives/forms", "/primitives/menu", "/primitives/inputs", "/primitives/listbox", "/themes");
 
     /// <summary>WCAG 2.2 SC 1.4.12 Text Spacing: no loss of content with the spacing a user style sheet may apply.</summary>
     [Theory]

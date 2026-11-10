@@ -3,8 +3,10 @@
 <PageTitle>Tree view · BlazorDesignToolkit</PageTitle>
 
 <h1 tabindex="-1">Tree view</h1>
+<p class="lead">A hierarchical list with expand and collapse, type-ahead and multi-level keyboard navigation.
+    Virtualization keeps thousands of nodes fast.</p>
 
-<Example Title="Token groups as a tree">
+<Example Title="Token groups as a tree" Inspect="true">
     <Description><p>The tree below shows the token groups of the current theme. Selecting a token shows its value.</p></Description>
     <ChildContent>
         <div class="tree-layout">
@@ -25,7 +27,7 @@
     </ChildContent>
 </Example>
 
-<Example Title="Virtualized tree (2,000 nodes)">
+<Example Title="Virtualized tree (2,000 nodes)" Inspect="true">
     <ChildContent>
         <TreeView TItem="string" Items="Folders" ChildrenSelector="@FolderChildren" Virtualize="true" ItemSize="32" @bind-Value="_file"
                   aria-label="Files" data-testid="virtual-tree" />

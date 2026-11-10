@@ -1,0 +1,50 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@* Shows the live DOM of an example (see wwwroot/js/live-markup.js), so the ARIA maintained by the primitives is visible
+   while the example is used. The panel stays mounted (hidden) so the observer can be stopped when it closes; the markup
+   is only built while the panel is open. *@
+
+<Disclosure class="live-markup" @bind-Open="_open">
+    <DisclosureTrigger class="live-markup__trigger">Live markup</DisclosureTrigger>
+    <DisclosurePanel KeepMounted="true">
+        <p class="live-markup__hint">The rendered HTML of this example, updated as you use it. Highlighted: roles, ARIA states and
+            relationships, focus order and visibility, all maintained by the primitive.</p>
+        <pre class="live-markup__output" tabindex="0" aria-label="Live markup" @ref="_output"></pre>
+    </DisclosurePanel>
+</Disclosure>
+
+@code {
+    private bool _open;
+    private bool _observing;
+    private ElementReference _output;
+    private IJSObjectReference? _module;
+
+    /// <summary>The id of the element whose content is shown.</summary>
+    [Parameter, EditorRequired] public string TargetId { get; set; } = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_open == _observing) return;
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/live-markup.js");
+            await _module.InvokeVoidAsync(_open ? "observe" : "stop", _output, TargetId);
+            _observing = _open;
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is null) return;
+        try
+        {
+            await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

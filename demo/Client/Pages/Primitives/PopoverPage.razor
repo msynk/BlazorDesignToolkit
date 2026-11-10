@@ -3,8 +3,10 @@
 <PageTitle>Popover and tooltip · BlazorDesignToolkit</PageTitle>
 
 <h1 tabindex="-1">Popover and tooltip</h1>
+<p class="lead">A popover is a non-modal overlay for interactive content; a tooltip is a short description shown on
+    hover and focus. Both use the browser's top layer, so overflow and z-index never clip them.</p>
 
-<Example Title="Popover">
+<Example Title="Popover" Inspect="true">
     <Description><p>Non-modal, in the top layer via the Popover API. Escape or an outside click closes it; focus returns to the trigger when it was inside.</p></Description>
     <ChildContent>
         <Popover>
@@ -20,7 +22,7 @@
     </ChildContent>
 </Example>
 
-<Example Title="Tooltip">
+<Example Title="Tooltip" Inspect="true">
     <Description><p>Shown on hover after a delay and immediately on keyboard focus; Escape hides it without moving focus; the pointer may move onto it.</p></Description>
     <ChildContent>
         <Tooltip>

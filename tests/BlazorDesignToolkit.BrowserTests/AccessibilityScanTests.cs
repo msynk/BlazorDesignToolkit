@@ -10,7 +10,7 @@ public class AccessibilityScanTests(DemoServer server) : IAsyncDisposable
     public async ValueTask DisposeAsync() => await server.CloseContextsAsync();
 
     public static readonly TheoryData<string> Pages = new(
-        "/", "/tokens", "/themes", "/compare", "/editor", "/import-export", "/validation", "/coverage", "/integrations", "/design-system", "/accessibility", "/not-found",
+        "/", "/tour", "/showcase", "/brand-builder", "/primitives", "/tokens", "/themes", "/compare", "/editor", "/import-export", "/validation", "/coverage", "/integrations", "/design-system", "/accessibility", "/not-found",
         "/primitives/controls", "/primitives/forms", "/primitives/tabs", "/primitives/disclosure", "/primitives/dialog", "/primitives/popover",
         "/primitives/listbox", "/primitives/menu", "/primitives/inputs", "/primitives/tree", "/primitives/feedback");
 

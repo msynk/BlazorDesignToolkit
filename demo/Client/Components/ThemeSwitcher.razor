@@ -1,0 +1,100 @@
+@using BlazorDesignToolkit.Tokens.Export
+@* Segmented controls (RadioGroup + native radios) that switch the theme of the whole site: the brand and every axis of the
+   catalog. Optionally shows the attributes of <html> that the switch changes, with the latest change highlighted. *@
+
+<div class="switcher" role="group" aria-label="@Label">
+    <FormField class="control">
+        <FormLabel>Brand</FormLabel>
+        <RadioGroup TValue="string" Value="State.ThemeId" ValueChanged="SetTheme" Orientation="Orientation.Horizontal" class="segmented">
+            @foreach (var theme in Manager.Catalog.Themes)
+            {
+                <label><Radio Value="theme.Id" /><span class="dot" style="background:@Accent(theme.Id)" aria-hidden="true"></span>@(theme.DisplayName ?? theme.Id)</label>
+            }
+        </RadioGroup>
+    </FormField>
+    @foreach (var axis in Manager.Catalog.Axes)
+    {
+        var name = axis.Name;
+        <FormField class="control">
+            <FormLabel>@(axis.DisplayName ?? name)</FormLabel>
+            <RadioGroup TValue="string" Value="State.Selection[name]" ValueChanged="v => SetAxis(name, v)" Orientation="Orientation.Horizontal" class="segmented">
+                @foreach (var value in ThemeControls.Values(axis))
+                {
+                    <label><Radio Value="value" />@ThemeControls.Label(value)</label>
+                }
+            </RadioGroup>
+        </FormField>
+    }
+</div>
+@if (ShowMarkup)
+{
+    <p class="code-line"><span class="visually-hidden">Attributes of the html element: </span>&lt;html
+        @foreach (var (name, value) in Attributes)
+        {
+            @(" ")
+            @if (_changed.Contains(name))
+            {
+                <mark>@($"{name}=\"{value}\"")</mark>
+            }
+            else
+            {
+                @($"{name}=\"{value}\"")
+            }
+        }&gt;</p>
+}
+
+@code {
+    private ThemeSelection? _previous;
+    private HashSet<string> _changed = [];
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    [Parameter] public string Label { get; set; } = "Theme of this site";
+
+    /// <summary>Shows the theme attributes of the root element below the controls.</summary>
+    [Parameter] public bool ShowMarkup { get; set; }
+
+    private IEnumerable<(string Attribute, string Value)> Attributes
+    {
+        get
+        {
+            yield return ("data-theme", State.Selection.ThemeId);
+            foreach (var axis in Manager.Catalog.Axes) yield return ("data-" + axis.Name, State.Selection[axis.Name] ?? axis.Default);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        var current = State.Selection;
+        if (_previous is not null && _previous.Key != current.Key)
+        {
+            _changed = [];
+            if (_previous.ThemeId != current.ThemeId) _changed.Add("data-theme");
+            foreach (var axis in Manager.Catalog.Axes)
+            {
+                if (_previous[axis.Name] != current[axis.Name]) _changed.Add("data-" + axis.Name);
+            }
+        }
+        _previous = current;
+    }
+
+    private void SetTheme(string? id)
+    {
+        if (id is not null) Manager.TrySetTheme(id);
+    }
+
+    private void SetAxis(string axis, string? value)
+    {
+        if (value is not null) Manager.TrySetAxis(axis, value);
+    }
+
+    /// <summary>The brand's accent color in the current mode and contrast.</summary>
+    private string Accent(string themeId)
+    {
+        var selection = new ThemeSelection(themeId, State.EffectiveSelection.Axes);
+        return Manager.Catalog.Resolve(selection).Tokens[TokenPath.Parse("color.surface.accent")]?.Value is ColorValue color
+            ? CssExporter.FormatValue(color) ?? "transparent"
+            : "transparent";
+    }
+}

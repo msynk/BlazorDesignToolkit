@@ -6,7 +6,7 @@
 <p>Built on the native <code>&lt;dialog&gt;</code> element: <code>showModal()</code> makes the rest of the page inert, so focus
     and the screen-reader cursor stay inside, and the dialog is promoted to the top layer without being moved in the DOM.</p>
 
-<Example Title="Modal dialog" Code="@Code">
+<Example Title="Modal dialog" Inspect="true" Code="@Code">
     <ChildContent>
         <Dialog @bind-Open="_open">
             <DialogTrigger data-testid="open-dialog">Edit profile</DialogTrigger>
@@ -27,13 +27,13 @@
     </ChildContent>
 </Example>
 
-<Example Title="Confirmation (alertdialog)">
+<Example Title="Confirmation (alertdialog)" Inspect="true">
     <ChildContent>
         <AuroraDialog TriggerText="Discard draft…" Title="Discard the draft?" Message="You cannot undo this." ConfirmText="Discard" Destructive="true" />
     </ChildContent>
 </Example>
 
-<Example Title="Escape does not close">
+<Example Title="Escape does not close" Inspect="true">
     <Description><p>An editor with unsaved changes: Escape is ignored (also on a repeated Escape, which some browsers would otherwise use to force-close the dialog); the buttons close it.</p></Description>
     <ChildContent>
         <button type="button" @onclick="() => _editorOpen = true" data-testid="editor-open">Edit notes…</button>

@@ -3,8 +3,10 @@
 <PageTitle>Disclosure and accordion · BlazorDesignToolkit</PageTitle>
 
 <h1 tabindex="-1">Disclosure and accordion</h1>
+<p class="lead">Show and hide content with a button that reports <code>aria-expanded</code> and <code>aria-controls</code>.
+    The accordion adds heading structure and arrow-key navigation between section headers.</p>
 
-<Example Title="Disclosure">
+<Example Title="Disclosure" Inspect="true">
     <ChildContent>
         <Disclosure data-testid="disclosure">
             <DisclosureTrigger>Shipping details</DisclosureTrigger>
@@ -14,7 +16,7 @@
     </ChildContent>
 </Example>
 
-<Example Title="Accordion (single, collapsible)">
+<Example Title="Accordion (single, collapsible)" Inspect="true">
     <ChildContent>
         <Accordion HeadingLevel="3" DefaultValues="@(new[] { "q1" })" data-testid="accordion">
             <AccordionItem Value="q1">

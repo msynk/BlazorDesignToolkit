@@ -1,0 +1,642 @@
+@page "/showcase"
+@using System.Globalization
+@inject ToastService Toasts
+@inject LiveAnnouncer Announcer
+
+<PageTitle>Showcase app · BlazorDesignToolkit</PageTitle>
+
+<p class="eyebrow">Showcase</p>
+<h1 tabindex="-1">A real app, built from tokens and headless primitives</h1>
+<p class="lead">"Orbit" is a small project tracker. Every control in it is a BlazorDesignToolkit primitive (menubar, tree view,
+    tabs, table selection, menus, popover, dialog, date picker and more) and every pixel is styled with Aurora tokens. It
+    has its own theme scope, so you can restyle it here without touching the rest of the site.</p>
+
+<div class="callout">
+    <p class="callout-title">Things to try</p>
+    <ul>
+        <li>Use only the keyboard: <kbd>Tab</kbd> between areas, arrow keys inside the menubar, tree, tabs and menus.</li>
+        <li>Create a task with <em>New task</em>: validation, a date picker and a combobox inside a modal dialog.</li>
+        <li>Switch the preview to <em>Ember</em>, <em>Dark</em>, <em>Compact</em> or <em>Right to left</em> below.</li>
+    </ul>
+</div>
+
+<div class="preview-bar" role="group" aria-label="Preview settings for the sample app">
+    <FormField class="control">
+        <FormLabel>Brand</FormLabel>
+        <RadioGroup TValue="string" @bind-Value="_theme" Orientation="Orientation.Horizontal" class="segmented" data-testid="showcase-brand">
+            @foreach (var theme in Manager.Catalog.Themes)
+            {
+                <label><Radio Value="theme.Id" />@(theme.DisplayName ?? theme.Id)</label>
+            }
+        </RadioGroup>
+    </FormField>
+    @foreach (var axis in Manager.Catalog.Axes)
+    {
+        var name = axis.Name;
+        <FormField class="control">
+            <FormLabel>@(axis.DisplayName ?? name)</FormLabel>
+            <RadioGroup TValue="string" Value="_axes[name]" ValueChanged="v => { if (v is not null) _axes[name] = v; }" Orientation="Orientation.Horizontal" class="segmented"
+                        data-testid="@($"showcase-{name}")">
+                @foreach (var value in axis.Values)
+                {
+                    <label><Radio Value="value" />@ThemeControls.Label(value)</label>
+                }
+            </RadioGroup>
+        </FormField>
+    }
+    <FormField class="control">
+        <FormLabel>Direction</FormLabel>
+        <RadioGroup TValue="string" @bind-Value="_dir" Orientation="Orientation.Horizontal" class="segmented">
+            <label><Radio Value="@("ltr")" />Left to right</label>
+            <label><Radio Value="@("rtl")" />Right to left</label>
+        </RadioGroup>
+    </FormField>
+</div>
+
+<ThemeScope ThemeId="@_theme" Axes="_axes" class="app-frame" dir="@_dir" role="region" aria-label="Orbit sample app" data-testid="showcase-app">
+    <header class="app-header">
+        <span class="app-logo"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" /><path d="M12 2a10 10 0 1 0 10 10h-2a8 8 0 1 1-8-8z" /></svg>Orbit</span>
+        <Menubar aria-label="Orbit">
+            <Menu>
+                <MenubarTrigger>File</MenubarTrigger>
+                <MenuContent class="menu">
+                    <MenuItem TextValue="New task" OnSelect="OpenNewTask">New task…</MenuItem>
+                    <MenuSub>
+                        <MenuSubTrigger TextValue="Export">Export</MenuSubTrigger>
+                        <MenuSubContent class="menu">
+                            <MenuItem TextValue="CSV" OnSelect="@(() => Toasts.Show($"Exported {Visible.Count} tasks as CSV", ToastKind.Success))">CSV</MenuItem>
+                            <MenuItem TextValue="JSON" OnSelect="@(() => Toasts.Show($"Exported {Visible.Count} tasks as JSON", ToastKind.Success))">JSON</MenuItem>
+                        </MenuSubContent>
+                    </MenuSub>
+                    <MenuSeparator />
+                    <MenuItem TextValue="Archive project" OnSelect="@(() => _archiveOpen = true)">Archive project…</MenuItem>
+                </MenuContent>
+            </Menu>
+            <Menu>
+                <MenubarTrigger>View</MenubarTrigger>
+                <MenuContent class="menu">
+                    <MenuCheckboxItem TextValue="Show completed" @bind-IsChecked="_showDone">Show completed tasks</MenuCheckboxItem>
+                    <MenuSeparator />
+                    <MenuRadioGroup aria-label="Sort tasks by" @bind-Value="_sort">
+                        <MenuRadioItem Value="due" TextValue="Due date">Sort by due date</MenuRadioItem>
+                        <MenuRadioItem Value="priority" TextValue="Priority">Sort by priority</MenuRadioItem>
+                        <MenuRadioItem Value="title" TextValue="Title">Sort by title</MenuRadioItem>
+                    </MenuRadioGroup>
+                </MenuContent>
+            </Menu>
+            <Menu>
+                <MenubarTrigger>Help</MenubarTrigger>
+                <MenuContent class="menu">
+                    <MenuItem TextValue="Keyboard shortcuts" OnSelect="@(() => _tab = "settings")">Keyboard and settings</MenuItem>
+                    <MenuItem TextValue="About" OnSelect="@(() => Toasts.Show("Orbit is a sample app of the BlazorDesignToolkit demo."))">About Orbit</MenuItem>
+                </MenuContent>
+            </Menu>
+        </Menubar>
+        <div class="app-search">
+            <Combobox TItem="TaskItem" Items="_tasks" ItemLabel="t => t.Title" Value="_found" ValueChanged="Find" aria-label="Search tasks"
+                      placeholder="Search tasks…" data-testid="task-search" />
+        </div>
+        <Menu>
+            <MenuTrigger class="icon-only" aria-label="Account">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0z" /></svg>
+            </MenuTrigger>
+            <MenuContent class="menu">
+                <MenuItem TextValue="Profile" OnSelect="@(() => Toasts.Show("Signed in as Ada Lovelace"))">Ada Lovelace</MenuItem>
+                <MenuSeparator />
+                <MenuItem TextValue="Sign out" OnSelect="@(() => Toasts.Show("This is a demo: you stay signed in."))">Sign out</MenuItem>
+            </MenuContent>
+        </Menu>
+    </header>
+    <div class="app-body">
+        <nav class="app-sidebar" aria-labelledby="orbit-projects">
+            <h2 id="orbit-projects">Projects</h2>
+            <TreeView TItem="ProjectNode" Items="ProjectTree" ChildrenSelector="n => n.Children.Count == 0 ? null : n.Children" ItemLabel="n => n.Name"
+                      Value="_selectedNode" ValueChanged="SelectNode" @bind-ExpandedItems="_expanded" aria-labelledby="orbit-projects" data-testid="project-tree" />
+        </nav>
+        <section class="app-main" aria-labelledby="orbit-title">
+            <h2 id="orbit-title">@_project</h2>
+            <Tabs Value="@_tab" ValueChanged="v => _tab = v ?? _tab" Direction="@(_dir == "rtl" ? TextDirection.Rtl : TextDirection.Ltr)">
+                <TabList aria-label="Project views">
+                    <Tab Value="overview">Overview</Tab>
+                    <Tab Value="tasks">Tasks <span class="fake-chip">@ProjectTasks.Count(t => t.Status != "Done")</span></Tab>
+                    <Tab Value="settings">Settings</Tab>
+                </TabList>
+                <TabPanel Value="overview">
+                    <dl class="kpi-grid">
+                        <div class="kpi"><dt>Open tasks</dt><dd>@ProjectTasks.Count(t => t.Status != "Done")</dd></div>
+                        <div class="kpi"><dt>Blocked</dt><dd>@ProjectTasks.Count(t => t.Status == "Blocked")</dd></div>
+                        <div class="kpi"><dt>Due this week</dt><dd>@ProjectTasks.Count(t => t.Status != "Done" && t.Due <= _today.AddDays(7))</dd></div>
+                        <div class="kpi"><dt>Complete</dt><dd>@Progress %</dd></div>
+                    </dl>
+                    <ul class="block-list" aria-label="Tasks by status">
+                        @foreach (var status in Statuses)
+                        {
+                            var count = ProjectTasks.Count(t => t.Status == status);
+                            <li>
+                                <span class="status @StatusClass(status)">@status</span>
+                                <span class="meter" aria-hidden="true"><span style="inline-size:@(ProjectTasks.Count == 0 ? 0 : count * 100 / ProjectTasks.Count)%"></span></span>
+                                <span>@count</span>
+                            </li>
+                        }
+                    </ul>
+                    <h3>Up next</h3>
+                    <ul>
+                        @foreach (var task in ProjectTasks.Where(t => t.Status != "Done").OrderBy(t => t.Due).Take(3))
+                        {
+                            <li>@task.Title, due @Date(task.Due) (@task.Assignee)</li>
+                        }
+                    </ul>
+                </TabPanel>
+                <TabPanel Value="tasks">
+                    <div class="app-toolbar">
+                        <AuroraButton OnClick="OpenNewTask" data-testid="new-task">New task</AuroraButton>
+                        <Popover>
+                            <PopoverTrigger>Filters@(FilterCount > 0 ? $" ({FilterCount})" : "")</PopoverTrigger>
+                            <PopoverContent class="popover-panel" aria-label="Filters">
+                                <fieldset class="stack">
+                                    <legend>Status</legend>
+                                    @foreach (var status in Statuses)
+                                    {
+                                        var current = status;
+                                        <label><Checkbox Checked="_statusFilter.Contains(current)" CheckedChanged="v => ToggleStatus(current, v)" /> @current</label>
+                                    }
+                                </fieldset>
+                                <FormField class="control">
+                                    <FormLabel>Assignee</FormLabel>
+                                    <Select TItem="string" Items="AssigneeFilters" @bind-Value="_assigneeFilter" />
+                                </FormField>
+                            </PopoverContent>
+                        </Popover>
+                        <span class="grow"></span>
+                        <AuroraButton Variant="secondary" Disabled="SelectedCount == 0" OnClick="CompleteSelected" data-testid="complete-selected">@(SelectedCount == 0 ? "Mark selected done" : $"Mark {SelectedCount} done")</AuroraButton>
+                    </div>
+                    @if (Visible.Count == 0)
+                    {
+                        <p class="empty-state">No tasks match. Change the filters or create a task.</p>
+                    }
+                    else
+                    {
+                        <div class="task-scroll" tabindex="0" role="region" aria-label="Tasks">
+                            <table class="task-table" data-testid="task-table">
+                                <caption class="visually-hidden">Tasks of @_project</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="col-check"><Checkbox Checked="AllSelected" Indeterminate="SomeSelected" CheckedChanged="SelectAll" aria-label="Select all tasks" /></th>
+                                        <th scope="col">Task</th>
+                                        <th scope="col">Assignee</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Due</th>
+                                        <th scope="col" class="col-actions"><span class="visually-hidden">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var task in Visible)
+                                    {
+                                        var current = task;
+                                        <tr @key="task.Id" data-selected="@(task.Selected || task == _found ? "" : null)">
+                                            <td><Checkbox Checked="task.Selected" CheckedChanged="v => current.Selected = v" aria-label="@($"Select {task.Title}")" /></td>
+                                            <th scope="row">
+                                                @task.Title
+                                                @if (task.Priority == "High")
+                                                {
+                                                    <Tooltip>
+                                                        <TooltipTrigger class="icon-only" aria-label="High priority">
+                                                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="priority-high"><path d="M5 21V4h11l-1.5 4L16 12H7v9z" /></svg>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>High priority</TooltipContent>
+                                                    </Tooltip>
+                                                }
+                                            </th>
+                                            <td>@task.Assignee</td>
+                                            <td><span class="status @StatusClass(task.Status)">@task.Status</span></td>
+                                            <td>@Date(task.Due)</td>
+                                            <td class="col-actions">
+                                                <Menu>
+                                                    <MenuTrigger class="icon-only" aria-label="@($"Actions for {task.Title}")">
+                                                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                                                    </MenuTrigger>
+                                                    <MenuContent class="menu">
+                                                        @foreach (var status in Statuses.Where(s => s != task.Status))
+                                                        {
+                                                            var target = status;
+                                                            <MenuItem TextValue="@($"Move to {target}")" OnSelect="() => Move(current, target)">Move to @target</MenuItem>
+                                                        }
+                                                        <MenuItem TextValue="Duplicate" OnSelect="() => Duplicate(current)">Duplicate</MenuItem>
+                                                        <MenuSeparator />
+                                                        <MenuItem TextValue="Delete" OnSelect="() => AskDelete(current)">Delete…</MenuItem>
+                                                    </MenuContent>
+                                                </Menu>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </TabPanel>
+                <TabPanel Value="settings">
+                    <div class="settings-grid">
+                        <fieldset>
+                            <legend>Notifications</legend>
+                            <FormField>
+                                <FormLabel>Email digest</FormLabel>
+                                <Switch @bind-Checked="_digest" />
+                            </FormField>
+                            <FormField class="control">
+                                <FormLabel>Digest frequency</FormLabel>
+                                <Select TItem="string" Items="Frequencies" @bind-Value="_frequency" Disabled="!_digest" />
+                            </FormField>
+                            <FormField>
+                                <FormLabel>Mention alerts</FormLabel>
+                                <Switch @bind-Checked="_mentions" />
+                            </FormField>
+                        </fieldset>
+                        <fieldset>
+                            <legend>Workflow</legend>
+                            <FormField class="control">
+                                <FormLabel>Work-in-progress limit</FormLabel>
+                                <Slider Min="1" Max="10" Step="1" @bind-Value="_wipLimit" ValueText="@(v => $"{v} tasks")" />
+                                <FormDescription>@_wipLimit tasks in progress per person.</FormDescription>
+                            </FormField>
+                            <FormField class="control">
+                                <FormLabel>Sprint length (days)</FormLabel>
+                                <NumberField Min="5" Max="30" Step="1" @bind-Value="_sprintDays" />
+                            </FormField>
+                            <FormField>
+                                <FormLabel>Default view</FormLabel>
+                                <RadioGroup TValue="string" @bind-Value="_view" class="radio-list">
+                                    <label><Radio Value="@("list")" /> List</label>
+                                    <label><Radio Value="@("board")" /> Board</label>
+                                    <label><Radio Value="@("timeline")" /> Timeline</label>
+                                </RadioGroup>
+                            </FormField>
+                        </fieldset>
+                    </div>
+                    <Accordion HeadingLevel="3">
+                        <AccordionItem Value="keyboard">
+                            <AccordionTrigger>Keyboard shortcuts in Orbit</AccordionTrigger>
+                            <AccordionPanel>
+                                <p>Arrow keys move inside the menubar, project tree, tabs, menus and lists; <kbd>Home</kbd> and
+                                    <kbd>End</kbd> jump to the ends; typing a letter moves to the next matching item;
+                                    <kbd>Escape</kbd> closes popups and returns focus to where you were.</p>
+                            </AccordionPanel>
+                        </AccordionItem>
+                        <AccordionItem Value="archive">
+                            <AccordionTrigger>Archive this project</AccordionTrigger>
+                            <AccordionPanel>
+                                <p>Archived projects are read-only and hidden from the sidebar.</p>
+                                <AuroraButton Variant="danger" OnClick="@(() => _archiveOpen = true)">Archive project…</AuroraButton>
+                            </AccordionPanel>
+                        </AccordionItem>
+                    </Accordion>
+                    <div class="actions">
+                        <AuroraButton OnClick="@(() => Toasts.Show("Project settings saved", ToastKind.Success))">Save settings</AuroraButton>
+                    </div>
+                </TabPanel>
+            </Tabs>
+        </section>
+    </div>
+
+    <Dialog @bind-Open="_newTaskOpen">
+        <DialogContent class="app-dialog" data-testid="new-task-dialog">
+            <DialogTitle>New task in @_project</DialogTitle>
+            <DialogDescription>Fields marked with an asterisk are required.</DialogDescription>
+            <form class="stack" @onsubmit="CreateTask" @onsubmit:preventDefault novalidate>
+                <FormField Invalid="_titleError is not null" Required="true">
+                    <FormLabel>Title <span aria-hidden="true">*</span></FormLabel>
+                    <FieldInput @bind-Value="_draftTitle" autocomplete="off" data-testid="task-title" />
+                    <FormError>@_titleError</FormError>
+                </FormField>
+                <FormField class="control">
+                    <FormLabel>Assignee</FormLabel>
+                    <Combobox TItem="string" Items="People" @bind-Value="_draftAssignee" />
+                    <FormDescription>Type to search the team.</FormDescription>
+                </FormField>
+                <FormField class="control">
+                    <FormLabel>Due date</FormLabel>
+                    <DatePicker @bind-Value="_draftDue" Culture="@Culture" Min="@_today" Today="@_today" />
+                </FormField>
+                <FormField>
+                    <FormLabel>Priority</FormLabel>
+                    <RadioGroup TValue="string" @bind-Value="_draftPriority" Orientation="Orientation.Horizontal" class="segmented">
+                        @foreach (var priority in Priorities)
+                        {
+                            <label><Radio Value="priority" />@priority</label>
+                        }
+                    </RadioGroup>
+                </FormField>
+                <div class="actions">
+                    <DialogClose>Cancel</DialogClose>
+                    <AuroraButton Type="submit" data-testid="create-task">Create task</AuroraButton>
+                </div>
+            </form>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog @bind-Open="_deleteOpen" Alert="true">
+        <DialogContent class="app-dialog">
+            <DialogTitle>Delete “@_pendingDelete?.Title”?</DialogTitle>
+            <DialogDescription>The task and its history are removed. You can undo this from the notification.</DialogDescription>
+            <div class="actions">
+                <DialogClose autofocus>Cancel</DialogClose>
+                <DialogClose OnClick="ConfirmDelete" class="danger-button">Delete</DialogClose>
+            </div>
+        </DialogContent>
+    </Dialog>
+
+    <Dialog @bind-Open="_archiveOpen" Alert="true">
+        <DialogContent class="app-dialog">
+            <DialogTitle>Archive @_project?</DialogTitle>
+            <DialogDescription>This is a demo, so nothing is archived; in a real app the project would become read-only.</DialogDescription>
+            <div class="actions">
+                <DialogClose autofocus>Cancel</DialogClose>
+                <DialogClose OnClick="@(() => Toasts.Show($"{_project} archived (not really)", ToastKind.Warning))" class="danger-button">Archive</DialogClose>
+            </div>
+        </DialogContent>
+    </Dialog>
+</ThemeScope>
+
+<section aria-labelledby="used-title">
+    <h2 id="used-title">What you just used</h2>
+    <p class="section-lead">@UsedPrimitives.Length primitives, each with its keyboard interaction, focus management and ARIA
+        handled for you. None of them ships any CSS: the app's own look is about 50 CSS rules that use only Aurora tokens, on top of
+        the optional starter styles.</p>
+    <ul class="used-list">
+        @foreach (var name in UsedPrimitives)
+        {
+            var info = DemoCatalog.Primitives.FirstOrDefault(p => p.Name == name);
+            <li><a href="@(info?.Page ?? "primitives")">@name</a></li>
+        }
+    </ul>
+    <ul class="card-grid used-cards">
+        <li class="card">
+            <h3>Scoped theming</h3>
+            <p>The app sits inside <code>&lt;ThemeScope&gt;</code>, which renders the theme attributes on its own element, so
+                one page can show several brands at once. Popups opened from inside the scope keep its theme.</p>
+        </li>
+        <li class="card">
+            <h3>Built for every input</h3>
+            <p>Roving focus, type-ahead, <kbd>Home</kbd>/<kbd>End</kbd>, right-to-left mirroring, focus restoration after
+                dialogs and menus, and live announcements are part of the primitives, not of this page.</p>
+        </li>
+        <li class="card">
+            <h3>Server or WebAssembly</h3>
+            <p>The same components run in Interactive Server and Interactive WebAssembly; switch in the footer and try again.</p>
+        </li>
+    </ul>
+</section>
+
+@code {
+    private sealed class TaskItem
+    {
+        public required int Id { get; init; }
+        public required string Title { get; set; }
+        public required string Project { get; set; }
+        public required string Assignee { get; set; }
+        public required string Status { get; set; }
+        public required DateOnly Due { get; set; }
+        public required string Priority { get; set; }
+        public bool Selected { get; set; }
+    }
+
+    public sealed record ProjectNode(string Name, IReadOnlyList<ProjectNode> Children);
+
+    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("en-US");
+    private static readonly string[] Statuses = ["To do", "In progress", "Blocked", "Done"];
+    private static readonly string[] Priorities = ["Low", "Normal", "High"];
+    private static readonly string[] Frequencies = ["Daily", "Weekly", "Monthly"];
+    private static readonly string[] People = ["Ada Lovelace", "Alan Turing", "Grace Hopper", "Katherine Johnson", "Linus Torvalds", "Margaret Hamilton", "Tim Berners-Lee"];
+    private static readonly string[] UsedPrimitives =
+    [
+        "Menubar", "Menu", "MenuSub", "Combobox", "TreeView", "Tabs", "Checkbox", "Tooltip", "Popover", "Select", "Dialog",
+        "FormField", "DatePicker", "RadioGroup", "Switch", "Slider", "NumberField", "Accordion", "ToastRegion", "LiveRegion",
+    ];
+
+    private static readonly IReadOnlyList<ProjectNode> ProjectTree =
+    [
+        new("Design", [new("Website redesign", []), new("Brand refresh", [])]),
+        new("Engineering", [new("Mobile app", []), new("Public API v2", [])]),
+        new("Marketing", [new("Launch campaign", [])]),
+    ];
+
+    private string _theme = "aurora";
+    private Dictionary<string, string> _axes = [];
+    private string? _dir = "ltr";
+
+    private DateOnly _today;
+    private List<TaskItem> _tasks = [];
+    private int _nextId = 1;
+    private string _project = "Website redesign";
+    private ProjectNode? _selectedNode;
+    private IReadOnlyCollection<ProjectNode> _expanded = ProjectTree;
+    private string _tab = "tasks";
+    private TaskItem? _found;
+    private bool _showDone = true;
+    private string? _sort = "due";
+    private readonly HashSet<string> _statusFilter = [.. Statuses];
+    private string? _assigneeFilter = AnyAssignee;
+    private const string AnyAssignee = "Anyone";
+
+    private bool _newTaskOpen;
+    private string? _draftTitle;
+    private string? _draftAssignee;
+    private DateOnly? _draftDue;
+    private string? _draftPriority = "Normal";
+    private string? _titleError;
+
+    private bool _deleteOpen;
+    private TaskItem? _pendingDelete;
+    private bool _archiveOpen;
+
+    private bool _digest = true;
+    private string? _frequency = "Weekly";
+    private bool _mentions = true;
+    private double _wipLimit = 3;
+    private double? _sprintDays = 14;
+    private string? _view = "list";
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+
+    /// <summary>Pins "today" (yyyy-MM-dd) so that due dates are the same on every day, for tests.</summary>
+    [SupplyParameterFromQuery(Name = "today")] private string? TodayParameter { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // The preview starts with the site's current (effective) theme and can then be changed independently.
+        var effective = Manager.State.EffectiveSelection;
+        _theme = effective.ThemeId;
+        _axes = Manager.Catalog.Axes.ToDictionary(a => a.Name, a => effective[a.Name] is { } v && a.Values.Contains(v) ? v : a.Default);
+        _today = DateOnly.TryParseExact(TodayParameter, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var pinned)
+            ? pinned
+            : DateOnly.FromDateTime(DateTime.Today);
+        _selectedNode = ProjectTree[0].Children[0];
+        Seed();
+    }
+
+    private void Seed()
+    {
+        void Add(string title, string project, string assignee, string status, int dueInDays, string priority = "Normal")
+            => _tasks.Add(new TaskItem { Id = _nextId++, Title = title, Project = project, Assignee = assignee, Status = status, Due = _today.AddDays(dueInDays), Priority = priority });
+
+        Add("Audit color contrast", "Website redesign", "Grace Hopper", "In progress", 2, "High");
+        Add("Design token review", "Website redesign", "Ada Lovelace", "To do", 4);
+        Add("Navigation prototype", "Website redesign", "Alan Turing", "Blocked", 6, "High");
+        Add("Write release notes", "Website redesign", "Margaret Hamilton", "To do", 9, "Low");
+        Add("Dark mode QA", "Website redesign", "Katherine Johnson", "Done", -1);
+        Add("Logo variations", "Brand refresh", "Ada Lovelace", "In progress", 3);
+        Add("Typography scale", "Brand refresh", "Grace Hopper", "To do", 8, "High");
+        Add("Offline sync", "Mobile app", "Linus Torvalds", "In progress", 5, "High");
+        Add("Push notifications", "Mobile app", "Tim Berners-Lee", "To do", 12);
+        Add("Rate limiting", "Public API v2", "Alan Turing", "Done", -3);
+        Add("OpenAPI document", "Public API v2", "Margaret Hamilton", "In progress", 1);
+        Add("Launch email", "Launch campaign", "Katherine Johnson", "To do", 7);
+    }
+
+    private List<TaskItem> ProjectTasks => _tasks.Where(t => t.Project == _project).ToList();
+
+    private List<TaskItem> Visible
+    {
+        get
+        {
+            var tasks = ProjectTasks.Where(t => _statusFilter.Contains(t.Status))
+                .Where(t => _showDone || t.Status != "Done")
+                .Where(t => _assigneeFilter is null or AnyAssignee || t.Assignee == _assigneeFilter);
+            return (_sort switch
+            {
+                "priority" => tasks.OrderBy(t => Array.IndexOf(Priorities, t.Priority) * -1).ThenBy(t => t.Due),
+                "title" => tasks.OrderBy(t => t.Title, StringComparer.CurrentCulture),
+                _ => tasks.OrderBy(t => t.Due),
+            }).ToList();
+        }
+    }
+
+    private IEnumerable<string> AssigneeFilters => new[] { AnyAssignee }.Concat(ProjectTasks.Select(t => t.Assignee).Distinct().Order());
+
+    private int FilterCount => (_statusFilter.Count < Statuses.Length ? 1 : 0) + (_assigneeFilter is null or AnyAssignee ? 0 : 1) + (_showDone ? 0 : 1);
+
+    private int Progress => ProjectTasks.Count == 0 ? 0 : ProjectTasks.Count(t => t.Status == "Done") * 100 / ProjectTasks.Count;
+
+    private int SelectedCount => Visible.Count(t => t.Selected);
+    private bool AllSelected => Visible.Count > 0 && Visible.All(t => t.Selected);
+    private bool SomeSelected => SelectedCount > 0 && !AllSelected;
+
+    private static string StatusClass(string status) => status switch
+    {
+        "In progress" => "status--doing",
+        "Blocked" => "status--blocked",
+        "Done" => "status--done",
+        _ => "status--todo",
+    };
+
+    private string Date(DateOnly date) => date == _today ? "today" : date.ToString("MMM d", Culture);
+
+    private void SelectNode(ProjectNode? node)
+    {
+        _selectedNode = node;
+        if (node is null || node.Children.Count > 0) return;
+        foreach (var task in _tasks) task.Selected = false;
+        _project = node.Name;
+        _found = null;
+        _assigneeFilter = AnyAssignee;
+    }
+
+    private void Find(TaskItem? task)
+    {
+        _found = task;
+        if (task is null) return;
+        _project = task.Project;
+        _selectedNode = ProjectTree.SelectMany(g => g.Children).FirstOrDefault(n => n.Name == task.Project);
+        _tab = "tasks";
+        _statusFilter.UnionWith(Statuses);
+        _showDone = true;
+        _assigneeFilter = AnyAssignee;
+        Announcer.Announce($"{task.Title}: {task.Status}, due {Date(task.Due)}, assigned to {task.Assignee}.");
+    }
+
+    private void ToggleStatus(string status, bool include)
+    {
+        if (include) _statusFilter.Add(status); else _statusFilter.Remove(status);
+    }
+
+    private void SelectAll(bool value)
+    {
+        foreach (var task in Visible) task.Selected = value;
+    }
+
+    private void CompleteSelected()
+    {
+        var selected = Visible.Where(t => t.Selected).ToList();
+        foreach (var task in selected)
+        {
+            task.Status = "Done";
+            task.Selected = false;
+        }
+        Toasts.Show($"{selected.Count} task(s) marked done", ToastKind.Success);
+    }
+
+    private void Move(TaskItem task, string status)
+    {
+        task.Status = status;
+        Announcer.Announce($"{task.Title} moved to {status}.");
+    }
+
+    private void Duplicate(TaskItem task)
+    {
+        var copy = new TaskItem { Id = _nextId++, Title = task.Title + " (copy)", Project = task.Project, Assignee = task.Assignee, Status = "To do", Due = task.Due, Priority = task.Priority };
+        _tasks.Insert(_tasks.IndexOf(task) + 1, copy);
+        Toasts.Show($"Duplicated “{task.Title}”");
+    }
+
+    private void AskDelete(TaskItem task)
+    {
+        _pendingDelete = task;
+        _deleteOpen = true;
+    }
+
+    private void ConfirmDelete()
+    {
+        if (_pendingDelete is not { } task) return;
+        var index = _tasks.IndexOf(task);
+        _tasks.Remove(task);
+        if (_found == task) _found = null;
+        Toasts.Show(new ToastOptions
+        {
+            Message = $"Deleted “{task.Title}”",
+            ActionLabel = "Undo",
+            Action = () =>
+            {
+                _tasks.Insert(Math.Min(index, _tasks.Count), task);
+                Announcer.Announce($"Restored {task.Title}.");
+                StateHasChanged();
+                return Task.CompletedTask;
+            },
+        });
+    }
+
+    private void OpenNewTask()
+    {
+        _draftTitle = null;
+        _draftAssignee = null;
+        _draftDue = _today.AddDays(7);
+        _draftPriority = "Normal";
+        _titleError = null;
+        _newTaskOpen = true;
+    }
+
+    private void CreateTask()
+    {
+        var title = _draftTitle?.Trim();
+        _titleError = string.IsNullOrEmpty(title) ? "Enter a title for the task." : null;
+        if (_titleError is not null) return;
+        var task = new TaskItem
+        {
+            Id = _nextId++, Title = title!, Project = _project, Assignee = _draftAssignee ?? "Unassigned", Status = "To do",
+            Due = _draftDue ?? _today.AddDays(7), Priority = _draftPriority ?? "Normal",
+        };
+        _tasks.Add(task);
+        _statusFilter.Add("To do");
+        _tab = "tasks";
+        _newTaskOpen = false;
+        Toasts.Show($"Created “{task.Title}”", ToastKind.Success);
+    }
+}

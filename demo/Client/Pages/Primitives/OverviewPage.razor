@@ -1,0 +1,154 @@
+@page "/primitives"
+
+<PageTitle>Primitives · BlazorDesignToolkit</PageTitle>
+
+<p class="eyebrow">Primitives</p>
+<h1 tabindex="-1">Headless, accessible components</h1>
+<p class="lead">Headless means each component brings the behavior (keyboard interaction, focus management, ARIA roles and
+    states, form integration) and no appearance. The look is yours: your own CSS, your design tokens, a CSS framework, or
+    the optional starter styles.</p>
+
+<section aria-labelledby="skins-title">
+    <h2 id="skins-title">Same components, three looks</h2>
+    <p class="section-lead">The markup below never changes; only the style sheet does. Open <em>Live markup</em> and switch
+        the styling to see for yourself.</p>
+    <FormField class="control">
+        <FormLabel>Styling</FormLabel>
+        <RadioGroup TValue="string" @bind-Value="_skin" Orientation="Orientation.Horizontal" class="segmented" data-testid="skin">
+            <label><Radio Value="@("starter")" />Starter styles + tokens</label>
+            <label><Radio Value="@("blueprint")" />Custom CSS</label>
+            <label><Radio Value="@("none")" />No CSS at all</label>
+        </RadioGroup>
+        <FormDescription>@SkinDescription</FormDescription>
+    </FormField>
+    <Example Title="Skinned components" Inspect="true">
+        <ChildContent>
+            <div class="skin-stage skin--@_skin" data-testid="skin-stage">
+                <div class="skin-grid">
+                    <div>
+                        <Tabs DefaultValue="profile">
+                            <TabList aria-label="Account">
+                                <Tab Value="profile">Profile</Tab>
+                                <Tab Value="security">Security</Tab>
+                                <Tab Value="billing">Billing</Tab>
+                            </TabList>
+                            <TabPanel Value="profile"><p>Your public profile.</p></TabPanel>
+                            <TabPanel Value="security"><p>Passwords and passkeys.</p></TabPanel>
+                            <TabPanel Value="billing"><p>Invoices and plans.</p></TabPanel>
+                        </Tabs>
+                    </div>
+                    <div>
+                        <div role="group" aria-label="Text style">
+                            <ToggleButton @bind-Pressed="_bold">Bold</ToggleButton>
+                            <ToggleButton @bind-Pressed="_italic">Italic</ToggleButton>
+                        </div>
+                        <FormField>
+                            <FormLabel>Wi-Fi</FormLabel>
+                            <Switch @bind-Checked="_wifi" />
+                            <FormDescription>Currently @(_wifi ? "on" : "off").</FormDescription>
+                        </FormField>
+                        <label><Checkbox @bind-Checked="_terms" /> I accept the terms</label>
+                    </div>
+                    <div>
+                        <FormField>
+                            <FormLabel>Size</FormLabel>
+                            <Select TItem="string" Items="Sizes" @bind-Value="_size" />
+                        </FormField>
+                        <FormField>
+                            <FormLabel>Delivery</FormLabel>
+                            <RadioGroup TValue="string" @bind-Value="_delivery">
+                                <label><Radio Value="@("standard")" /> Standard</label>
+                                <label><Radio Value="@("express")" /> Express</label>
+                            </RadioGroup>
+                        </FormField>
+                    </div>
+                </div>
+            </div>
+        </ChildContent>
+    </Example>
+</section>
+
+<section aria-labelledby="every-title">
+    <h2 id="every-title">What every primitive gives you</h2>
+    <div class="split">
+        <ul class="check-list">
+            <li>The WAI-ARIA Authoring Practices pattern: roles, states and properties kept in sync with your data.</li>
+            <li>Complete keyboard support, including type-ahead, <kbd>Home</kbd>/<kbd>End</kbd>, <kbd>Page Up</kbd>/<kbd>Page Down</kbd> and right-to-left mirroring.</li>
+            <li>Focus management: roving focus in composite widgets, focus containment in modal dialogs, focus restoration when overlays close.</li>
+            <li>Native elements first: real buttons, inputs and <code>&lt;dialog&gt;</code>; the Popover API for overlays.</li>
+        </ul>
+        <ul class="check-list">
+            <li>Controlled or uncontrolled: <code>@@bind-Value</code>, or a default value and change events; changes the parent rejects are reverted.</li>
+            <li>Integrates with <code>FormField</code> for labels, descriptions and errors, and with HTML form submission.</li>
+            <li>Virtualization for long listboxes and trees; localizable texts through <code>PrimitiveStrings</code>.</li>
+            <li>Works in Interactive Server and WebAssembly; tested with bUnit, Playwright and axe-core in Chromium, Firefox and WebKit.</li>
+        </ul>
+    </div>
+</section>
+
+<section aria-labelledby="catalog-title">
+    <h2 id="catalog-title">The catalog</h2>
+    <p class="section-lead">@DemoCatalog.Primitives.Count components. Each page shows examples, the keyboard interaction and the live markup.</p>
+    <ul class="card-grid">
+        @foreach (var group in DemoCatalog.Primitives.GroupBy(p => p.Category))
+        {
+            <li class="card">
+                <h3>@group.Key</h3>
+                <ul>
+                    @foreach (var primitive in group)
+                    {
+                        <li>
+                            @if (primitive.Page == "primitives")
+                            {
+                                <code>@primitive.Name</code>
+                            }
+                            else
+                            {
+                                <a href="@primitive.Page"><code>@primitive.Name</code></a>
+                            }
+                            <span class="muted"> · @primitive.Pattern</span>
+                        </li>
+                    }
+                </ul>
+            </li>
+        }
+    </ul>
+</section>
+
+<section aria-labelledby="test-title">
+    <h2 id="test-title">Test your own components</h2>
+    <p class="section-lead"><code>BlazorDesignToolkit.Testing</code> audits rendered markup in bUnit tests: duplicate ids,
+        broken id references, missing accessible names, invalid ARIA, required owned elements, and focusable content inside
+        hidden subtrees.</p>
+    <CodeBlock Code="@TestSnippet" Label="bUnit test" />
+</section>
+
+@code {
+    private static readonly string[] Sizes = ["Small", "Medium", "Large"];
+    private string? _skin = "starter";
+    private bool _bold = true;
+    private bool _italic;
+    private bool _wifi = true;
+    private bool _terms;
+    private string? _size = "Medium";
+    private string? _delivery = "standard";
+
+    private string SkinDescription => _skin switch
+    {
+        "blueprint" => "Fewer than 20 rules of custom CSS that target ARIA states such as [aria-selected=\"true\"] and [aria-checked=\"true\"].",
+        "none" => "Browser defaults only. Everything still works with the keyboard and screen readers; state lives in ARIA attributes.",
+        _ => "The optional StarterStyles package, with its --bdt-* variables mapped to Aurora tokens.",
+    };
+
+    private const string TestSnippet = """
+        [Fact]
+        public void Settings_panel_is_accessible()
+        {
+            var cut = Render(@<SettingsPanel />);
+
+            cut.Find("[role=tab]:nth-child(2)").KeyDown(Key.ArrowLeft);
+
+            AccessibilityAssert.NoViolations(cut.Markup);
+        }
+        """;
+}

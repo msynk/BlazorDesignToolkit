@@ -1,11 +1,11 @@
 <nav class="site-nav" id="@Id" aria-label="Main">
     @foreach (var group in Links.GroupBy(l => l.Group))
     {
-        <h2 class="nav-group" id="nav-@group.Key.ToLowerInvariant()">@group.Key</h2>
-        <ul aria-labelledby="nav-@group.Key.ToLowerInvariant()">
+        <h2 class="nav-group" id="nav-@Slug(group.Key)">@group.Key</h2>
+        <ul aria-labelledby="nav-@Slug(group.Key)">
             @foreach (var link in group)
             {
-                <li><NavLink href="@link.Href" Match="@(link.Href == "" ? NavLinkMatch.All : NavLinkMatch.Prefix)">@link.Title</NavLink></li>
+                <li><NavLink href="@link.Href" Match="NavLinkMatch.All">@link.Title</NavLink></li>
             }
         </ul>
     }
@@ -18,15 +18,19 @@
 
     public static readonly IReadOnlyList<Link> Links =
     [
-        new("Overview", "Introduction", ""),
-        new("Tokens", "Token explorer", "tokens"),
-        new("Tokens", "Themes and brands", "themes"),
-        new("Tokens", "Compare themes", "compare"),
-        new("Tokens", "Live editor", "editor"),
-        new("Tokens", "Import and export", "import-export"),
-        new("Tokens", "Validation", "validation"),
-        new("Tokens", "Coverage", "coverage"),
-        new("Tokens", "Integrations", "integrations"),
+        new("Start here", "Introduction", ""),
+        new("Start here", "Guided tour", "tour"),
+        new("Start here", "Showcase app", "showcase"),
+        new("Design tokens", "Token explorer", "tokens"),
+        new("Design tokens", "Validation", "validation"),
+        new("Design tokens", "Compare themes", "compare"),
+        new("Design tokens", "Coverage", "coverage"),
+        new("Design tokens", "Import and export", "import-export"),
+        new("Design tokens", "Integrations", "integrations"),
+        new("Theming", "Themes and brands", "themes"),
+        new("Theming", "Brand builder", "brand-builder"),
+        new("Theming", "Live editor", "editor"),
+        new("Primitives", "Overview and skins", "primitives"),
         new("Primitives", "Buttons and toggles", "primitives/controls"),
         new("Primitives", "Forms", "primitives/forms"),
         new("Primitives", "Tabs", "primitives/tabs"),
@@ -41,4 +45,7 @@
         new("Guides", "Design system example", "design-system"),
         new("Guides", "Accessibility", "accessibility"),
     ];
+
+    /// <summary>An id-safe form of a group name.</summary>
+    public static string Slug(string text) => text.ToLowerInvariant().Replace(' ', '-');
 }

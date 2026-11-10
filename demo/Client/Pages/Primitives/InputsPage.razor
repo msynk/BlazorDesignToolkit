@@ -4,8 +4,10 @@
 <PageTitle>Slider, number field, date picker · BlazorDesignToolkit</PageTitle>
 
 <h1 tabindex="-1">Slider, number field and date picker</h1>
+<p class="lead">Inputs for the cases native elements do not cover well: sliders with spoken value text, a
+    culture-aware number field, and a date picker with a keyboard-navigable calendar grid and disabled dates.</p>
 
-<Example Title="Slider">
+<Example Title="Slider" Inspect="true">
     <ChildContent>
         <FormField class="control">
             <FormLabel>Volume</FormLabel>
@@ -16,7 +18,7 @@
     </ChildContent>
 </Example>
 
-<Example Title="Range slider">
+<Example Title="Range slider" Inspect="true">
     <ChildContent>
         <FormField class="control">
             <FormLabel>Price range</FormLabel>
@@ -27,7 +29,7 @@
     </ChildContent>
 </Example>
 
-<Example Title="Number field (spinbutton)">
+<Example Title="Number field (spinbutton)" Inspect="true">
     <ChildContent>
         <FormField class="control">
             <FormLabel>Quantity</FormLabel>
@@ -39,7 +41,7 @@
     </ChildContent>
 </Example>
 
-<Example Title="Date picker">
+<Example Title="Date picker" Inspect="true">
     <Description><p>Weekends cannot be chosen, and dates before today (@_today.ToString("D", Culture)) are disabled.</p></Description>
     <ChildContent>
         <FormField class="control">

@@ -1,0 +1,280 @@
+@page "/brand-builder"
+@using BlazorDesignToolkit.Tokens.Colors
+@using BlazorDesignToolkit.Tokens.Export
+@using BlazorDesignToolkit.Tokens.Json
+@using BlazorDesignToolkit.Tokens.Resolution
+@using BlazorDesignToolkit.Tokens.Validation
+@inject LiveAnnouncer Announcer
+
+<PageTitle>Brand builder · BlazorDesignToolkit</PageTitle>
+
+<p class="eyebrow">Theming</p>
+<h1 tabindex="-1">Brand builder</h1>
+<p class="lead">Pick one color. The toolkit turns it into an 11-step palette in OKLCH that keeps Aurora's lightness ladder,
+    swaps it in for Aurora's blue scale, and every semantic and component token that refers to that scale follows, in
+    light and dark, standard and increased contrast. Contrast is re-checked on every change.</p>
+
+<div class="builder-grid">
+    <section class="card" aria-labelledby="seed-title">
+        <h2 id="seed-title">1. Choose a brand color</h2>
+        <FormField class="control">
+            <FormLabel>Preset</FormLabel>
+            <RadioGroup TValue="string" Value="_preset" ValueChanged="ChoosePreset" Orientation="Orientation.Horizontal" class="segmented" data-testid="brand-preset">
+                @foreach (var (name, hex) in Presets)
+                {
+                    <label><Radio Value="name" /><span class="dot" style="background:@hex" aria-hidden="true"></span>@name</label>
+                }
+            </RadioGroup>
+        </FormField>
+        <FormField class="control" Context="field">
+            <FormLabel>Or any color</FormLabel>
+            <div class="inline-field">
+                <input type="color" value="@_hex" @onchange="OnColorChanged" @attributes="field.ControlAttributes" data-testid="brand-color" />
+                <code>@_hex</code>
+            </div>
+        </FormField>
+        <FormField class="control">
+            <FormLabel>Vividness</FormLabel>
+            <Slider Min="40" Max="140" Step="10" Value="_vividness" ValueChanged="SetVividness" ValueText="@(v => $"{v} percent")" />
+            <FormDescription>Scales the chroma of every step; lightness stays fixed so contrast stays predictable.</FormDescription>
+        </FormField>
+
+        <h2>2. The generated palette</h2>
+        <ol class="palette" aria-label="Generated palette">
+            @for (var i = 0; i < Steps.Length; i++)
+            {
+                <li title="@_palette[i].ToHex(false)"><span class="chip" style="background:@_palette[i].ToHex(false)" aria-hidden="true"></span><span>@Steps[i]<span class="visually-hidden">: @_palette[i].ToHex(false)</span></span></li>
+            }
+        </ol>
+        <p>These @Steps.Length primitive tokens change <strong data-testid="follower-count">@_followers.Count other tokens</strong>
+            through references, for example:</p>
+        <ul class="used-list" aria-label="Tokens that follow the palette">
+            @foreach (var path in _followers.Take(10))
+            {
+                <li><code>@path</code></li>
+            }
+            @if (_followers.Count > 10)
+            {
+                <li>and @(_followers.Count - 10) more</li>
+            }
+        </ul>
+        <div class="actions">
+            @if (IsApplied)
+            {
+                <AuroraButton Variant="secondary" OnClick="RemoveFromSite" data-testid="remove-brand">Remove from the site</AuroraButton>
+            }
+            else
+            {
+                <AuroraButton OnClick="ApplyToSite" data-testid="apply-brand">Apply to the whole site</AuroraButton>
+            }
+        </div>
+        <p class="muted">Applying switches the site to the Aurora brand and sets the @Steps.Length colors as runtime overrides,
+            exactly like the <a href="editor">live editor</a>. They last until you remove them or reload.</p>
+    </section>
+
+    <div>
+        <section aria-labelledby="preview-title">
+            <h2 id="preview-title">3. Preview and contrast in every mode</h2>
+            <p class="section-lead">Each preview is a <code>ThemeScope</code> with the palette as overrides; only this part of
+                the page changes. The checks are the design system's own contrast rules.</p>
+            <ul class="matrix" aria-label="Previews">
+                @foreach (var check in _checks)
+                {
+                    var failures = check.Results.Where(r => r.Passed == false).ToList();
+                    <li>
+                        <ThemeScope ThemeId="aurora" Axes="check.Axes" Overrides="_overrides" class="mini-ui">
+                            <p class="mini-ui-title">@check.Label</p>
+                            <p>Body text with <span class="fake-link">a link</span>.</p>
+                            <p class="mini-ui-row"><span class="fake-button">Save</span><span class="fake-button fake-button--secondary">Cancel</span></p>
+                            <p class="mini-ui-row"><span class="fake-chip">Selected</span><span class="fake-focus">Focused</span></p>
+                            @if (failures.Count == 0)
+                            {
+                                <p class="result-pass">All @check.Results.Count contrast checks pass</p>
+                            }
+                            else
+                            {
+                                <p class="result-fail">@failures.Count of @check.Results.Count checks fail</p>
+                                <ul>
+                                    @foreach (var f in failures.Take(3))
+                                    {
+                                        <li><code>@f.Foreground</code> on <code>@f.Background</code>: @f.RatioText (needs @f.Required:1)</li>
+                                    }
+                                </ul>
+                            }
+                        </ThemeScope>
+                    </li>
+                }
+            </ul>
+            <div role="status" class="visually-hidden">@Summary</div>
+        </section>
+
+        <section aria-labelledby="export-title">
+            <h2 id="export-title">4. Take it with you</h2>
+            <p class="section-lead">Save the palette as a DTCG file and register a brand that extends Aurora, like the Ember
+                brand of this demo does.</p>
+            <Tabs DefaultValue="tokens">
+                <TabList aria-label="Brand files">
+                    <Tab Value="tokens">brands/custom.tokens.json</Tab>
+                    <Tab Value="manifest">Theme manifest entry</Tab>
+                </TabList>
+                <TabPanel Value="tokens" Focusable="false"><CodeBlock Code="@_json" Label="brand tokens" /></TabPanel>
+                <TabPanel Value="manifest" Focusable="false"><CodeBlock Code="@ManifestSnippet" Label="manifest entry" /></TabPanel>
+            </Tabs>
+        </section>
+    </div>
+</div>
+
+@code {
+    private sealed record Check(string Label, IReadOnlyDictionary<string, string> Axes, IReadOnlyList<ContrastResult> Results);
+
+    private static readonly string[] Steps = ["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"];
+
+    private static readonly (string Name, string Hex)[] Presets =
+    [
+        ("Aurora", "#2d6dca"), ("Teal", "#0d7f7a"), ("Violet", "#7d56bf"), ("Rose", "#c2416b"), ("Forest", "#2f7d32"), ("Amber", "#b86e00"),
+    ];
+
+    private static readonly (string Label, string Mode, string Contrast)[] Variants =
+    [
+        ("Light", "light", "standard"), ("Dark", "dark", "standard"), ("Light, more contrast", "light", "more"), ("Dark, more contrast", "dark", "more"),
+    ];
+
+    private string? _preset = "Teal";
+    private string _hex = "#0d7f7a";
+    private double _vividness = 100;
+    private SrgbColor[] _palette = [];
+    private Dictionary<string, SourceNode> _overrides = [];
+    private List<Check> _checks = [];
+    private List<string> _followers = [];
+    private string _json = "";
+
+    [CascadingParameter] private ThemeManager Manager { get; set; } = default!;
+    // Re-renders when overrides are applied or removed elsewhere (for example in the live editor).
+    [CascadingParameter] private ThemeState State { get; set; } = default!;
+
+    private ThemeCatalog Catalog => Manager.Catalog;
+
+    protected override void OnInitialized() => Rebuild();
+
+    private bool IsApplied => Manager.State.ThemeId == "aurora" && _overrides.All(o =>
+        Manager.State.Overrides.TryGetValue(o.Key, out var value) && SourceNode.DeepEquals(value, o.Value));
+
+    private string Summary => _checks.Count == 0 ? "" : string.Join("; ", _checks.Select(c =>
+    {
+        var failed = c.Results.Count(r => r.Passed == false);
+        return failed == 0 ? $"{c.Label}: all checks pass" : $"{c.Label}: {failed} checks fail";
+    }));
+
+    private void ChoosePreset(string? name)
+    {
+        var preset = Presets.FirstOrDefault(p => p.Name == name);
+        if (preset.Name is null) return;
+        _preset = preset.Name;
+        _hex = preset.Hex;
+        Rebuild();
+    }
+
+    private void OnColorChanged(ChangeEventArgs e)
+    {
+        if (e.Value?.ToString() is not { } hex || !SrgbColor.TryParseHex(hex, out _)) return;
+        _hex = hex.ToLowerInvariant();
+        _preset = Presets.FirstOrDefault(p => p.Hex == _hex).Name;
+        Rebuild();
+    }
+
+    private void SetVividness(double value)
+    {
+        _vividness = value;
+        Rebuild();
+    }
+
+    private void Rebuild()
+    {
+        SrgbColor.TryParseHex(_hex, out var seed);
+        _palette = Generate(seed, _vividness / 100);
+        _overrides = Steps.Select((step, i) => (Path: $"color.blue.{step}", Value: ColorValue.FromSrgb(_palette[i]).ToSourceNode()))
+            .ToDictionary(p => p.Path, p => p.Value, StringComparer.Ordinal);
+        var tree = ThemeOverrides.ToTree(_overrides);
+
+        _checks = [];
+        var followers = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var (label, mode, contrast) in Variants)
+        {
+            var axes = Catalog.DefaultSelection.Axes.SetItem("mode", mode).SetItem("contrast", contrast);
+            var selection = new ThemeSelection("aurora", axes);
+            var before = Catalog.Resolve(selection).Tokens;
+            var after = Catalog.Resolve(selection, tree).Tokens;
+            _checks.Add(new Check(label, axes, TokenValidator.Validate(after, DemoTokens.Validation).ContrastResults));
+            foreach (var token in after.Tokens)
+            {
+                var path = token.Path.ToString();
+                if (_overrides.ContainsKey(path) || token.Value is null) continue;
+                if (before[token.Path]?.Value is not { } old || CssExporter.FormatValue(old) != CssExporter.FormatValue(token.Value)) followers.Add(path);
+            }
+        }
+        _followers = [.. followers];
+        _json = BuildJson();
+    }
+
+    /// <summary>
+    /// Generates a scale with the lightness of each step of Aurora's blue scale, the seed's hue, and the reference chroma
+    /// scaled by the seed's chroma, mapped into the sRGB gamut and rounded to 8-bit channels.
+    /// </summary>
+    private SrgbColor[] Generate(SrgbColor seed, double vividness)
+    {
+        var reference = Catalog.Resolve(Catalog.DefaultSelection.WithTheme("aurora")).Tokens;
+        var seedLch = ColorMath.Convert(ColorSpaces.Srgb, [seed.R, seed.G, seed.B], ColorSpaces.Oklch);
+        var steps = Steps.Select(s => reference[TokenPath.Parse($"color.blue.{s}")]?.Value is ColorValue c
+            ? ColorMath.Convert(c.ColorSpace, c.Components, ColorSpaces.Oklch)
+            : [0.5, 0.1, 250]).ToArray();
+        var anchor = steps[6][1];
+        var seedChroma = double.IsFinite(seedLch[1]) ? seedLch[1] : 0;
+        var hue = double.IsFinite(seedLch[2]) ? seedLch[2] : 0;
+        return steps.Select(step =>
+        {
+            var chroma = anchor <= 0 ? 0 : step[1] * seedChroma / anchor * vividness;
+            var mapped = ColorMath.GamutMapToSrgb(ColorSpaces.Oklch, [step[0], chroma, hue]).Clip();
+            return new SrgbColor(Channel(mapped.R), Channel(mapped.G), Channel(mapped.B));
+        }).ToArray();
+    }
+
+    /// <summary>An 8-bit channel value, written with six decimals like the demo's own palette files.</summary>
+    private static double Channel(double value) => Math.Round(SrgbColor.To8(value) / 255.0, 6);
+
+    private string BuildJson()
+    {
+        var scale = SourceObject.Create(Steps.Select((step, i) => (step, (SourceNode)SourceObject.Create(("$value", _overrides[$"color.blue.{step}"])))).ToArray());
+        var document = SourceObject.Create(
+            ("$description", new SourceString($"Custom brand generated from {_hex} by the BlazorDesignToolkit brand builder. It replaces Aurora's accent scale.")),
+            ("color", SourceObject.Create(("$type", new SourceString("color")), ("blue", scale))));
+        return document.ToJson(indented: true);
+    }
+
+    private const string ManifestSnippet = """
+        {
+          "id": "custom",
+          "name": "Custom",
+          "extends": "aurora",
+          "layers": [{ "source": "brands/custom.tokens.json" }]
+        }
+        """;
+
+    private void ApplyToSite()
+    {
+        using (Manager.BeginBatch())
+        {
+            Manager.TrySetTheme("aurora");
+            foreach (var (path, value) in _overrides) Manager.SetOverride(path, value);
+        }
+        Announcer.Announce("The palette is applied to the whole site.");
+    }
+
+    private void RemoveFromSite()
+    {
+        using (Manager.BeginBatch())
+        {
+            foreach (var path in _overrides.Keys) Manager.RemoveOverride(path);
+        }
+        Announcer.Announce("The palette is removed from the site.");
+    }
+}

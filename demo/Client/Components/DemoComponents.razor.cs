@@ -15,6 +15,8 @@ public sealed class Example : ComponentBase
     [Parameter] public RenderFragment? Description { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public string? Code { get; set; }
+    /// <summary>Adds a "Live markup" panel that shows the example's rendered HTML, with its ARIA, as it changes.</summary>
+    [Parameter] public bool Inspect { get; set; }
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
@@ -36,13 +38,20 @@ public sealed class Example : ComponentBase
         {
             builder.OpenElement(9, "div");
             builder.AddAttribute(10, "class", "example-stage");
-            builder.AddContent(11, ChildContent);
+            builder.AddAttribute(11, "id", _id + "-stage");
+            builder.AddContent(12, ChildContent);
             builder.CloseElement();
+            if (Inspect)
+            {
+                builder.OpenComponent<LiveMarkup>(13);
+                builder.AddAttribute(14, nameof(LiveMarkup.TargetId), _id + "-stage");
+                builder.CloseComponent();
+            }
         }
         if (Code is not null)
         {
-            builder.OpenComponent<CodeBlock>(12);
-            builder.AddAttribute(13, nameof(CodeBlock.Code), Code);
+            builder.OpenComponent<CodeBlock>(15);
+            builder.AddAttribute(16, nameof(CodeBlock.Code), Code);
             builder.CloseComponent();
         }
         builder.CloseElement();
